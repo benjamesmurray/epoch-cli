@@ -1,0 +1,33 @@
+{
+  "mcpServers": {
+    "github": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "GITHUB_PERSONAL_ACCESS_TOKEN",
+        "ghcr.io/github/github-mcp-server"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "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"
+      }
+    },
+    "project-map-cli": {
+      "command": "/home/benmurray/Projects/cli/project-map-cli/venv/bin/python",
+      "args": [
+        "-m",
+        "project_map_cli.mcp.server"
+      ]
+    },
+    "mcp-spec-cli": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-spec-cli@1.6.0"
+      ],
+      "trust": true
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "module": "packages.continue-sdk.python.api.test.test_default_api",
+  "symbols": [
+    {
+      "samples": [
+        { "ln": 24, "pid": 4620, "snippet": "self.api = DefaultApi()" }
+      ],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.test.test_default_api.DefaultApi",
+      "total": 1
+    }
+  ]
+}

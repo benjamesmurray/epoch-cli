@@ -1,0 +1,13 @@
+{
+  "module": "packages.continue-sdk.python.api.openapi_client.models.list_organizations200_response",
+  "symbols": [
+    {
+      "samples": [
+        { "ln": 33, "pid": 4609, "snippet": "model_config = ConfigDict(" }
+      ],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.openapi_client.models.list_organizations200_response.ConfigDict",
+      "total": 1
+    }
+  ]
+}

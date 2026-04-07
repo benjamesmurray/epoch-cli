@@ -1,0 +1,1 @@
+{"module":"project-map-cli.src.project_map_cli.core.tests.validation.audit_coverage","symbols":[{"samples":[{"ln":119,"pid":6637,"snippet":"audit_repo(Path(\"/opt/project\"), Path(\"/tmp/audit_out\"))"}],"sig_unknown":true,"symbol":"project-map-cli.src.project_map_cli.core.tests.validation.audit_coverage.audit_repo","total":1}]}

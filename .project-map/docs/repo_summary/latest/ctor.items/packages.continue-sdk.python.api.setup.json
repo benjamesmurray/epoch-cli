@@ -1,0 +1,23 @@
+{
+  "module": "packages.continue-sdk.python.api.setup",
+  "symbols": [
+    {
+      "samples": [
+        {
+          "ln": 42,
+          "pid": 4617,
+          "snippet": "packages=find_packages(exclude=[\"test\", \"tests\"]),"
+        }
+      ],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.setup.find_packages",
+      "total": 1
+    },
+    {
+      "samples": [{ "ln": 33, "pid": 4617, "snippet": "setup(" }],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.setup.setup",
+      "total": 1
+    }
+  ]
+}

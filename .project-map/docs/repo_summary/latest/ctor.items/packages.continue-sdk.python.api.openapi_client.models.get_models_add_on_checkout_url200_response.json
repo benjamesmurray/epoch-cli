@@ -1,0 +1,25 @@
+{
+  "module": "packages.continue-sdk.python.api.openapi_client.models.get_models_add_on_checkout_url200_response",
+  "symbols": [
+    {
+      "samples": [
+        { "ln": 32, "pid": 4601, "snippet": "model_config = ConfigDict(" }
+      ],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.openapi_client.models.get_models_add_on_checkout_url200_response.ConfigDict",
+      "total": 1
+    },
+    {
+      "samples": [
+        {
+          "ln": 29,
+          "pid": 4601,
+          "snippet": "url: StrictStr = Field(description=\"Stripe checkout session URL\")"
+        }
+      ],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.openapi_client.models.get_models_add_on_checkout_url200_response.Field",
+      "total": 1
+    }
+  ]
+}

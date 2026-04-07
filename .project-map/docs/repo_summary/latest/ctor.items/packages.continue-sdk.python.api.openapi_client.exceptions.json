@@ -1,0 +1,128 @@
+{
+  "module": "packages.continue-sdk.python.api.openapi_client.exceptions",
+  "symbols": [
+    {
+      "samples": [
+        {
+          "ln": 46,
+          "pid": 4595,
+          "snippet": "full_msg = \"{0} at {1}\".format(msg, render_path(path_to_item))"
+        },
+        {
+          "ln": 64,
+          "pid": 4595,
+          "snippet": "full_msg = \"{0} at {1}\".format(msg, render_path(path_to_item))"
+        },
+        {
+          "ln": 83,
+          "pid": 4595,
+          "snippet": "full_msg = \"{0} at {1}\".format(msg, render_path(path_to_item))"
+        },
+        {
+          "ln": 100,
+          "pid": 4595,
+          "snippet": "full_msg = \"{0} at {1}\".format(msg, render_path(path_to_item))"
+        }
+      ],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.openapi_client.exceptions.render_path",
+      "total": 4
+    },
+    {
+      "samples": [
+        {
+          "ln": 162,
+          "pid": 4595,
+          "snippet": "raise ApiException(http_resp=http_resp, body=body, data=data)"
+        }
+      ],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.openapi_client.exceptions.ApiException",
+      "total": 1
+    },
+    {
+      "samples": [
+        {
+          "ln": 142,
+          "pid": 4595,
+          "snippet": "raise BadRequestException(http_resp=http_resp, body=body, data=data)"
+        }
+      ],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.openapi_client.exceptions.BadRequestException",
+      "total": 1
+    },
+    {
+      "samples": [
+        {
+          "ln": 155,
+          "pid": 4595,
+          "snippet": "raise ConflictException(http_resp=http_resp, body=body, data=data)"
+        }
+      ],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.openapi_client.exceptions.ConflictException",
+      "total": 1
+    },
+    {
+      "samples": [
+        {
+          "ln": 148,
+          "pid": 4595,
+          "snippet": "raise ForbiddenException(http_resp=http_resp, body=body, data=data)"
+        }
+      ],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.openapi_client.exceptions.ForbiddenException",
+      "total": 1
+    },
+    {
+      "samples": [
+        {
+          "ln": 151,
+          "pid": 4595,
+          "snippet": "raise NotFoundException(http_resp=http_resp, body=body, data=data)"
+        }
+      ],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.openapi_client.exceptions.NotFoundException",
+      "total": 1
+    },
+    {
+      "samples": [
+        {
+          "ln": 161,
+          "pid": 4595,
+          "snippet": "raise ServiceException(http_resp=http_resp, body=body, data=data)"
+        }
+      ],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.openapi_client.exceptions.ServiceException",
+      "total": 1
+    },
+    {
+      "samples": [
+        {
+          "ln": 145,
+          "pid": 4595,
+          "snippet": "raise UnauthorizedException(http_resp=http_resp, body=body, data=data)"
+        }
+      ],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.openapi_client.exceptions.UnauthorizedException",
+      "total": 1
+    },
+    {
+      "samples": [
+        {
+          "ln": 158,
+          "pid": 4595,
+          "snippet": "raise UnprocessableEntityException(http_resp=http_resp, body=body, data=data)"
+        }
+      ],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.openapi_client.exceptions.UnprocessableEntityException",
+      "total": 1
+    }
+  ]
+}

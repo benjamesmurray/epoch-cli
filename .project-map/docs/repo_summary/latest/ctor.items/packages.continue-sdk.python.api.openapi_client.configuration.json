@@ -1,0 +1,37 @@
+{
+  "module": "packages.continue-sdk.python.api.openapi_client.configuration",
+  "symbols": [
+    {
+      "samples": [
+        { "ln": 35, "pid": 4594, "snippet": "GenericAuthSetting = TypedDict(" },
+        { "ln": 46, "pid": 4594, "snippet": "OAuth2AuthSetting = TypedDict(" },
+        { "ln": 57, "pid": 4594, "snippet": "APIKeyAuthSetting = TypedDict(" },
+        { "ln": 68, "pid": 4594, "snippet": "BasicAuthSetting = TypedDict(" },
+        {
+          "ln": 79,
+          "pid": 4594,
+          "snippet": "BearerFormatAuthSetting = TypedDict("
+        }
+      ],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.openapi_client.configuration.TypedDict",
+      "total": 8
+    },
+    {
+      "samples": [
+        { "ln": 367, "pid": 4594, "snippet": "cls._default = cls()" }
+      ],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.openapi_client.configuration.cls",
+      "total": 1
+    },
+    {
+      "samples": [
+        { "ln": 321, "pid": 4594, "snippet": "memo[id(self)] = result" }
+      ],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.openapi_client.configuration.id",
+      "total": 1
+    }
+  ]
+}

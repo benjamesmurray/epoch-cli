@@ -1,0 +1,30 @@
+{
+  "module": "packages.continue-sdk.python.api.openapi_client.models.get_policy200_response",
+  "symbols": [
+    {
+      "samples": [
+        {
+          "ln": 29,
+          "pid": 4603,
+          "snippet": "policy: Optional[Dict[str, Any]] = Field(default=None, description=\"Organization policy configuration\")"
+        },
+        {
+          "ln": 30,
+          "pid": 4603,
+          "snippet": "org_slug: Optional[StrictStr] = Field(default=None, description=\"Slug of the organization that has the policy\", alias=\"orgSlug\")"
+        }
+      ],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.openapi_client.models.get_policy200_response.Field",
+      "total": 2
+    },
+    {
+      "samples": [
+        { "ln": 33, "pid": 4603, "snippet": "model_config = ConfigDict(" }
+      ],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.openapi_client.models.get_policy200_response.ConfigDict",
+      "total": 1
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "module": "core.autocomplete.context.root-path-context.test.files.python.functions",
+  "symbols": [
+    {
+      "samples": [{ "ln": 3, "pid": 1871, "snippet": "T = TypeVar('T')" }],
+      "sig_unknown": true,
+      "symbol": "core.autocomplete.context.root-path-context.test.files.python.functions.TypeVar",
+      "total": 1
+    }
+  ]
+}

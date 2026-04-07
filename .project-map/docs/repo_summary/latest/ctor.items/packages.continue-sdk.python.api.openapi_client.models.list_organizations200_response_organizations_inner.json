@@ -1,0 +1,40 @@
+{
+  "module": "packages.continue-sdk.python.api.openapi_client.models.list_organizations200_response_organizations_inner",
+  "symbols": [
+    {
+      "samples": [
+        {
+          "ln": 29,
+          "pid": 4610,
+          "snippet": "id: StrictStr = Field(description=\"Organization ID\")"
+        },
+        {
+          "ln": 30,
+          "pid": 4610,
+          "snippet": "name: StrictStr = Field(description=\"Organization name\")"
+        },
+        {
+          "ln": 31,
+          "pid": 4610,
+          "snippet": "icon_url: Optional[StrictStr] = Field(default=None, description=\"Pre-signed URL for the organization's icon\", alias=\"iconUrl\")"
+        },
+        {
+          "ln": 32,
+          "pid": 4610,
+          "snippet": "slug: StrictStr = Field(description=\"Organization slug\")"
+        }
+      ],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.openapi_client.models.list_organizations200_response_organizations_inner.Field",
+      "total": 4
+    },
+    {
+      "samples": [
+        { "ln": 35, "pid": 4610, "snippet": "model_config = ConfigDict(" }
+      ],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.openapi_client.models.list_organizations200_response_organizations_inner.ConfigDict",
+      "total": 1
+    }
+  ]
+}

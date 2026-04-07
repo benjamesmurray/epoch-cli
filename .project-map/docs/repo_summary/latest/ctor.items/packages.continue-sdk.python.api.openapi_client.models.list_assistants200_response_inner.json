@@ -1,0 +1,45 @@
+{
+  "module": "packages.continue-sdk.python.api.openapi_client.models.list_assistants200_response_inner",
+  "symbols": [
+    {
+      "samples": [
+        {
+          "ln": 30,
+          "pid": 4605,
+          "snippet": "config_result: ListAssistants200ResponseInnerConfigResult = Field(alias=\"configResult\")"
+        },
+        {
+          "ln": 31,
+          "pid": 4605,
+          "snippet": "owner_slug: StrictStr = Field(description=\"Slug of the user or organization that owns the assistant\", alias=\"ownerSlug\")"
+        },
+        {
+          "ln": 32,
+          "pid": 4605,
+          "snippet": "package_slug: StrictStr = Field(description=\"Slug of the assistant package\", alias=\"packageSlug\")"
+        },
+        {
+          "ln": 33,
+          "pid": 4605,
+          "snippet": "icon_url: Optional[StrictStr] = Field(default=None, description=\"Pre-signed URL for the assistant's icon\", alias=\"iconUrl\")"
+        },
+        {
+          "ln": 34,
+          "pid": 4605,
+          "snippet": "on_prem_proxy_url: Optional[StrictStr] = Field(default=None, description=\"URL of the on-premises proxy if the organization uses one\", alias…"
+        }
+      ],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.openapi_client.models.list_assistants200_response_inner.Field",
+      "total": 7
+    },
+    {
+      "samples": [
+        { "ln": 39, "pid": 4605, "snippet": "model_config = ConfigDict(" }
+      ],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.openapi_client.models.list_assistants200_response_inner.ConfigDict",
+      "total": 1
+    }
+  ]
+}

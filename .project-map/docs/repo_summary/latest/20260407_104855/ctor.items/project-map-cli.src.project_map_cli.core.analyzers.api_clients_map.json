@@ -1,0 +1,1 @@
+{"module":"project-map-cli.src.project_map_cli.core.analyzers.api_clients_map","symbols":[{"samples":[{"ln":37,"pid":10841,"snippet":"key = _route_key(path, method)"},{"ln":49,"pid":10841,"snippet":"key = _route_key(url, method)"}],"sig_unknown":true,"symbol":"project-map-cli.src.project_map_cli.core.analyzers.api_clients_map._route_key","total":2}]}

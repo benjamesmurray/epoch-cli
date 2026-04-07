@@ -1,0 +1,54 @@
+{
+  "module": "packages.continue-sdk.python.api.openapi_client.rest",
+  "symbols": [
+    {
+      "samples": [
+        {
+          "ln": 243,
+          "pid": 4613,
+          "snippet": "raise ApiException(status=0, reason=msg)"
+        },
+        {
+          "ln": 256,
+          "pid": 4613,
+          "snippet": "raise ApiException(status=0, reason=msg)"
+        }
+      ],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.openapi_client.rest.ApiException",
+      "total": 2
+    },
+    {
+      "samples": [
+        { "ln": 258, "pid": 4613, "snippet": "return RESTResponse(r)" }
+      ],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.openapi_client.rest.RESTResponse",
+      "total": 1
+    },
+    {
+      "samples": [
+        {
+          "ln": 107,
+          "pid": 4613,
+          "snippet": "self.pool_manager = SOCKSProxyManager(**pool_args)"
+        }
+      ],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.openapi_client.rest.SOCKSProxyManager",
+      "total": 1
+    },
+    {
+      "samples": [
+        {
+          "ln": 103,
+          "pid": 4613,
+          "snippet": "if is_socks_proxy_url(configuration.proxy):"
+        }
+      ],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.openapi_client.rest.is_socks_proxy_url",
+      "total": 1
+    }
+  ]
+}

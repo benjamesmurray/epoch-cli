@@ -1,0 +1,82 @@
+{
+  "module": "packages.continue-sdk.python.api.openapi_client.api_client",
+  "symbols": [
+    {
+      "samples": [
+        {
+          "ln": 202,
+          "pid": 4592,
+          "snippet": "quote(str(v), safe=config.safe_chars_for_path_param)"
+        },
+        {
+          "ln": 520,
+          "pid": 4592,
+          "snippet": "new_params.extend((k, quote(str(value))) for value in v)"
+        },
+        {
+          "ln": 531,
+          "pid": 4592,
+          "snippet": "(k, delimiter.join(quote(str(value)) for value in v))"
+        },
+        {
+          "ln": 534,
+          "pid": 4592,
+          "snippet": "new_params.append((k, quote(str(v))))"
+        }
+      ],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.openapi_client.api_client.quote",
+      "total": 4
+    },
+    {
+      "samples": [
+        { "ln": 721, "pid": 4592, "snippet": "return klass(data)" },
+        { "ln": 779, "pid": 4592, "snippet": "return klass(data)" }
+      ],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.openapi_client.api_client.klass",
+      "total": 2
+    },
+    {
+      "samples": [
+        { "ln": 741, "pid": 4592, "snippet": "return parse(string).date()" },
+        { "ln": 759, "pid": 4592, "snippet": "return parse(string)" }
+      ],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.openapi_client.api_client.parse",
+      "total": 2
+    },
+    {
+      "samples": [
+        { "ln": 128, "pid": 4592, "snippet": "cls._default = ApiClient()" }
+      ],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.openapi_client.api_client.ApiClient",
+      "total": 1
+    },
+    {
+      "samples": [{ "ln": 415, "pid": 4592, "snippet": "raise ApiException(" }],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.openapi_client.api_client.ApiException",
+      "total": 1
+    },
+    {
+      "samples": [{ "ln": 328, "pid": 4592, "snippet": "return ApiResponse(" }],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.openapi_client.api_client.ApiResponse",
+      "total": 1
+    },
+    {
+      "samples": [
+        {
+          "ln": 380,
+          "pid": 4592,
+          "snippet": "if hasattr(obj, 'to_dict') and callable(getattr(obj, 'to_dict')):"
+        }
+      ],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.openapi_client.api_client.callable",
+      "total": 1
+    }
+  ]
+}

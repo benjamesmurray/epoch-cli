@@ -1,0 +1,1 @@
+{"module":"project-map-cli.tests.test_cli","symbols":[{"samples":[{"ln":15,"pid":12578,"snippet":"runner = CliRunner()"},{"ln":24,"pid":12578,"snippet":"runner = CliRunner()"},{"ln":32,"pid":12578,"snippet":"runner = CliRunner()"}],"sig_unknown":true,"symbol":"project-map-cli.tests.test_cli.CliRunner","total":3}]}

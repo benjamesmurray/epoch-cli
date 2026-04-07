@@ -1,0 +1,35 @@
+{
+  "module": "packages.continue-sdk.python.api.openapi_client.models.list_assistants200_response_inner_config_result",
+  "symbols": [
+    {
+      "samples": [
+        {
+          "ln": 29,
+          "pid": 4606,
+          "snippet": "config: Optional[Dict[str, Any]] = Field(description=\"The unrolled assistant configuration\")"
+        },
+        {
+          "ln": 30,
+          "pid": 4606,
+          "snippet": "config_load_interrupted: StrictBool = Field(description=\"Whether the configuration loading was interrupted\", alias=\"configLoadInterrupted\")"
+        },
+        {
+          "ln": 31,
+          "pid": 4606,
+          "snippet": "errors: Optional[List[StrictStr]] = Field(default=None, description=\"Any errors that occurred during configuration loading\")"
+        }
+      ],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.openapi_client.models.list_assistants200_response_inner_config_result.Field",
+      "total": 3
+    },
+    {
+      "samples": [
+        { "ln": 34, "pid": 4606, "snippet": "model_config = ConfigDict(" }
+      ],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.openapi_client.models.list_assistants200_response_inner_config_result.ConfigDict",
+      "total": 1
+    }
+  ]
+}

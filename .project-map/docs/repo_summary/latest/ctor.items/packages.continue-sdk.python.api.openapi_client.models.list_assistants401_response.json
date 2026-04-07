@@ -1,0 +1,13 @@
+{
+  "module": "packages.continue-sdk.python.api.openapi_client.models.list_assistants401_response",
+  "symbols": [
+    {
+      "samples": [
+        { "ln": 32, "pid": 4607, "snippet": "model_config = ConfigDict(" }
+      ],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.openapi_client.models.list_assistants401_response.ConfigDict",
+      "total": 1
+    }
+  ]
+}

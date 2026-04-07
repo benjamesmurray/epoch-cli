@@ -1,0 +1,45 @@
+{
+  "module": "packages.continue-sdk.python.api.openapi_client.models.get_free_trial_status200_response",
+  "symbols": [
+    {
+      "samples": [
+        {
+          "ln": 29,
+          "pid": 4600,
+          "snippet": "opted_in_to_free_trial: StrictBool = Field(description=\"Whether the user has opted into the free trial\", alias=\"optedInToFreeTrial\")"
+        },
+        {
+          "ln": 30,
+          "pid": 4600,
+          "snippet": "chat_count: Optional[Union[StrictFloat, StrictInt]] = Field(default=None, description=\"Current number of chat messages used\", alias=\"chatCo…"
+        },
+        {
+          "ln": 31,
+          "pid": 4600,
+          "snippet": "autocomplete_count: Optional[Union[StrictFloat, StrictInt]] = Field(default=None, description=\"Current number of autocomplete requests used…"
+        },
+        {
+          "ln": 32,
+          "pid": 4600,
+          "snippet": "chat_limit: Union[StrictFloat, StrictInt] = Field(description=\"Maximum number of chat messages allowed in free trial\", alias=\"chatLimit\")"
+        },
+        {
+          "ln": 33,
+          "pid": 4600,
+          "snippet": "autocomplete_limit: Union[StrictFloat, StrictInt] = Field(description=\"Maximum number of autocomplete requests allowed in free trial\", alia…"
+        }
+      ],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.openapi_client.models.get_free_trial_status200_response.Field",
+      "total": 5
+    },
+    {
+      "samples": [
+        { "ln": 36, "pid": 4600, "snippet": "model_config = ConfigDict(" }
+      ],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.openapi_client.models.get_free_trial_status200_response.ConfigDict",
+      "total": 1
+    }
+  ]
+}

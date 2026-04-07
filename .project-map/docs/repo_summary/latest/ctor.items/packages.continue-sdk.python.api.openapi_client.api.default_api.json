@@ -1,0 +1,37 @@
+{
+  "module": "packages.continue-sdk.python.api.openapi_client.api.default_api",
+  "symbols": [
+    {
+      "samples": [
+        {
+          "ln": 51,
+          "pid": 4591,
+          "snippet": "owner_slug: Annotated[StrictStr, Field(description=\"Slug of the user or organization that owns the assistant\")],"
+        },
+        {
+          "ln": 52,
+          "pid": 4591,
+          "snippet": "package_slug: Annotated[StrictStr, Field(description=\"Slug of the assistant package\")],"
+        },
+        {
+          "ln": 53,
+          "pid": 4591,
+          "snippet": "always_use_proxy: Annotated[Optional[StrictStr], Field(description=\"Whether to always use the Continue-managed proxy for model requests\")] …"
+        },
+        {
+          "ln": 54,
+          "pid": 4591,
+          "snippet": "organization_id: Annotated[Optional[StrictStr], Field(description=\"ID of the organization to scope assistants to. If not provided, personal…"
+        },
+        {
+          "ln": 57,
+          "pid": 4591,
+          "snippet": "Annotated[StrictFloat, Field(gt=0)],"
+        }
+      ],
+      "sig_unknown": true,
+      "symbol": "packages.continue-sdk.python.api.openapi_client.api.default_api.Field",
+      "total": 120
+    }
+  ]
+}
