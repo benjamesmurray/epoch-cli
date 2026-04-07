@@ -406,7 +406,7 @@ jobs:
           persist-credentials: false
 
       - name: Run epochcli
-        uses: anomalyco/epochcli/github@latest${envStr}
+        uses: benjamesmurray/epoch-cli/github@latest${envStr}
         with:
           model: ${provider}/${model}`,
             )

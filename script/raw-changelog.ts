@@ -22,7 +22,7 @@ type Diff = {
   message: string
 }
 
-const repo = process.env.GH_REPO ?? "anomalyco/epochcli"
+const repo = process.env.GH_REPO ?? "benjamesmurray/epoch-cli"
 const bot = ["actions-user", "epochcli", "epochcli-agent[bot]"]
 const team = [
   ...(await Bun.file(new URL("../.github/TEAM_MEMBERS", import.meta.url))

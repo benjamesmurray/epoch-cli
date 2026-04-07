@@ -117,7 +117,7 @@ describe("installation", () => {
         () => jsonResponse({ versions: { stable: "2.0.0" } }),
         (cmd, args) => {
           // getBrewFormula: return core formula (no tap)
-          if (cmd === "brew" && args.includes("--formula") && args.includes("anomalyco/tap/epochcli")) return ""
+          if (cmd === "brew" && args.includes("--formula") && args.includes("benjamesmurray/tap/epochcli")) return ""
           if (cmd === "brew" && args.includes("--formula") && args.includes("epochcli")) return "epochcli"
           return ""
         },
@@ -136,7 +136,7 @@ describe("installation", () => {
       const layer = testLayer(
         () => jsonResponse({}), // HTTP not used for tap formula
         (cmd, args) => {
-          if (cmd === "brew" && args.includes("anomalyco/tap/epochcli") && args.includes("--formula")) return "epochcli"
+          if (cmd === "brew" && args.includes("benjamesmurray/tap/epochcli") && args.includes("--formula")) return "epochcli"
           if (cmd === "brew" && args.includes("--json=v2")) return brewInfoJson
           return ""
         },

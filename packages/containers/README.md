@@ -15,8 +15,8 @@ Images
 Build
 
 ```
-REGISTRY=ghcr.io/anomalyco TAG=24.04 bun ./packages/containers/script/build.ts
-REGISTRY=ghcr.io/anomalyco TAG=24.04 bun ./packages/containers/script/build.ts --push
+REGISTRY=ghcr.io/benjamesmurray TAG=24.04 bun ./packages/containers/script/build.ts
+REGISTRY=ghcr.io/benjamesmurray TAG=24.04 bun ./packages/containers/script/build.ts --push
 ```
 
 Workflow usage
@@ -26,7 +26,7 @@ jobs:
   build-cli:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/anomalyco/build/bun-node:24.04
+      image: ghcr.io/benjamesmurray/build/bun-node:24.04
 ```
 
 Notes

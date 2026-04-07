@@ -15,7 +15,7 @@ This extension requires the [epochcli CLI](https://epochcli.ai) to be installed 
 
 ## Support
 
-This is an early release. If you encounter issues or have feedback, please create an issue at https://github.com/anomalyco/epochcli/issues.
+This is an early release. If you encounter issues or have feedback, please create an issue at https://github.com/benjamesmurray/epoch-cli/issues.
 
 ## Development
 

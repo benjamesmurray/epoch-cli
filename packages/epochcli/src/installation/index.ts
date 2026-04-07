@@ -137,8 +137,8 @@ export namespace Installation {
         )
 
         const getBrewFormula = Effect.fnUntraced(function* () {
-          const tapFormula = yield* text(["brew", "list", "--formula", "anomalyco/tap/epochcli"])
-          if (tapFormula.includes("epochcli")) return "anomalyco/tap/epochcli"
+          const tapFormula = yield* text(["brew", "list", "--formula", "benjamesmurray/tap/epochcli"])
+          if (tapFormula.includes("epochcli")) return "benjamesmurray/tap/epochcli"
           const coreFormula = yield* text(["brew", "list", "--formula", "epochcli"])
           if (coreFormula.includes("epochcli")) return "epochcli"
           return "epochcli"
@@ -253,7 +253,7 @@ export namespace Installation {
           }
 
           const response = yield* httpOk.execute(
-            HttpClientRequest.get("https://api.github.com/repos/anomalyco/epochcli/releases/latest").pipe(
+            HttpClientRequest.get("https://api.github.com/repos/benjamesmurray/epoch-cli/releases/latest").pipe(
               HttpClientRequest.acceptJson,
             ),
           )
@@ -280,12 +280,12 @@ export namespace Installation {
               const formula = yield* getBrewFormula()
               const env = { HOMEBREW_NO_AUTO_UPDATE: "1" }
               if (formula.includes("/")) {
-                const tap = yield* run(["brew", "tap", "anomalyco/tap"], { env })
+                const tap = yield* run(["brew", "tap", "benjamesmurray/tap"], { env })
                 if (tap.code !== 0) {
                   result = tap
                   break
                 }
-                const repo = yield* text(["brew", "--repo", "anomalyco/tap"])
+                const repo = yield* text(["brew", "--repo", "benjamesmurray/tap"])
                 const dir = repo.trim()
                 if (dir) {
                   const pull = yield* run(["git", "pull", "--ff-only"], { cwd: dir, env })
