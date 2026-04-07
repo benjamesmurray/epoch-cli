@@ -1,36 +1,36 @@
-id = "opencode"
-name = "OpenCode"
+id = "epochcli"
+name = "Epoch CLI"
 description = "The open source coding agent."
 version = "1.3.17"
 schema_version = 1
 authors = ["Anomaly"]
-repository = "https://github.com/anomalyco/opencode"
+repository = "https://github.com/anomalyco/epochcli"
 
-[agent_servers.opencode]
-name = "OpenCode"
-icon = "./icons/opencode.svg"
+[agent_servers.epochcli]
+name = "Epoch CLI"
+icon = "./icons/epochcli.svg"
 
-[agent_servers.opencode.targets.darwin-aarch64]
-archive = "https://github.com/anomalyco/opencode/releases/download/v1.3.17/opencode-darwin-arm64.zip"
-cmd = "./opencode"
+[agent_servers.epochcli.targets.darwin-aarch64]
+archive = "https://github.com/anomalyco/epochcli/releases/download/v1.3.17/opencode-darwin-arm64.zip"
+cmd = "./epochcli"
 args = ["acp"]
 
-[agent_servers.opencode.targets.darwin-x86_64]
-archive = "https://github.com/anomalyco/opencode/releases/download/v1.3.17/opencode-darwin-x64.zip"
-cmd = "./opencode"
+[agent_servers.epochcli.targets.darwin-x86_64]
+archive = "https://github.com/anomalyco/epochcli/releases/download/v1.3.17/opencode-darwin-x64.zip"
+cmd = "./epochcli"
 args = ["acp"]
 
-[agent_servers.opencode.targets.linux-aarch64]
-archive = "https://github.com/anomalyco/opencode/releases/download/v1.3.17/opencode-linux-arm64.tar.gz"
-cmd = "./opencode"
+[agent_servers.epochcli.targets.linux-aarch64]
+archive = "https://github.com/anomalyco/epochcli/releases/download/v1.3.17/opencode-linux-arm64.tar.gz"
+cmd = "./epochcli"
 args = ["acp"]
 
-[agent_servers.opencode.targets.linux-x86_64]
-archive = "https://github.com/anomalyco/opencode/releases/download/v1.3.17/opencode-linux-x64.tar.gz"
-cmd = "./opencode"
+[agent_servers.epochcli.targets.linux-x86_64]
+archive = "https://github.com/anomalyco/epochcli/releases/download/v1.3.17/opencode-linux-x64.tar.gz"
+cmd = "./epochcli"
 args = ["acp"]
 
-[agent_servers.opencode.targets.windows-x86_64]
-archive = "https://github.com/anomalyco/opencode/releases/download/v1.3.17/opencode-windows-x64.zip"
-cmd = "./opencode.exe"
+[agent_servers.epochcli.targets.windows-x86_64]
+archive = "https://github.com/anomalyco/epochcli/releases/download/v1.3.17/opencode-windows-x64.zip"
+cmd = "./epochcli.exe"
 args = ["acp"]

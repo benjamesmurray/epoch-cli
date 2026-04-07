@@ -1,0 +1,1 @@
+{"module":"project-map-cli.src.project_map_cli.core.analyzers.python_symbols","symbols":[{"samples":[{"ln":112,"pid":16702,"snippet":"qn = _resolve_qname(path, root, [], name)"}],"sig_unknown":true,"symbol":"project-map-cli.src.project_map_cli.core.analyzers.python_symbols._resolve_qname","total":1}]}

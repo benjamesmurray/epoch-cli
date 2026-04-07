@@ -2,7 +2,7 @@
 
 ## Overview
 
-This design outlines the final phase of rebranding from "opencode" to "Epoch CLI". While major directories have been renamed, internal code symbols (classes, functions), environment variables, and some documentation still reference the old brand.
+This design outlines the final phase of rebranding from "epochcli" to "Epoch CLI". While major directories have been renamed, internal code symbols (classes, functions), environment variables, and some documentation still reference the old brand.
 
 ## Architecture
 
@@ -14,16 +14,16 @@ The rebranding affects three main layers:
 ## Components and Interfaces
 
 ### SDK Renaming
-- `OpencodeClient` -> `EpochClient`
-- `createOpencodeClient` -> `createEpochClient`
-- `createOpencodeServer` -> `createEpochServer`
-- `createOpencodeTui` -> `createEpochTui`
+- `EpochClient` -> `EpochClient`
+- `createEpochClient` -> `createEpochClient`
+- `createEpochServer` -> `createEpochServer`
+- `createEpochTui` -> `createEpochTui`
 
 ### CLI Environment Variables
-- `OPENCODE_BIN_PATH` -> `EPOCH_BIN_PATH` (with backward compatibility if needed, though not requested).
+- `EPOCHCLI_BIN_PATH` -> `EPOCH_BIN_PATH` (with backward compatibility if needed, though not requested).
 
 ### Binary Packaging
-- Rename `opencode` binary to `epoch` in build scripts and templates.
+- Rename `epochcli` binary to `epoch` in build scripts and templates.
 
 ## Data Models
 
@@ -31,7 +31,7 @@ No changes to underlying data structures, only to the names of the classes and i
 
 ## Error Handling
 
-Ensure that renaming symbols does not break error reporting or logs that might still be looking for "opencode" strings.
+Ensure that renaming symbols does not break error reporting or logs that might still be looking for "epochcli" strings.
 
 ## Testing Strategy
 

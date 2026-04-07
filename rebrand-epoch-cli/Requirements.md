@@ -2,7 +2,7 @@
 
 ## Core Features
 
-- Execute a widespread search-and-replace to rebrand "opencode" to "epoch" and "OpenCode" to "Epoch CLI" across the entire monorepo.
+- Execute a widespread search-and-replace to rebrand "epochcli" to "epoch" and "Epoch CLI" to "Epoch CLI" across the entire monorepo.
 - Rename configurations, package names, binary endpoints, and documentation to reflect the new Epoch CLI brand.
 
 ## User Stories
@@ -12,8 +12,8 @@
 ## Acceptance Criteria
 
 - [x] Text references updated.
-- [x] `packages/opencode` renamed to `packages/epoch`.
-- [x] `.opencode` config dir renamed to `.epoch`.
+- [x] `packages/epochcli` renamed to `packages/epoch`.
+- [x] `.epochcli` config dir renamed to `.epoch`.
 - [x] Internal package dependency names and imports updated.
 - [x] Monorepo successfully typechecks.
 

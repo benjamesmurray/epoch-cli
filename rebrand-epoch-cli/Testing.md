@@ -15,6 +15,6 @@
 
 ## Acceptance Criteria
 
-- No "opencode" strings remaining in source code (excluding necessary third-party package names like `opencode-gitlab-auth`).
+- No "epochcli" strings remaining in source code (excluding necessary third-party package names like `epochcli-gitlab-auth`).
 - All binaries produced are named `epoch`.
-- All `OpencodeClient` references in the code are replaced with `EpochClient`.
+- All `EpochClient` references in the code are replaced with `EpochClient`.

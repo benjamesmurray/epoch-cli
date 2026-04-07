@@ -1,0 +1,1 @@
+{"capabilities":["call_graph","inheritance","kafka_bridge","go_support","rust_support","sharding"],"duration_sec":83.07963,"errors":[],"generated_at":"2026-04-07T17:59:26.301939+00:00","gsi":{},"status":"success","version":"1.0.0"}

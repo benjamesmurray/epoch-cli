@@ -1,0 +1,1 @@
+{"module":"project-map-cli.tests.test_query_engine","symbols":[{"samples":[{"ln":11,"pid":16766,"snippet":"return QueryEngine(project_root=fixture_root)"}],"sig_unknown":true,"symbol":"project-map-cli.tests.test_query_engine.QueryEngine","total":1}]}
