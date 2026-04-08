@@ -49,6 +49,7 @@
       "command": ["node", "ground-truth-cli/dist/index.js"]
     }
   },
+  "mcp_timeout": 120000,
   "tools": {
     "github-triage": false,
     "github-pr-search": false,
