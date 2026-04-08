@@ -13,17 +13,35 @@ t
 - **Purpose:** Provides a contextually efficient architectural map of the local project.
 - **When to use:** Invoke this tool when you need to understand the project structure, file dependencies, or system-wide layout without wasting context on exhaustive manual directory listings or file reads. Create new projects here: /home/benmurray/Projects/cli/Projects/Active
 - **Tools:**
-  - **`mcp_project-map-cli_sc_exec`**: Accepts a CLI string to search symbols or check impact (e.g., `find --query User`, `impact --fqn com.example.UserService`).
-  - **`mcp_project-map-cli_sc_status`**: Returns current workspace context and available commands for the project map.
-  - **`mcp_project-map-cli_sc_help`**: Gets documentation for project map commands.
-  - **`mcp_project-map-cli_sc_verify`**: Checks workspace state.
+  - **`pm_status`**: Returns current workspace context, last active project, and available commands.
+  - **`pm_help`**: Accepts a topic/command (e.g., 'find') and returns the detailed help text.
+  - **`pm_init`**: Initializes or refreshes the project map index. Use this after significant code changes.
+  - **`pm_query`**: Search for symbols or get file context. Provide 'query' for symbol search or 'path' for file context.
+  - **`pm_plan`**: Analyzes the architectural impact of a symbol. Useful for planning refactors or changes.
+  - **`pm_verify`**: Checks the health of the project map system and recent indexing status.
 
 ## 3. Spec CLI (`mcp-spec-cli`)
 
 - **Purpose:** Manages intelligent, specification-driven development workflows.
 - **When to use:** Use these tools to structure feature development and track progress.
 - **Tools:**
-  - **`mcp_mcp-spec-cli_sc_exec`**: Use for core actions like initializing a new feature (`init`), planning (`plan`), and managing tasks (`todo`).
-  - **`mcp_mcp-spec-cli_sc_status`**: Use to check the current health of the spec and get explicit "Next Step" directives.
-  - **`mcp_mcp-spec-cli_sc_verify`**: Use after making changes to validate that the last action was successful and aligns with the spec.
-  - **`mcp_mcp-spec-cli_sc_help`**: Call this if you need deeper documentation on how to use the spec workflow tools.
+  - **`sc_init`**: Initialize a new feature specification in `projects/active/`.
+  - **`sc_plan`**: Progress the workflow state. Automatically archives when finished.
+  - **`sc_status`**: Get a health check of the active project and next steps.
+  - **`sc_todo_list`**: List all implementation tasks and their status.
+  - **`sc_todo_start`**: Mark a specific task as being actively worked on.
+  - **`sc_todo_complete`**: Mark a specific task as completed.
+  - **`sc_epoch`**: Update the task-epoch context for short-term memory.
+  - **`sc_mode`**: Toggle project mode between `one-shot` and `step-through`.
+  - **`sc_archive`**: Manually move the project to the `projects/completed/` folder.
+  - **`sc_help`**: Learn how to use the tools and get deep documentation.
+  - **`sc_verify`**: A dedicated tool to validate that the last action worked.
+
+## 4. Ground Truth CLI (`ground-truth-cli`)
+
+- **Purpose:** Scans the active project to synthesize a "Project Constitution" (TOON formatted). Ensures the AI agent operates using strict project-specific behavioral constraints, stack details, and architectural rules.
+- **When to use:** Use this tool when onboarding to a new repository, bootstrapping a new agent session, or when you need explicit operational constraints generated for the current codebase.
+- **Tools:**
+  - **`gt_status`**: Orient the agent: returns current scanning state and findings.
+  - **`gt_help`**: Pull deep documentation for a specific feature or command (e.g., 'scan').
+  - **`gt_exec`**: The primary workhorse. Action format: [action] [resource] (e.g., `{"action": "scan", "resource": "."}`).

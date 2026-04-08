@@ -30,3 +30,9 @@ logs/
 *.bun-build
 tsconfig.tsbuildinfo
 Projects/
+
+# Test and Tool Artifacts
+e2e_testing/*_test/
+.epochcli/tool/roaster/
+.project-map/docs/repo_summary/
+.assistant_rules.toon

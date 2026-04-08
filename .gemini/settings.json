@@ -25,9 +25,15 @@
       "command": "npx",
       "args": [
         "-y",
-        "mcp-spec-cli@1.6.0"
+        "mcp-spec-cli@1.7.0"
       ],
       "trust": true
+    },
+    "ground-truth-cli": {
+      "command": "node",
+      "args": [
+        "/home/benmurray/Projects/cli/ground-truth-cli/dist/index.js"
+      ]
     }
   }
 }

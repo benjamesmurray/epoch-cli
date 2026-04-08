@@ -36,6 +36,9 @@ import { Database } from "./storage/db"
 import { errorMessage } from "./util/error"
 import { PluginCommand } from "./cli/cmd/plug"
 import { Heap } from "./cli/heap"
+import { EngineConfigValidator } from "./config/validator"
+import { Config } from "./config/config"
+import { Effect } from "effect"
 
 process.on("unhandledRejection", (e) => {
   Log.Default.error("rejection", {
@@ -107,6 +110,14 @@ const cli = yargs(args)
       version: Installation.VERSION,
       args: process.argv.slice(2),
     })
+    
+    // Engine Config Validator Injection
+    try {
+      const globalConfig = await Config.getGlobal()
+      await Effect.runPromise(EngineConfigValidator.validate(globalConfig))
+    } catch (e) {
+      Log.Default.warn("Failed to validate dual-model engine config", { error: String(e) })
+    }
 
     const marker = path.join(Global.Path.data, "epochcli.db")
     if (!(await Filesystem.exists(marker))) {

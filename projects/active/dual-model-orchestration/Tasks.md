@@ -1,0 +1,46 @@
+# dual-model-orchestration - Tasks
+
+- [x] 1.1 **Implement `EngineConfigValidator`**
+  - **Objective:** Perform pre-flight checks on engine context limits (cap at 32k) and KV cache precision (`fp8`) for both `local-main` and `local-side`.
+  - **Expected Files:** `packages/epochcli/src/config/config.ts` or a new `validator.ts`.
+  - **Dependencies:** None. This is a startup check.
+- [x] 1.2 **Implement `SessionController.resetEpoch()`**
+  - **Objective:** Programmatically wipe chat history arrays and flush KV cache (The Memory Wipe) to prepare the 32k window for the next task.
+  - **Expected Files:** `packages/epochcli/src/session/session.ts` or TUI thread state manager (`packages/epochcli/src/cli/cmd/tui/thread.ts`).
+  - **Dependencies:** None.
+- [x] 1.3 **Implement `ToonEncoder`**
+  - **Objective:** Create a utility to convert standard JSON context payloads (e.g., localized file trees, linter logs) to the compressed TOON format (YAML-like, CSV rows).
+  - **Expected Files:** `packages/epochcli/src/util/toon.ts`.
+  - **Dependencies:** None.
+- [x] 1.4 **Implement Phase 1 Pre-Generation (Clerk)**
+  - **Objective:** Update the pre-generation phase to use `mcp-spec-cli` to determine active paths and `project-map-cli` to fetch localized file trees. Compress both using `ToonEncoder`.
+  - **Expected Files:** `packages/epochcli/src/session/llm.ts` or the main orchestrator/thread.
+  - **Dependencies:** Requires `ToonEncoder` (1.3).
+- [x] 1.5 **Implement Positional Prompt Builder**
+  - **Objective:** Construct the 3-Zone prompt (Zone 1: TOON context, Zone 2: Rules, Zone 3: Query) immediately before Phase 2 generation.
+  - **Expected Files:** `packages/epochcli/src/session/system.ts` or `packages/epochcli/src/session/llm.ts`.
+  - **Dependencies:** Requires Phase 1 context (1.4).
+- [x] 1.6 **Implement `NativeTokenParser`**
+  - **Objective:** Build a stream interceptor to translate `<|">` to standard markdown and capture/hide `<|think|>` and `<|channel>` scratchpad blocks for UI rendering.
+  - **Expected Files:** Middleware in `packages/epochcli/src/session/llm.ts` or TUI response parser.
+  - **Dependencies:** None.
+- [x] 1.7 **Update Phase 2 Generation Pipeline**
+  - **Objective:** Ensure the Phase 2 response from `local-main` streams directly to the user UI using the assembled Positional Prompt.
+  - **Expected Files:** `packages/epochcli/src/session/llm.ts`.
+  - **Dependencies:** Requires Prompt Builder (1.5) and NativeTokenParser (1.6).
+- [x] 1.8 **Implement Phase 2 `OutputInterceptor`**
+  - **Objective:** Create middleware to catch broken JSON tool calls from `local-main` and immediately trigger `local-side` to repair them before passing back to the execution engine.
+  - **Expected Files:** `packages/epochcli/src/session/llm.ts` or `packages/epochcli/src/provider/transform.ts`.
+  - **Dependencies:** Requires Phase 2 Generation (1.7).
+- [x] 1.9 **Create Phase 3 Post-Generation Worker**
+  - **Objective:** Implement an asynchronous background worker that calls `local-side` for epoch summarization AND autonomously calls `mcp-spec-cli` to advance task state to COMPLETE upon successful code generation.
+  - **Expected Files:** `packages/epochcli/src/session/llm.ts` (trigger point) and a new `worker.ts`.
+  - **Dependencies:** Requires successful Phase 2 completion (1.7).
+- [x] 1.10 **Implement Phase 3 Cancellation Safeguards**
+  - **Objective:** Use `AbortController` in the orchestrator to instantly kill or gracefully resolve the background Phase 3 task if a new user submit event fires, preventing race conditions on `local-side`.
+  - **Expected Files:** `packages/epochcli/src/session/llm.ts` or the central `EventLoopOrchestrator`.
+  - **Dependencies:** Requires Phase 3 Worker (1.9).
+- [x] 1.11 **Implement `LogParserTool`**
+  - **Objective:** Create a standalone utility function to parse `/home/llm/utils/launch/logs` and verify the `Phase 1 -> Phase 2 -> Phase 3` sequential, non-overlapping execution to validate performance optimization.
+  - **Expected Files:** `packages/epochcli/src/util/log-parser.ts` or a dedicated testing script.
+  - **Dependencies:** None (can be built independently).

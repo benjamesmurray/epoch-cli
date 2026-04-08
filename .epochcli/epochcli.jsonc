@@ -4,13 +4,51 @@
     "opencode": {
       "options": {},
     },
+    "local-main": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Local Gemma (RTX 4090)",
+      "options": {
+        "baseURL": "http://localhost:8085/v1",
+        "apiKey": "2250"
+      },
+      "models": {
+        "gemma-4-26b-q4-xl": { "name": "Gemma 4 26B" },
+        "gemma-4-q5": { "name": "Gemma 4 26B Q5" },
+        "qwen-3.5": { "name": "Qwen 3.5" }
+      }
+    },
+    "local-side": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Local Nemotron (RTX 4090)",
+      "options": {
+        "baseURL": "http://localhost:8086/v1",
+        "apiKey": "2250"
+      },
+      "models": {
+        "nemotron-3-nano-4b": { "name": "Nemotron 3 Nano" }
+      }
+    }
   },
+  "model": "local-main/gemma-4-26b-q4-xl",
   "permission": {
     "edit": {
       "packages/opencode/migration/*": "deny",
     },
   },
-  "mcp": {},
+  "mcp": {
+    "mcp-spec-cli": {
+      "type": "local",
+      "command": ["node", "mcp-spec-cli/dist/index.js"]
+    },
+    "project-map-cli": {
+      "type": "local",
+      "command": ["project-map-cli/venv/bin/python", "project-map-cli/src/project_map_cli/mcp/server.py"]
+    },
+    "ground-truth-cli": {
+      "type": "local",
+      "command": ["node", "ground-truth-cli/dist/index.js"]
+    }
+  },
   "tools": {
     "github-triage": false,
     "github-pr-search": false,

@@ -6,6 +6,35 @@ import z from "zod"
 import { Glob } from "./glob"
 
 export namespace Log {
+  export interface EnhancedModelExecutionEvent {
+    timestamp: number;
+    epochId: string;
+    event: "START_GENERATE" | "END_GENERATE" | "ERROR";
+    providerId: string;
+    phase: string;
+    metrics?: {
+      ttftMs?: number;
+      tps?: number;
+      promptTokens?: number;
+    };
+    payload?: any;
+    json_repaired?: boolean;
+  }
+
+  export function truncatePayload(payload: any): any {
+    if (Array.isArray(payload) && payload.length > 2) {
+      const zone1 = payload[0];
+      const zone3 = payload[payload.length - 1];
+      const truncatedCount = payload.length - 2;
+      return [
+        zone1,
+        { role: "system", content: `[... ${truncatedCount} messages truncated (Zone 2) ...]` },
+        zone3
+      ];
+    }
+    return payload;
+  }
+
   export const Level = z.enum(["DEBUG", "INFO", "WARN", "ERROR"]).meta({ ref: "LogLevel", description: "Log level" })
   export type Level = z.infer<typeof Level>
 

@@ -889,6 +889,8 @@ export namespace MCP {
 
   export const status = async () => runPromise((svc) => svc.status())
 
+  export const clients = async () => runPromise((svc) => svc.clients())
+
   export const tools = async () => runPromise((svc) => svc.tools())
 
   export const prompts = async () => runPromise((svc) => svc.prompts())

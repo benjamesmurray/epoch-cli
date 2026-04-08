@@ -3,7 +3,7 @@ import { Log } from "@/util/log"
 import { Cause, Effect, Layer, Record, ServiceMap } from "effect"
 import * as Queue from "effect/Queue"
 import * as Stream from "effect/Stream"
-import { streamText, wrapLanguageModel, type ModelMessage, type Tool, tool, jsonSchema } from "ai"
+import { streamText, wrapLanguageModel, type ModelMessage, type Tool, tool, jsonSchema, generateText } from "ai"
 import { mergeDeep, pipe } from "remeda"
 import { GitLabWorkflowLanguageModel } from "gitlab-ai-provider"
 import { ProviderTransform } from "@/provider/transform"
@@ -17,6 +17,8 @@ import { Flag } from "@/flag/flag"
 import { Permission } from "@/permission"
 import { Auth } from "@/auth"
 import { Installation } from "@/installation"
+import { ToonEncoder } from "@/util/toon"
+import { MCP } from "@/mcp/index"
 
 export namespace LLM {
   const log = Log.create({ service: "llm" })
@@ -100,6 +102,87 @@ export namespace LLM {
     const isOpenaiOauth = provider.id === "openai" && auth?.type === "oauth"
 
     const system: string[] = []
+
+    // Phase 1: Pre-Generation (Clerk / local-side) - Task 1.4
+    // Attempt to fetch localized file trees and active path from MCP servers and compress them
+    if (provider.id === "local-main") {
+      try {
+        let mcpContext = ""
+        const mcpClientsRecord = await MCP.clients()
+        const mcpClients = Object.values(mcpClientsRecord) as any[]
+        const specCli = mcpClients.find((c: any) => c.id === "mcp-spec-cli")
+        const projectMapCli = mcpClients.find((c: any) => c.id === "project-map-cli")
+        
+        let activePath = "."
+        
+        if (specCli) {
+          try {
+             log.debug("Fetching current state from mcp-spec-cli")
+             const statusRes = await specCli.client.callTool({ name: "sc_status", arguments: {} })
+             if (statusRes.content && statusRes.content.length > 0 && statusRes.content[0].type === "text") {
+                const text = statusRes.content[0].text
+                const featureMatch = text.match(/Feature: projects\/active\/(.+)/)
+                if (featureMatch) {
+                    activePath = `projects/active/${featureMatch[1]}`
+                    mcpContext += `Spec CLI Context:\n${ToonEncoder.encode({ active_feature: activePath, status: text })}\n`
+                }
+             }
+          } catch (e) {
+             log.debug("Failed to fetch mcp-spec-cli status", { error: String(e) })
+          }
+        }
+        
+        if (projectMapCli) {
+           try {
+             log.debug("Fetching localized map from project-map-cli for path", { activePath })
+             const mapRes = await projectMapCli.client.callTool({ name: "pm_query", arguments: { path: activePath } })
+             if (mapRes.content && mapRes.content.length > 0 && mapRes.content[0].type === "text") {
+                 mcpContext += `Project Map Context:\n${ToonEncoder.encode({ localized_map: mapRes.content[0].text })}\n`
+             }
+           } catch (e) {
+             log.debug("Failed to fetch project-map-cli localized map", { error: String(e) })
+           }
+        }
+        
+        if (mcpContext) {
+            system.push(mcpContext)
+        }
+      } catch (e) {
+        log.warn("Phase 1 Pre-Generation MCP Context fetch failed", { error: String(e) })
+      }
+    }
+
+    if (provider.id === "local-main") {
+      try {
+        let rulesContext = ""
+        const mcpClientsRecord = await MCP.clients()
+        const mcpClients = Object.values(mcpClientsRecord) as any[]
+        const gtCli = mcpClients.find((c: any) => c.id === "ground-truth-cli")
+        if (gtCli) {
+            log.debug("Fetching ground truth rules")
+            const gtRes = await gtCli.client.callTool({ name: "gt_status", arguments: {} })
+            if (gtRes.content && gtRes.content.length > 0 && gtRes.content[0].type === "text") {
+                 rulesContext = `Ground Truth Rules:\n${gtRes.content[0].text}\n`
+            }
+        } else {
+             // Fallback rule load
+             try {
+                const fsNode = await import("fs/promises")
+                const rulesFile = await fsNode.readFile(".assistant_rules.toon", "utf-8")
+                rulesContext = `Ground Truth Rules:\n${rulesFile}\n`
+             } catch (e) {
+                 // ignore missing file
+             }
+        }
+        
+        if (rulesContext) {
+           system.push(rulesContext)
+        }
+      } catch (e) {
+         log.warn("Phase 1 Pre-Generation Rules Context fetch failed", { error: String(e) })
+      }
+    }
+
     system.push(
       [
         // use agent prompt otherwise provider prompt
@@ -256,12 +339,67 @@ export namespace LLM {
     }
 
     return streamText({
+      onFinish(event) {
+          // Trigger Phase 3 background worker without awaiting it to allow the stream to finish immediately
+          if (provider.id === "local-main") {
+             import("./worker").then(({ PostGenerationWorker }) => {
+                 Effect.runPromise(PostGenerationWorker.execute({
+                     sessionID: input.sessionID,
+                     chatHistory: messages,
+                     abortSignal: input.abort
+                 }) as any)
+             }).catch(e => {
+                 log.warn("Failed to load or execute PostGenerationWorker", { error: String(e) })
+             })
+          }
+      },
       onError(error) {
         l.error("stream error", {
           error,
         })
       },
       async experimental_repairToolCall(failed) {
+        // Phase 2 OutputInterceptor: Catch broken JSON from local-main and use local-side to fix it.
+        if (provider.id === "local-main") {
+            try {
+               const sideProviderConfig = cfg.provider?.["local-side"]
+               if (sideProviderConfig) {
+                   log.info("Attempting to repair broken JSON tool call with local-side Clerk")
+                   const sideLanguage = await Provider.getLanguage(
+                     await Provider.getModel("local-side" as any, "nemotron-3-nano-4b" as any) // or default local-side model
+                   )
+                   const repairResponse = await generateText({
+                     model: sideLanguage,
+                     system: "You are a JSON repair utility. The user will provide a broken JSON tool call. Your ONLY job is to output the repaired, valid JSON object that matches the intended schema. DO NOT output any markdown, explanations, or other text. ONLY the valid JSON object.",
+                     prompt: `Broken JSON: ${(failed.toolCall as any).args}\n\nError: ${failed.error.message}`,
+                   })
+                   
+                   try {
+                     const repairedArgs = JSON.parse(repairResponse.text.trim())
+                     log.info("Successfully repaired JSON with local-side")
+
+                     const repairEvent: Log.EnhancedModelExecutionEvent = {
+                       timestamp: Date.now(),
+                       epochId: input.sessionID,
+                       event: "END_GENERATE",
+                       providerId: "local-side",
+                       phase: "Phase 2",
+                       json_repaired: true
+                     }
+                     log.info(JSON.stringify(repairEvent))
+
+                     return {
+                       ...failed.toolCall,
+                       args: repairedArgs
+                     }                   } catch (parseErr) {
+                      log.warn("local-side failed to output valid JSON for repair")
+                   }
+               }
+            } catch (e) {
+               log.error("Failed during local-side JSON repair attempt", { error: String(e) })
+            }
+        }
+
         const lower = failed.toolCall.toolName.toLowerCase()
         if (lower !== failed.toolCall.toolName && tools[lower]) {
           l.info("repairing tool call", {
@@ -322,6 +460,181 @@ export namespace LLM {
               return args.params
             },
           },
+          // Telemetry middleware
+          {
+            specificationVersion: "v3" as const,
+            wrapGenerate: async ({ doGenerate, params }) => {
+              const startTime = Date.now()
+              const truncatedPayload = Log.truncatePayload(params.prompt)
+              const epochId = input.sessionID
+              const phase = input.model.providerID.includes("local-side") ? "Phase 1/3" : "Phase 2"
+              
+              const startEvent: Log.EnhancedModelExecutionEvent = {
+                timestamp: startTime,
+                epochId,
+                event: "START_GENERATE",
+                providerId: input.model.providerID,
+                phase,
+                payload: truncatedPayload
+              }
+              console.log(JSON.stringify(startEvent))
+
+              try {
+                const res = await doGenerate()
+                const endTime = Date.now()
+                
+                const endEvent: Log.EnhancedModelExecutionEvent = {
+                  timestamp: endTime,
+                  epochId,
+                  event: "END_GENERATE",
+                  providerId: input.model.providerID,
+                  phase,
+                  metrics: {
+                    ttftMs: endTime - startTime,
+                    promptTokens: (res.usage as any)?.promptTokens,
+                    tps: (res.usage as any)?.completionTokens ? ((res.usage as any).completionTokens / ((endTime - startTime) / 1000)) : undefined
+                  }
+                }
+                console.log(JSON.stringify(endEvent))
+                return res
+              } catch (e) {
+                const errorEvent: Log.EnhancedModelExecutionEvent = {
+                  timestamp: Date.now(),
+                  epochId,
+                  event: "ERROR",
+                  providerId: input.model.providerID,
+                  phase,
+                  payload: { error: String(e) }
+                }
+                console.error(JSON.stringify(errorEvent))
+                throw e
+              }
+            },
+            wrapStream: async ({ doStream, params }) => {
+              const startTime = Date.now()
+              const truncatedPayload = Log.truncatePayload(params.prompt)
+              const epochId = input.sessionID
+              const phase = input.model.providerID.includes("local-side") ? "Phase 1/3" : "Phase 2"
+              
+              const startEvent: Log.EnhancedModelExecutionEvent = {
+                timestamp: startTime,
+                epochId,
+                event: "START_GENERATE",
+                providerId: input.model.providerID,
+                phase,
+                payload: truncatedPayload
+              }
+              console.log(JSON.stringify(startEvent))
+
+              try {
+                const { stream, ...rest } = await doStream()
+                let firstTokenTime: number | undefined
+                let tokenCount = 0
+
+                const iterator = (async function* () {
+                   for await (const chunk of (stream as any)) {
+                      if (!firstTokenTime && chunk.type === "text-delta") {
+                         firstTokenTime = Date.now()
+                      }
+                      if (chunk.type === "text-delta" || chunk.type === "tool-call-delta") {
+                         tokenCount++
+                      }
+                      yield chunk
+                   }
+                })();
+
+                const readableStream = new ReadableStream({
+                  async pull(controller) {
+                    try {
+                      const { value, done } = await iterator.next()
+                      if (done) {
+                        const endTime = Date.now()
+                        const endEvent: Log.EnhancedModelExecutionEvent = {
+                          timestamp: endTime,
+                          epochId,
+                          event: "END_GENERATE",
+                          providerId: input.model.providerID,
+                          phase,
+                          metrics: {
+                            ttftMs: firstTokenTime ? firstTokenTime - startTime : undefined,
+                            tps: (tokenCount && firstTokenTime) ? (tokenCount / ((endTime - firstTokenTime) / 1000)) : undefined
+                          }
+                        }
+                        console.log(JSON.stringify(endEvent))
+                        controller.close()
+                      } else {
+                        controller.enqueue(value)
+                      }
+                    } catch (e) {
+                      const errorEvent: Log.EnhancedModelExecutionEvent = {
+                        timestamp: Date.now(),
+                        epochId,
+                        event: "ERROR",
+                        providerId: input.model.providerID,
+                        phase,
+                        payload: { error: String(e) }
+                      }
+                      console.error(JSON.stringify(errorEvent))
+                      controller.error(e)
+                    }
+                  },
+                  cancel(reason) {
+                    iterator.return?.(reason)
+                  }
+                })
+
+                return { stream: readableStream, ...rest }
+              } catch (e) {
+                const errorEvent: Log.EnhancedModelExecutionEvent = {
+                  timestamp: Date.now(),
+                  epochId,
+                  event: "ERROR",
+                  providerId: input.model.providerID,
+                  phase,
+                  payload: { error: String(e) }
+                }
+                console.error(JSON.stringify(errorEvent))
+                throw e
+              }
+            }
+          },
+          // NativeTokenParser middleware
+          {
+             specificationVersion: "v3" as const,
+             wrapGenerate: async ({ doGenerate, params }) => {
+                   const res = await doGenerate()
+                   // Replace <|"> with markdown backticks
+                   ;(res as any).text = (res as any).text?.replace(/<\|">/g, "```")
+                   return res
+             },
+             wrapStream: async ({ doStream, params }) => {
+                   const { stream, ...rest } = await doStream()
+
+                   const iterator = (async function* () {
+                      for await (const chunk of (stream as any)) {
+                         if (chunk.type === "text-delta" && typeof chunk.textDelta === "string") {
+                            chunk.textDelta = chunk.textDelta.replace(/<\|">/g, "```")
+                         }
+                         yield chunk
+                      }
+                   })();
+
+                   const readableStream = new ReadableStream({
+                     async pull(controller) {
+                       const { value, done } = await iterator.next()
+                       if (done) {
+                         controller.close()
+                       } else {
+                         controller.enqueue(value)
+                       }
+                     },
+                     cancel(reason) {
+                       iterator.return?.(reason)
+                     }
+                   })
+
+                   return { stream: readableStream, ...rest }
+             }          }
         ],
       }),
       experimental_telemetry: {
