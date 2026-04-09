@@ -1,6 +1,6 @@
 # Epoch CLI
 
-Epoch CLI is an advanced, Agent-Native command-line interface designed to orchestrate complex development workflows using a novel **Dual-Model Architecture** and the **Model Context Protocol (MCP)**.
+Epoch CLI is an advanced, Agent-Native command-line interface designed to orchestrate complex development workflows using a novel **Dual-Model Architecture**.
 
 It is built to maximize the efficiency of local LLMs by intelligently routing tasks, strictly managing context windows via "Task-Epochs", and leveraging specialized external tools to explore and manipulate codebases without wasting context tokens.
 
@@ -28,13 +28,6 @@ The system prompt has been aggressively compressed to the theoretical minimum re
 
 ### 🧪 Automated E2E Testing Framework
 Includes robust end-to-end testing scripts (e.g., `e2e_testing/run_eventbus_v2_e2e.sh`) that force the agent to autonomously plan, implement, and test complex TypeScript utilities. The framework subsequently analyzes the telemetry logs to prove zero compute overlap, verify typing constraints, and monitor JSON repair rates.
-
-## Changes since v1.0.0
-- **System Prompt Streamlining:** Removed 2,000+ tokens of bloat from the base personas (`default.txt`, `gemini.txt`) to drastically improve TTFT and context capacity.
-- **Gemma 4 Native Support:** Added a specialized `gemma4.txt` persona to explicitly leverage Google's native string bounding `<|">` and strict `channel` thought optimization.
-- **Supervisor Middleware:** Introduced an active loop-detection middleware that uses the `local-side` model to intercept and correct the main model if it gets stuck in repetitive hallucinations.
-- **Positional Prompt Architecture:** Wired the core execution loop to properly inject `=== ZONE X ===` headers, isolating behavioral rules from general context for improved LLM attention mechanics.
-- **Spec CLI Integration:** Upgraded MCP connections to point to the latest `mcp-spec-cli` GitHub release, fully integrating the `.epoch-context.md` continuity system.
 
 ## Getting Started
 
@@ -78,7 +71,6 @@ bun packages/epochcli/src/index.ts run "Use the Spec CLI to initialize a new pro
 ```
 
 ## Documentation
-- [GEMINI.md](GEMINI.md) - Workspace instructions and architecture overview.
 - [MCP Configuration Guide](docs/MCP_config_guide.md) - Guide to connecting external tools.
 - [Epoch Spec](docs/Epoch_spec.md) - Deep dive into the orchestration specification.
 
