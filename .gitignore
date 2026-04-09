@@ -33,6 +33,8 @@ Projects/
 
 # Test and Tool Artifacts
 e2e_testing/*_test/
-.epochcli/tool/roaster/
+.epochcli/tool/*/
 .project-map/docs/repo_summary/
 .assistant_rules.toon
+projects/active/eventbus*
+projects/completed/eventbus*

@@ -13,6 +13,7 @@ import type { Agent } from "@/agent/agent"
 import type { MessageV2 } from "./message-v2"
 import { Plugin } from "@/plugin"
 import { SystemPrompt } from "./system"
+import { PromptBuilder, type PromptPayload } from "./prompt/builder"
 import { Flag } from "@/flag/flag"
 import { Permission } from "@/permission"
 import { Auth } from "@/auth"
@@ -101,7 +102,11 @@ export namespace LLM {
     // TODO: move this to a proper hook
     const isOpenaiOauth = provider.id === "openai" && auth?.type === "oauth"
 
-    const system: string[] = []
+    const payload: PromptPayload = {
+      zone1: [],
+      zone2: [],
+      zone3: [],
+    }
 
     // Phase 1: Pre-Generation (Clerk / local-side) - Task 1.4
     // Attempt to fetch localized file trees and active path from MCP servers and compress them
@@ -145,7 +150,7 @@ export namespace LLM {
         }
         
         if (mcpContext) {
-            system.push(mcpContext)
+            payload.zone1.push(mcpContext)
         }
       } catch (e) {
         log.warn("Phase 1 Pre-Generation MCP Context fetch failed", { error: String(e) })
@@ -176,14 +181,14 @@ export namespace LLM {
         }
         
         if (rulesContext) {
-           system.push(rulesContext)
+           payload.zone2.push(rulesContext)
         }
       } catch (e) {
          log.warn("Phase 1 Pre-Generation Rules Context fetch failed", { error: String(e) })
       }
     }
 
-    system.push(
+    payload.zone2.push(
       [
         // use agent prompt otherwise provider prompt
         ...(input.agent.prompt ? [input.agent.prompt] : SystemPrompt.provider(input.model)),
@@ -193,9 +198,10 @@ export namespace LLM {
         ...(input.user.system ? [input.user.system] : []),
       ]
         .filter((x) => x)
-        .join("\n"),
+        .join("\n\n"),
     )
 
+    const system: string[] = [PromptBuilder.build(payload)]
     const header = system[0]
     await Plugin.trigger(
       "experimental.chat.system.transform",
@@ -280,6 +286,68 @@ export namespace LLM {
     )
 
     const tools = await resolveTools(input)
+
+    // Loop detection middleware
+    for (const [toolName, toolDef] of Object.entries(tools)) {
+      if (toolDef.execute) {
+        const originalExecute = toolDef.execute
+        toolDef.execute = async (args, options) => {
+           // Check input.messages for identical tool calls
+           let identicalCount = 0
+           for (let i = input.messages.length - 1; i >= 0; i--) {
+              const msg = input.messages[i]
+              if (msg.role === "assistant" && Array.isArray(msg.content)) {
+                 const call = msg.content.find(c => c.type === "tool-call" && c.toolName === toolName)
+                 if (call && JSON.stringify((call as any).args) === JSON.stringify(args)) {
+                    identicalCount++
+                 } else if (call) {
+                    break // Different args, chain broken
+                 }
+              } else if (msg.role === "user" && msg.content && typeof msg.content === "string") {
+                  break // User interrupted or added new text
+              }
+           }
+           
+           if (identicalCount >= 3) {
+              log.warn(`Infinite loop detected for tool ${toolName}`, { args })
+              // Use local-side to generate an intervention
+              if (provider.id === "local-main") {
+                  try {
+                     const sideProviderConfig = cfg.provider?.["local-side"]
+                     if (sideProviderConfig) {
+                         log.info("Generating intervention directive with local-side Clerk")
+                         const sideLanguage = await Provider.getLanguage(
+                           await Provider.getModel("local-side" as any, "nemotron-3-nano-4b" as any)
+                         )
+                         const intervention = await generateText({
+                             model: sideLanguage,
+                             system: "You are an AI supervisor monitoring a main agent. The main agent is stuck in an infinite loop calling the same tool with the exact same arguments. Provide a concise, stern directive telling the agent to STOP calling this tool, explain that its current approach is failing, and instruct it to stop and rethink or try a completely different approach. Do not output anything other than the directive.",
+                             prompt: `Tool: ${toolName}\nArgs: ${JSON.stringify(args)}\n\nPlease provide the intervention directive:`
+                         })
+                         
+                         const interventionEvent: Log.EnhancedModelExecutionEvent = {
+                           timestamp: Date.now(),
+                           mainEpochId: input.sessionID,
+                           event: "END_GENERATE",
+                           providerId: "local-side",
+                           phase: "Phase 2",
+                           metrics: { wrap_up_triggered: true }
+                         }
+                         log.info(JSON.stringify(interventionEvent))
+                         
+                         return { error: `SYSTEM INTERVENTION: ${intervention.text}` }
+                     }
+                  } catch (e) {
+                      log.error("Failed to generate intervention with local-side", { error: String(e) })
+                  }
+              }
+              return { error: "SYSTEM INTERVENTION: You are stuck in a loop calling this tool with the exact same arguments. Stop and reconsider your approach." }
+           }
+           
+           return originalExecute(args, options)
+        }
+      }
+    }
 
     // LiteLLM and some Anthropic proxies require the tools parameter to be present
     // when message history contains tool calls, even if no tools are being used.
@@ -380,11 +448,11 @@ export namespace LLM {
 
                      const repairEvent: Log.EnhancedModelExecutionEvent = {
                        timestamp: Date.now(),
-                       epochId: input.sessionID,
+                       mainEpochId: input.sessionID,
                        event: "END_GENERATE",
                        providerId: "local-side",
                        phase: "Phase 2",
-                       json_repaired: true
+                       metrics: { json_repaired: true }
                      }
                      log.info(JSON.stringify(repairEvent))
 
@@ -466,12 +534,12 @@ export namespace LLM {
             wrapGenerate: async ({ doGenerate, params }) => {
               const startTime = Date.now()
               const truncatedPayload = Log.truncatePayload(params.prompt)
-              const epochId = input.sessionID
+              const mainEpochId = input.sessionID
               const phase = input.model.providerID.includes("local-side") ? "Phase 1/3" : "Phase 2"
               
               const startEvent: Log.EnhancedModelExecutionEvent = {
                 timestamp: startTime,
-                epochId,
+                mainEpochId,
                 event: "START_GENERATE",
                 providerId: input.model.providerID,
                 phase,
@@ -485,7 +553,7 @@ export namespace LLM {
                 
                 const endEvent: Log.EnhancedModelExecutionEvent = {
                   timestamp: endTime,
-                  epochId,
+                  mainEpochId,
                   event: "END_GENERATE",
                   providerId: input.model.providerID,
                   phase,
@@ -500,7 +568,7 @@ export namespace LLM {
               } catch (e) {
                 const errorEvent: Log.EnhancedModelExecutionEvent = {
                   timestamp: Date.now(),
-                  epochId,
+                  mainEpochId,
                   event: "ERROR",
                   providerId: input.model.providerID,
                   phase,
@@ -513,12 +581,12 @@ export namespace LLM {
             wrapStream: async ({ doStream, params }) => {
               const startTime = Date.now()
               const truncatedPayload = Log.truncatePayload(params.prompt)
-              const epochId = input.sessionID
+              const mainEpochId = input.sessionID
               const phase = input.model.providerID.includes("local-side") ? "Phase 1/3" : "Phase 2"
               
               const startEvent: Log.EnhancedModelExecutionEvent = {
                 timestamp: startTime,
-                epochId,
+                mainEpochId,
                 event: "START_GENERATE",
                 providerId: input.model.providerID,
                 phase,
@@ -551,7 +619,7 @@ export namespace LLM {
                         const endTime = Date.now()
                         const endEvent: Log.EnhancedModelExecutionEvent = {
                           timestamp: endTime,
-                          epochId,
+                          mainEpochId,
                           event: "END_GENERATE",
                           providerId: input.model.providerID,
                           phase,
@@ -568,7 +636,7 @@ export namespace LLM {
                     } catch (e) {
                       const errorEvent: Log.EnhancedModelExecutionEvent = {
                         timestamp: Date.now(),
-                        epochId,
+                        mainEpochId,
                         event: "ERROR",
                         providerId: input.model.providerID,
                         phase,
@@ -587,7 +655,7 @@ export namespace LLM {
               } catch (e) {
                 const errorEvent: Log.EnhancedModelExecutionEvent = {
                   timestamp: Date.now(),
-                  epochId,
+                  mainEpochId,
                   event: "ERROR",
                   providerId: input.model.providerID,
                   phase,

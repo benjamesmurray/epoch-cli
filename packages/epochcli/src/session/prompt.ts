@@ -1507,9 +1507,32 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                   instruction.system().pipe(Effect.orDie),
                   Effect.promise(() => MessageV2.toModelMessages(msgs, model)),
                 ])
-                const system = [...env, ...(skills ? [skills] : []), ...instructions]
+                
+                let currentTokensEstimate = 0
+                for (let i = msgs.length - 1; i >= 0; i--) {
+                  const m = msgs[i]
+                  if (m.info.role === "assistant" && m.info.tokens?.input) {
+                    currentTokensEstimate = m.info.tokens.input + (m.info.tokens.output || 0)
+                    break
+                  }
+                }
+                
+                const CONTEXT_LIMIT = 32000
+                const HIGH_WATERMARK = CONTEXT_LIMIT * 0.85
+                const wrapUpDirective = currentTokensEstimate >= HIGH_WATERMARK
+                  ? "CRITICAL: Context limit approaching. Finalize the immediate sub-task, do not initiate new architectural changes, and output your final <|tool_call|> to commit current state."
+                  : ""
+
                 const format = lastUser.format ?? { type: "text" as const }
-                if (format.type === "json_schema") system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
+                
+                const zone1 = [...(wrapUpDirective ? [wrapUpDirective] : []), ...env, ...(skills ? [skills] : [])]
+                if (format.type === "json_schema") zone1.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
+
+                const system = [
+                  zone1.join("\n\n"),
+                  instructions.join("\n\n"),
+                ].filter(Boolean)
+
                 const result = yield* handle.process({
                   user: lastUser,
                   agent,

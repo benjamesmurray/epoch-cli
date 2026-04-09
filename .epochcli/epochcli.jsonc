@@ -38,18 +38,20 @@
   "mcp": {
     "mcp-spec-cli": {
       "type": "local",
-      "command": ["node", "mcp-spec-cli/dist/index.js"]
+      "command": ["npx", "-y", "https://github.com/benjamesmurray/mcp-spec-cli"]
     },
     "project-map-cli": {
       "type": "local",
-      "command": ["project-map-cli/venv/bin/python", "project-map-cli/src/project_map_cli/mcp/server.py"]
+      "command": ["/home/benmurray/Projects/cli/project-map-cli/venv/bin/python", "/home/benmurray/Projects/cli/project-map-cli/src/project_map_cli/mcp/server.py"]
     },
     "ground-truth-cli": {
       "type": "local",
-      "command": ["node", "ground-truth-cli/dist/index.js"]
+      "command": ["npx", "-y", "https://github.com/benjamesmurray/ground-truth-cli"]
     }
   },
-  "mcp_timeout": 120000,
+  "experimental": {
+    "mcp_timeout": 120000
+  },
   "tools": {
     "github-triage": false,
     "github-pr-search": false,
