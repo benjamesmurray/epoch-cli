@@ -30,6 +30,8 @@ export namespace Log {
       json_repaired?: boolean;
       wrap_up_triggered?: boolean;
       tps?: number;
+      loop_detected?: boolean;
+      loop_type?: string;
     };
 
     payload?: ZoneStructuredPayload | any;

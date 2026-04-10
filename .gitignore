@@ -38,3 +38,4 @@ e2e_testing/*_test/
 .assistant_rules.toon
 projects/active/eventbus*
 projects/completed/eventbus*
+.agent_logs/

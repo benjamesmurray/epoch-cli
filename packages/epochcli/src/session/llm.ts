@@ -766,7 +766,7 @@ export namespace LLM {
             // Check if this specific call resulted in an error in the subsequent message
             const nextMsg = input.messages[i + 1]
             if (nextMsg && nextMsg.role === "user" && Array.isArray(nextMsg.content)) {
-              const result = nextMsg.content.find(
+              const result = (nextMsg.content as any[]).find(
                 (c) => c.type === "tool-result" && c.toolCallId === (call as any).toolCallId,
               )
               if (result && (result as any).isError) {
