@@ -76,11 +76,13 @@ Schema Validation (Type Safety): * The structurally sound JSON object is parsed 
 This ensures that while the syntax was repaired, the underlying logical types (e.g., expecting an array of strings vs. a single string) remain valid.
 
 5.2 Loop Detection & Supervisor Intervention
-Beyond syntactic errors, local models can occasionally enter an autoregressive "infinite loop" where they repeatedly call the exact same tool with identical arguments, failing to advance their reasoning.
-To counter this, a **Supervisor Middleware** monitors the tool execution pipeline:
-* **The Monitor:** Before executing a tool, the middleware scans the recent message history. If it detects that the Main Model has called the exact same tool with identical arguments **3 times sequentially**, it intercepts the execution.
-* **The Intervention (Side-Model Handoff):** Instead of throwing a generic hard error, the orchestrator delegates to the Clerk (`local-side` model). It prompts the Clerk with the failing tool and arguments, instructing it to generate a "stern, technical directive" commanding the Main Model to stop its current approach.
-* **The Correction:** This dynamically generated directive is fed back into the Main Model as a forced `SYSTEM INTERVENTION` tool error. This effectively breaks the hallucination loop by providing a novel, context-aware disruption, forcing the Main Model to pivot its strategy.
+Beyond syntactic errors, local models can occasionally enter an autoregressive "infinite loop" or a trial-and-error "hallucination loop" where they repeatedly call a tool without advancing their reasoning.
+To counter this, a **Supervisor Middleware** monitors the tool execution pipeline for two specific patterns:
+* **The Monitor:** Before executing a tool, the middleware scans the recent message history for:
+    * **Identical Loops:** Detecting if the Main Model has called the exact same tool with identical arguments **3 times sequentially**.
+    * **Variadic Failure Loops:** Detecting if the Main Model has called the same tool **3 times sequentially** where every attempt resulted in a `tool-error` or failure, even if the arguments varied slightly (e.g., repeatedly trying different capitalizations of a non-existent file path).
+* **The Intervention (Side-Model Handoff):** When a loop is detected, the orchestrator intercepts the execution and delegates to the Clerk (`local-side` model). The Clerk is provided with the failing tool and a history of the attempted arguments, instructing it to generate a "stern, technical directive" commanding the Main Model to pivot.
+* **The Correction:** This dynamically generated directive is fed back into the Main Model as a forced `SYSTEM INTERVENTION` tool error. By including the specific history of failed attempts in the intervention, the Clerk can provide precise corrections (e.g., "Stop trying variations of requirements.md; it is missing from the directory") that effectively break the hallucination.
 
 5.3 Integration into the Agentic Loop
 Because this sanitization happens immediately post-stream (or intercepted mid-stream) at the application layer, the 26B model remains unaware of its own syntax failures.
@@ -97,16 +99,41 @@ Autocomplete (FIM): Disable <|think|> entirely. Strip all markdown formatting fr
 7. Positional Prompt Architecture (Bypassing Attention Bias)
 To guarantee ground-truth compliance and absolute context fidelity, the dynamic system prompt must be structurally partitioned to exploit the transformer's U-shaped attention curve. We must never place critical task data or user corrections in the middle of the prompt.
 Zone 1: The Absolute Beginning (First 200 Tokens)
-Correction Persistence Block: An automatically managed list of permanent facts and user corrections extracted from previous conversations.
-Current State (Spec CLI MCP): The immediate active task, current project phase, and the pending intentions tracked by the functional state.
-Critical Symbols (Project Map MCP): A highly condensed TOON-formatted list of the specific functions, classes, or imports immediately relevant to the active file.
-Zone 2: The Middle (The Attention Blind Spot)
-Ground Truth Rules: The behavioural rules, trigger conditions, and formatting constraints (e.g., the JSON-to-TOON logic, 3-stage JSON sanitizer rules).
+Purpose: This is the High-Attention Entry Zone. It is used for "Critical Facts" that the model must recall perfectly and immediately without any fabrication.
+Type of Content: Hard constants, identity facts, and core project definitions.
+Coding Assistant Example:
+The "Ground Truth" of the Project: "The project uses Python 3.12 and the FastAPI framework."
+Critical Constraints: "No external libraries are allowed beyond what is in requirements.txt."
+Identity/Personnel: "The Lead Architect is Sarah; all code reviews must be directed to her".
+Implemented as:
+Operational Facts: From operational_facts[12]{fact_id, zone, circumstance, content} in.assistant_rules.toon.
+Current State (Spec CLI MCP): The immediate active task in progress from Tasks.md, current project phase from .epoch-context.md. 
+Critical Symbols (Project Map MCP): A highly condensed TOON-formatted list of the specific functions, classes, or imports immediately relevant to the active file. Using the ‘impact’ command.
+Zone 2: The Engine (Middle Section)
+Purpose: This is the Attention Blind Spot. It is used for "Ground Truth Rules" — behavioral guidelines and reasoning frameworks that the model needs to follow rather than recite verbatim.
+Type of Content: General behavioral rules, cognitive domains, and "Living Context" (general knowledge about the task).
+Coding Assistant Example:
+Reasoning Rules: "Always perform a 'verify-during-generation' pass to check for syntax errors before finishing a response".
+Style Guides: "Follow PEP 8 styling. Use descriptive variable names and provide docstrings for every new function."
+Communication Discipline: "If a solution is uncertain, use the 'Uncertainty Vocabulary' (e.g., mark it as an 'Inferred' fix rather than a 'Confirmed' one)".
+	Implemented as:
+Ground Truth Rules: From BEHAVIORAL RULE PACKS, the rule pack identified based on the ‘user intent’ the side model identifies being discussed, to select the appropriate Behavioural rule pack. e.g. debugging pack in .assistant_rules.toon
 General Context: Broad repository context, inactive file trees, or full linter logs that are useful for background reasoning but not strictly critical for the immediate next token.
-Tool Definitions: The JSON schemas for your MCP servers and application-layer tools.
-Zone 3: The Absolute End (Last 200 Tokens Before Conversation)
-Fact Repetition: A brief reiteration of the most critical facts or the immediate active task injected right before the conversation history.
+Communication Discipline: Content from Gemma.txt
+
+
+Zone 3: The Reinforcement & Focus (Bottom ~200 Tokens)
+Purpose: This is the High-Attention Exit Zone. It repeats the critical facts from Zone 1 to ensure they stay "top of mind" right before the model generates its response. It also includes the "Persistent State" (what is happening right now).
+Type of Content: Repetition of Zone 1 facts, the current "Workspace Focus," and recent user corrections.
+Coding Assistant Example:
+Fact Repetition: "Reminder: The project is Python 3.12 / FastAPI. Personnel: Sarah (Architect)".
+Active Workspace Focus: "Current Task: Fix the IndexError in the auth_service.py login function".
+Persistent Correction: "User Correction: We are now using asynchronous database calls for the login feature (Updated April 5, 2026)"
+	Implemented as: 
+Fact Repetition: A verbatim reiteration of the Critical/Operational Facts from Zone 1.
+Correction Persistence Block: Extracted user corrections (from the persistence pipeline) PROJECT-SPECIFIC RULES (Context-Aware Gaps) in .assistant_rules.toon. 
 Local Cursor Context: The exact line of code the user is highlighting or editing.
+
 *8. The Correction Persistence Pipeline
 To prevent the model from repeating factual or stylistic errors as the conversation context grows, the assistant must utilize an automated correction-to-permanent-fact pipeline.
 Detection: The system passively monitors the user's chat input for correction language patterns (e.g., "No, use this variable," or "Don't format it like that").

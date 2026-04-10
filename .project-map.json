@@ -1,0 +1,8 @@
+[
+  { "path": "packages/epochcli", "type": "directory" },
+  { "path": "ground-truth-cli", "type": "directory" },
+  { "path": "project-map-cli", "type": "directory" },
+  { "path": "mcp-spec-cli", "type": "directory" },
+  { "path": "package.json", "type": "file" },
+  { "path": ".epochcli/epochcli.jsonc", "type": "file" }
+]

@@ -1,0 +1,16 @@
+[
+  {
+    "id": "eventbus-v2",
+    "iterations": 10,
+    "timeoutMs": 300000,
+    "prompt": "Implement an advanced, strictly typed Transactional Event Sourcing Bus using the Spec CLI in ONE-SHOT mode. Complete the feature until it is fully built and verified.",
+    "expectedTools": ["sc_init", "sc_todo_start", "sc_todo_complete", "sc_plan"],
+    "runTargetDir": ".epochcli/tool/$RUN_ID",
+    "docker": {
+      "imageName": "epochcli-eval-env:latest",
+      "network": "bridge",
+      "memoryLimit": "4g"
+    }
+  }
+]
+

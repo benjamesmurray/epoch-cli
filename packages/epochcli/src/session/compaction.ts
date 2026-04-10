@@ -259,7 +259,7 @@ When constructing the summary, try to stick to this template:
             agent,
             sessionID: input.sessionID,
             tools: {},
-            system: [],
+            system: { zone1: [], zone2: [] },
             messages: [
               ...modelMessages,
               {

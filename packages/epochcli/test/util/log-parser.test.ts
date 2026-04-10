@@ -17,10 +17,10 @@ describe("LogParserTool - State Machine Overlap Detection", () => {
   it("validates successful sequential execution", async () => {
     const logPath = path.join(tmpDir, "valid.log")
     const logContent = `
-2026-04-08T12:00:00 INFO {"epochId":"123","event":"START_GENERATE","providerId":"local-side","phase":"Phase 1"}
-2026-04-08T12:00:01 INFO {"epochId":"123","event":"END_GENERATE","providerId":"local-side","phase":"Phase 1","json_repaired":true}
-2026-04-08T12:00:02 INFO {"epochId":"123","event":"START_GENERATE","providerId":"local-main","phase":"Phase 2"}
-2026-04-08T12:00:05 INFO {"epochId":"123","event":"END_GENERATE","providerId":"local-main","phase":"Phase 2"}
+2026-04-08T12:00:00 INFO {"mainEpochId":"123","event":"START_GENERATE","providerId":"local-side","phase":"Phase 1"}
+2026-04-08T12:00:01 INFO {"mainEpochId":"123","event":"END_GENERATE","providerId":"local-side","phase":"Phase 1","metrics":{"json_repaired":true}}
+2026-04-08T12:00:02 INFO {"mainEpochId":"123","event":"START_GENERATE","providerId":"local-main","phase":"Phase 2"}
+2026-04-08T12:00:05 INFO {"mainEpochId":"123","event":"END_GENERATE","providerId":"local-main","phase":"Phase 2"}
 `
     await fs.writeFile(logPath, logContent.trim())
 
@@ -33,8 +33,8 @@ describe("LogParserTool - State Machine Overlap Detection", () => {
   it("flags overlapping execution when local-main starts while local-side is active", async () => {
     const logPath = path.join(tmpDir, "overlap.log")
     const logContent = `
-2026-04-08T12:00:00 INFO {"epochId":"456","event":"START_GENERATE","providerId":"local-side","phase":"Phase 1"}
-2026-04-08T12:00:01 INFO {"epochId":"456","event":"START_GENERATE","providerId":"local-main","phase":"Phase 2"}
+2026-04-08T12:00:00 INFO {"mainEpochId":"456","event":"START_GENERATE","providerId":"local-side","phase":"Phase 1"}
+2026-04-08T12:00:01 INFO {"mainEpochId":"456","event":"START_GENERATE","providerId":"local-main","phase":"Phase 2"}
 `
     await fs.writeFile(logPath, logContent.trim())
 
@@ -46,9 +46,9 @@ describe("LogParserTool - State Machine Overlap Detection", () => {
   it("ignores malformed JSON and skips gracefully", async () => {
     const logPath = path.join(tmpDir, "malformed.log")
     const logContent = `
-2026-04-08T12:00:00 INFO {"epochId":"789","event":"START_GENERATE","providerId":"local-side","phase":"Phase 1"}
+2026-04-08T12:00:00 INFO {"mainEpochId":"789","event":"START_GENERATE","providerId":"local-side","phase":"Phase 1"}
 Just a normal log line with { some invalid JSON
-2026-04-08T12:00:01 INFO {"epochId":"789","event":"END_GENERATE","providerId":"local-side","phase":"Phase 1"}
+2026-04-08T12:00:01 INFO {"mainEpochId":"789","event":"END_GENERATE","providerId":"local-side","phase":"Phase 1"}
 `
     await fs.writeFile(logPath, logContent.trim())
 

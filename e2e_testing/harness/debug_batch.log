@@ -1,0 +1,57 @@
+Loading configuration from /home/benmurray/Projects/cli/e2e_testing/harness/test_config.json...
+
+Evidence will be captured in: /home/benmurray/Projects/epochclievaluations/suite_2026-04-10T01-43-56-904Z
+
+==================================================
+Starting Scenario: eventbus-v2 (10 iterations)
+Docker Mode: Enabled (epochcli-eval-env:latest)
+==================================================
+
+[2026-04-10T01:43:56.904Z] Starting eventbus-v2-run-1...
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_plan
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_plan
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_plan
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_plan
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_plan
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_plan
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_plan
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_plan
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_plan
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_plan
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_plan

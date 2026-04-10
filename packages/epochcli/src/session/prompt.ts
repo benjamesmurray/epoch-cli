@@ -222,7 +222,10 @@ export namespace SessionPrompt {
           const result = await LLM.stream({
             agent: ag,
             user: firstInfo,
-            system: [],
+            system: {
+              zone1: [],
+              zone2: [],
+            },
             small: true,
             tools: {},
             model: mdl,
@@ -981,6 +984,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           },
           system: input.system,
           format: input.format,
+          cursorContext: input.cursorContext,
         }
 
         yield* Effect.addFinalizer(() =>
@@ -1528,10 +1532,10 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                 const zone1 = [...(wrapUpDirective ? [wrapUpDirective] : []), ...env, ...(skills ? [skills] : [])]
                 if (format.type === "json_schema") zone1.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
 
-                const system = [
-                  zone1.join("\n\n"),
-                  instructions.join("\n\n"),
-                ].filter(Boolean)
+                const system = {
+                  zone1: [zone1.join("\\n\\n")].filter(Boolean),
+                  zone2: [instructions.join("\\n\\n")].filter(Boolean),
+                }
 
                 const result = yield* handle.process({
                   user: lastUser,
@@ -1775,6 +1779,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       })
       .optional(),
     agent: z.string().optional(),
+    cursorContext: z.any().optional(),
     noReply: z.boolean().optional(),
     tools: z
       .record(z.string(), z.boolean())

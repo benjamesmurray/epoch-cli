@@ -1,7 +1,7 @@
+import * as vscode from "vscode"
+
 // This method is called when your extension is deactivated
 export function deactivate() {}
-
-import * as vscode from "vscode"
 
 const TERMINAL_NAME = "epochcli"
 
@@ -35,7 +35,7 @@ export function activate(context: vscode.ExtensionContext) {
     if (terminal.name === TERMINAL_NAME) {
       // @ts-ignore
       const port = terminal.creationOptions.env?.["_EXTENSION_EPOCHCLI_PORT"]
-      port ? await appendPrompt(parseInt(port), fileRef) : terminal.sendText(fileRef, false)
+      port ? await appendPrompt(parseInt(port), fileRef.text, fileRef.cursorContext) : terminal.sendText(fileRef.text, false)
       terminal.show()
     }
   })
@@ -85,18 +85,18 @@ export function activate(context: vscode.ExtensionContext) {
 
     // If connected, append the prompt to the terminal
     if (connected) {
-      await appendPrompt(port, `In ${fileRef}`)
+      await appendPrompt(port, `In ${fileRef.text}`, fileRef.cursorContext)
       terminal.show()
     }
   }
 
-  async function appendPrompt(port: number, text: string) {
+  async function appendPrompt(port: number, text: string, cursorContext?: any) {
     await fetch(`http://localhost:${port}/tui/append-prompt`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, cursorContext }),
     })
   }
 
@@ -115,6 +115,8 @@ export function activate(context: vscode.ExtensionContext) {
     // Get the relative path from workspace root
     const relativePath = vscode.workspace.asRelativePath(document.uri)
     let filepathWithAt = `@${relativePath}`
+    
+    let cursorContext: any = undefined
 
     // Check if there's a selection and add line numbers
     const selection = activeEditor.selection
@@ -130,8 +132,17 @@ export function activate(context: vscode.ExtensionContext) {
         // Multi-line selection
         filepathWithAt += `#L${startLine}-${endLine}`
       }
+    } else {
+      // Empty selection, get the current line
+      const line = selection.active.line
+      const lineText = document.lineAt(line).text
+      cursorContext = {
+        file: relativePath,
+        line: line + 1,
+        code: lineText
+      }
     }
 
-    return filepathWithAt
+    return { text: filepathWithAt, cursorContext }
   }
 }

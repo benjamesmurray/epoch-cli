@@ -33,8 +33,7 @@ Open your `/home/benmurray/Projects/cli/.epochcli/epochcli.jsonc` file and updat
     },
     "ground-truth-cli": {
       "type": "local",
-      // Node.js application
-      "command": ["node", "ground-truth-cli/dist/index.js"]
+      "command": ["npx", "-y", "https://github.com/benjamesmurray/ground-truth-cli"]
     }
   },
 

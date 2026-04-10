@@ -104,6 +104,12 @@ export function Prompt(props: PromptProps) {
     if (!current) return provider
     return consoleManagedProviderLabel(sync.data.console_state.consoleManagedProviders, current.providerID, provider)
   })
+  const clerkModelName = createMemo(() => {
+    const sideProvider = sync.data.provider.find((p) => p.id === "local-side")
+    if (!sideProvider) return null
+    const firstModel = Object.values(sideProvider.models)[0]
+    return firstModel ? firstModel.name : null
+  })
   const hasRightContent = createMemo(() => Boolean(props.right || activeOrgName()))
 
   function promptModelWarning() {
@@ -127,6 +133,11 @@ export function Prompt(props: PromptProps) {
   sdk.event.on(TuiEvent.PromptAppend.type, (evt) => {
     if (!input || input.isDestroyed) return
     input.insertText(evt.properties.text)
+    // @ts-expect-error cursorContext is omitted from the generated OpenAPI schema due to z.any()
+    if (evt.properties.cursorContext) {
+      // @ts-expect-error
+      setStore("prompt", "cursorContext", evt.properties.cursorContext)
+    }
     setTimeout(() => {
       // setTimeout is a workaround and needs to be addressed properly
       if (!input || input.isDestroyed) return
@@ -705,6 +716,8 @@ export function Prompt(props: PromptProps) {
           agent: local.agent.current().name,
           model: selectedModel,
           variant,
+          // @ts-expect-error
+          cursorContext: store.prompt.cursorContext,
           parts: [
             {
               id: PartID.ascending(),
@@ -1098,22 +1111,45 @@ export function Prompt(props: PromptProps) {
               syntaxStyle={syntax()}
             />
             <box flexDirection="row" flexShrink={0} paddingTop={1} gap={1} justifyContent="space-between">
-              <box flexDirection="row" gap={1}>
-                <text fg={highlight()}>
-                  {store.mode === "shell" ? "Shell" : Locale.titlecase(local.agent.current().name)}{" "}
-                </text>
-                <Show when={store.mode === "normal"}>
-                  <box flexDirection="row" gap={1}>
-                    <text flexShrink={0} fg={keybind.leader ? theme.textMuted : theme.text}>
-                      {local.model.parsed().model}
-                    </text>
-                    <text fg={theme.textMuted}>{currentProviderLabel()}</text>
-                    <Show when={showVariant()}>
-                      <text fg={theme.textMuted}>·</text>
-                      <text>
-                        <span style={{ fg: theme.warning, bold: true }}>{local.model.variant.current()}</span>
+              <box flexDirection="row" gap={4}>
+                <box flexDirection="column">
+                  <Show when={store.mode === "shell"}>
+                    <text fg={highlight()}>Shell</text>
+                  </Show>
+                  <Show when={store.mode === "normal"}>
+                    <box flexDirection="row" gap={1}>
+                      <text fg={theme.success}>•</text>
+                      <text flexShrink={0} fg={keybind.leader ? theme.textMuted : theme.text}>
+                        Coder: {local.model.parsed().model}
                       </text>
+                      <text fg={theme.textMuted}>{currentProviderLabel()}</text>
+                      <Show when={showVariant()}>
+                        <text fg={theme.textMuted}>·</text>
+                        <text>
+                          <span style={{ fg: theme.warning, bold: true }}>{local.model.variant.current()}</span>
+                        </text>
+                      </Show>
+                    </box>
+                    <Show when={clerkModelName()}>
+                      <box flexDirection="row" gap={1}>
+                        <text fg={theme.success}>•</text>
+                        <text flexShrink={0} fg={keybind.leader ? theme.textMuted : theme.text}>
+                          Clerk: {clerkModelName()}
+                        </text>
+                      </box>
                     </Show>
+                  </Show>
+                </box>
+                <Show when={store.mode === "normal"}>
+                  <box flexDirection="column">
+                    {["mcp-spec-cli", "project-map-cli", "ground-truth-cli"].map((server) => (
+                      <box flexDirection="row" gap={1}>
+                        <text fg={sync.data.mcp[server]?.status === "connected" ? theme.success : theme.error}>
+                          {sync.data.mcp[server]?.status === "connected" ? "●" : "○"}
+                        </text>
+                        <text fg={theme.textMuted}>{server}</text>
+                      </box>
+                    ))}
                   </box>
                 </Show>
               </box>

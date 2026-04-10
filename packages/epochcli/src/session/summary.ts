@@ -1,4 +1,5 @@
 import z from "zod"
+import { Lock } from "../util/lock.js"
 import { Effect, Layer, ServiceMap } from "effect"
 import { makeRuntime } from "@/effect/run-service"
 import { Bus } from "@/bus"
@@ -107,29 +108,33 @@ export namespace SessionSummary {
         sessionID: SessionID
         messageID: MessageID
       }) {
-        const all = yield* sessions.messages({ sessionID: input.sessionID })
-        if (!all.length) return
+        const lock = yield* Effect.promise(() => Lock.write(input.sessionID))
+        
+        yield* Effect.gen(function* () {
+          const all = yield* sessions.messages({ sessionID: input.sessionID })
+          if (!all.length) return
 
-        const diffs = yield* computeDiff({ messages: all })
-        yield* sessions.setSummary({
-          sessionID: input.sessionID,
-          summary: {
-            additions: diffs.reduce((sum, x) => sum + x.additions, 0),
-            deletions: diffs.reduce((sum, x) => sum + x.deletions, 0),
-            files: diffs.length,
-          },
-        })
-        yield* storage.write(["session_diff", input.sessionID], diffs).pipe(Effect.ignore)
-        yield* bus.publish(Session.Event.Diff, { sessionID: input.sessionID, diff: diffs })
+          const diffs = yield* computeDiff({ messages: all })
+          yield* sessions.setSummary({
+            sessionID: input.sessionID,
+            summary: {
+              additions: diffs.reduce((sum, x) => sum + x.additions, 0),
+              deletions: diffs.reduce((sum, x) => sum + x.deletions, 0),
+              files: diffs.length,
+            },
+          })
+          yield* storage.write(["session_diff", input.sessionID], diffs).pipe(Effect.ignore)
+          yield* bus.publish(Session.Event.Diff, { sessionID: input.sessionID, diff: diffs })
 
-        const messages = all.filter(
-          (m) => m.info.id === input.messageID || (m.info.role === "assistant" && m.info.parentID === input.messageID),
-        )
-        const target = messages.find((m) => m.info.id === input.messageID)
-        if (!target || target.info.role !== "user") return
-        const msgDiffs = yield* computeDiff({ messages })
-        target.info.summary = { ...target.info.summary, diffs: msgDiffs }
-        yield* sessions.updateMessage(target.info)
+          const messages = all.filter(
+            (m) => m.info.id === input.messageID || (m.info.role === "assistant" && m.info.parentID === input.messageID),
+          )
+          const target = messages.find((m) => m.info.id === input.messageID)
+          if (!target || target.info.role !== "user") return
+          const msgDiffs = yield* computeDiff({ messages })
+          target.info.summary = { ...target.info.summary, diffs: msgDiffs }
+          yield* sessions.updateMessage(target.info)
+        }).pipe(Effect.ensuring(Effect.sync(() => lock[Symbol.dispose]())))
       })
 
       const diff = Effect.fn("SessionSummary.diff")(function* (input: { sessionID: SessionID; messageID?: MessageID }) {

@@ -9,6 +9,7 @@ import { ReadTool } from "./read"
 import { TaskTool } from "./task"
 import { TodoWriteTool } from "./todo"
 import { WebFetchTool } from "./webfetch"
+import { RevertFileTool } from "./revert"
 import { WriteTool } from "./write"
 import { InvalidTool } from "./invalid"
 import { SkillTool } from "./skill"
@@ -142,6 +143,7 @@ export namespace ToolRegistry {
       const glob = yield* build(GlobTool)
       const grep = yield* build(GrepTool)
       const edit = yield* build(EditTool)
+      const revert = yield* build(RevertFileTool)
       const write = yield* build(WriteTool)
       const task = yield* build(TaskTool)
       const fetch = yield* build(WebFetchTool)
@@ -166,6 +168,7 @@ export namespace ToolRegistry {
           glob,
           grep,
           edit,
+          revert,
           write,
           task,
           fetch,
@@ -202,7 +205,7 @@ export namespace ToolRegistry {
             !!Env.get("EPOCHCLI_E2E_LLM_URL") ||
             (model.modelID.includes("gpt-") && !model.modelID.includes("oss") && !model.modelID.includes("gpt-4"))
           if (tool.id === "apply_patch") return usePatch
-          if (tool.id === "edit" || tool.id === "write") return !usePatch
+          if (tool.id === "edit" || tool.id === "write" || tool.id === "revert_file") return !usePatch
 
           return true
         })

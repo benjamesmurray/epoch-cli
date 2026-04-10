@@ -59,23 +59,23 @@ export namespace LogParserTool {
                 
                 const event = JSON.parse(match[0]) as Log.EnhancedModelExecutionEvent
                 
-                if (event.json_repaired) {
+                if (event.metrics?.json_repaired) {
                     repairCount++
                 }
 
-                if (!event.event || !event.providerId || !event.epochId) continue
+                if (!event.event || !event.providerId || !event.mainEpochId) continue
 
                 if (event.event === "START_GENERATE") {
-                    const activeProvider = stateMachine.get(event.epochId)
+                    const activeProvider = stateMachine.get(event.mainEpochId)
                     if (activeProvider && activeProvider !== event.providerId) {
                         overlapDetected = true
-                        return { valid: false, message: `Concurrency Violation: ${event.providerId} started while ${activeProvider} was still active in epoch ${event.epochId}` }
+                        return { valid: false, message: `Concurrency Violation: ${event.providerId} started while ${activeProvider} was still active in epoch ${event.mainEpochId}` }
                     }
-                    stateMachine.set(event.epochId, event.providerId)
+                    stateMachine.set(event.mainEpochId, event.providerId)
                 } else if (event.event === "END_GENERATE") {
-                    const activeProvider = stateMachine.get(event.epochId)
+                    const activeProvider = stateMachine.get(event.mainEpochId)
                     if (activeProvider === event.providerId) {
-                        stateMachine.delete(event.epochId)
+                        stateMachine.delete(event.mainEpochId)
                         sequentialSuccessCount++
                     }
                 }

@@ -360,6 +360,7 @@ export namespace MessageV2 {
       created: z.number(),
     }),
     format: Format.optional(),
+    cursorContext: z.any().optional(),
     summary: z
       .object({
         title: z.string().optional(),

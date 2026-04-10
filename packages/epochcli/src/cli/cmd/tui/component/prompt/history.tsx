@@ -10,6 +10,7 @@ import type { AgentPart, FilePart, TextPart } from "@epoch-ai/sdk/v2"
 export type PromptInfo = {
   input: string
   mode?: "normal" | "shell"
+  cursorContext?: any
   parts: (
     | Omit<FilePart, "id" | "messageID" | "sessionID">
     | Omit<AgentPart, "id" | "messageID" | "sessionID">

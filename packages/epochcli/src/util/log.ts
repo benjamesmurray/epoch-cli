@@ -6,33 +6,45 @@ import z from "zod"
 import { Glob } from "./glob"
 
 export namespace Log {
-  export interface EnhancedModelExecutionEvent {
-    timestamp: number;
-    epochId: string;
-    event: "START_GENERATE" | "END_GENERATE" | "ERROR";
-    providerId: string;
-    phase: string;
-    metrics?: {
-      ttftMs?: number;
-      tps?: number;
-      promptTokens?: number;
-    };
-    payload?: any;
-    json_repaired?: boolean;
+  export type ZoneStructuredPayload = any; // 
+  export type OldZoneStructuredPayload = {
+    zone1_critical_rules: string
+    zone2_context_files: string
+    zone3_active_cursor: string
   }
 
-  export function truncatePayload(payload: any): any {
-    if (Array.isArray(payload) && payload.length > 2) {
-      const zone1 = payload[0];
-      const zone3 = payload[payload.length - 1];
-      const truncatedCount = payload.length - 2;
-      return [
-        zone1,
-        { role: "system", content: `[... ${truncatedCount} messages truncated (Zone 2) ...]` },
-        zone3
-      ];
+  export interface EnhancedModelExecutionEvent {
+    timestamp: number;
+    event: "START_GENERATE" | "END_GENERATE" | "ERROR";
+    providerId: "local-main" | "local-side" | string;
+    phase: "Phase 1: Pre-Gen" | "Phase 2: Gen" | "Phase 3: Post-Gen" | string;
+
+    mainEpochId: string;
+    clerkMicroEpochId?: string;
+
+    metrics?: {
+      promptTokens?: number;
+      completionTokens?: number;
+      ttftMs?: number;
+      toolsCalled?: number;
+      json_repaired?: boolean;
+      wrap_up_triggered?: boolean;
+      tps?: number;
+    };
+
+    payload?: ZoneStructuredPayload | any;
+  }
+
+  export function truncatePayload(payload: ZoneStructuredPayload | any | undefined): ZoneStructuredPayload | undefined {
+    if (!payload) return undefined;
+
+    // Always preserve zone1 and zone3, truncate zone2 specifically for logging
+    return {
+      ...payload,
+      zone2_context_files: payload.zone2_context_files 
+        ? "...[ZONE 2 TRUNCATED FOR LOGGING]"
+        : payload.zone2_context_files
     }
-    return payload;
   }
 
   export const Level = z.enum(["DEBUG", "INFO", "WARN", "ERROR"]).meta({ ref: "LogLevel", description: "Log level" })

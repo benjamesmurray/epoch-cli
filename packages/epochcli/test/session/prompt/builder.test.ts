@@ -1,12 +1,12 @@
 import { describe, it, expect } from "bun:test";
-import { PromptBuilder, type PromptPayload } from "../../../src/session/prompt/builder";
+import { PromptBuilder, type ZoneStructuredPayload } from "../../../src/session/prompt/builder";
 
 describe("PromptBuilder", () => {
   it("should correctly assemble all three zones", () => {
-    const payload: PromptPayload = {
-      zone1: ["Fact 1", "Fact 2"],
-      zone2: ["Rule Pack A", "Tool Schemas"],
-      zone3: ["Fact 1 Repeated", "Cursor at line 10"],
+    const payload: ZoneStructuredPayload = {
+      zone1_critical_rules: ["Fact 1", "Fact 2"],
+      zone2_context_files: ["Rule Pack A", "Tool Schemas"],
+      zone3_active_cursor: ["Fact 1 Repeated", "Cursor at line 10"],
     };
 
     const result = PromptBuilder.build(payload);
@@ -22,10 +22,10 @@ describe("PromptBuilder", () => {
   });
 
   it("should handle empty zones gracefully", () => {
-    const payload: PromptPayload = {
-      zone1: ["Fact 1"],
-      zone2: [],
-      zone3: ["Cursor at line 10"],
+    const payload: ZoneStructuredPayload = {
+      zone1_critical_rules: ["Fact 1"],
+      zone2_context_files: [],
+      zone3_active_cursor: ["Cursor at line 10"],
     };
 
     const result = PromptBuilder.build(payload);
@@ -40,10 +40,10 @@ describe("PromptBuilder", () => {
   });
 
   it("should filter out empty strings within zones", () => {
-    const payload: PromptPayload = {
-      zone1: ["Fact 1", "", "Fact 2"],
-      zone2: ["", "Rule Pack A"],
-      zone3: [""],
+    const payload: ZoneStructuredPayload = {
+      zone1_critical_rules: ["Fact 1", "", "Fact 2"],
+      zone2_context_files: ["", "Rule Pack A"],
+      zone3_active_cursor: [""],
     };
 
     const result = PromptBuilder.build(payload);
@@ -54,10 +54,10 @@ describe("PromptBuilder", () => {
   });
 
   it("should return an empty string if all zones are empty", () => {
-    const payload: PromptPayload = {
-      zone1: [],
-      zone2: [""],
-      zone3: [],
+    const payload: ZoneStructuredPayload = {
+      zone1_critical_rules: [],
+      zone2_context_files: [""],
+      zone3_active_cursor: [],
     };
 
     const result = PromptBuilder.build(payload);

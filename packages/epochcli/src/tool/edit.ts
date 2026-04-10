@@ -18,8 +18,42 @@ import { Filesystem } from "../util/filesystem"
 import { Instance } from "../project/instance"
 import { Snapshot } from "@/snapshot"
 import { assertExternalDirectory } from "./external-directory"
+import { generateText } from "ai"
+import { Provider } from "../provider/provider"
 
 const MAX_DIAGNOSTICS_PER_FILE = 20
+
+async function analyzeEditFailure(content: string, oldString: string, newString: string): Promise<string | null> {
+  try {
+    const sideLanguage = await Provider.getLanguage(
+      await Provider.getModel("local-side" as any, "nemotron-3-nano-4b" as any)
+    )
+    if (!sideLanguage) return null
+
+    const prompt = `You are a pair programmer assisting an AI agent. The agent tried to edit a file using a search-and-replace tool, but its 'oldString' was not found.
+Analyze the actual file contents against what the agent tried to replace, and return a CONCISE, 1-2 sentence explanation of why it failed so the agent can fix it.
+DO NOT return the raw code. ONLY return the explanation (e.g. "The signature changed to include ctx", "The function was deleted").
+
+Intended oldString:
+${oldString}
+
+Intended newString:
+${newString}
+
+Actual File Content:
+${content.substring(0, 8000)}`
+
+    const response = await generateText({
+      model: sideLanguage,
+      prompt
+    })
+
+    return response.text
+  } catch (error) {
+    // Silently fallback if the side model is offline or fails
+    return null
+  }
+}
 
 function normalizeLineEndings(text: string): string {
   return text.replaceAll("\r\n", "\n")
@@ -92,7 +126,17 @@ export const EditTool = Tool.define("edit", {
       const old = convertToLineEnding(normalizeLineEndings(params.oldString), ending)
       const next = convertToLineEnding(normalizeLineEndings(params.newString), ending)
 
-      contentNew = replace(contentOld, old, next, params.replaceAll)
+      try {
+        contentNew = replace(contentOld, old, next, params.replaceAll)
+      } catch (error: any) {
+        if (error.message.includes("Could not find oldString")) {
+          const helperMsg = await analyzeEditFailure(contentOld, old, next)
+          if (helperMsg) {
+            throw new Error(`${error.message}\n\n[Clerk Pair Programmer Analysis]:\n${helperMsg}`)
+          }
+        }
+        throw error
+      }
 
       diff = trimDiff(
         createTwoFilesPatch(filePath, filePath, normalizeLineEndings(contentOld), normalizeLineEndings(contentNew)),
@@ -106,6 +150,9 @@ export const EditTool = Tool.define("edit", {
           diff,
         },
       })
+
+      // Create a safety net backup file
+      await Filesystem.write(filePath + ".bak", contentOld)
 
       await Filesystem.write(filePath, contentNew)
       await Format.file(filePath)
@@ -659,8 +706,10 @@ export function replace(content: string, oldString: string, newString: string, r
   }
 
   if (notFound) {
+    const preview = content.split("\\n").slice(0, 100).join("\\n")
+    const previewMessage = content.split("\\n").length > 100 ? `\\n\\nFirst 100 lines of current file:\\n${preview}\\n...` : `\\n\\nCurrent file contents:\\n${preview}`
     throw new Error(
-      "Could not find oldString in the file. It must match exactly, including whitespace, indentation, and line endings.",
+      `Could not find oldString in the file. It must match exactly, including whitespace, indentation, and line endings.${previewMessage}`,
     )
   }
   throw new Error("Found multiple matches for oldString. Provide more surrounding context to make the match unique.")

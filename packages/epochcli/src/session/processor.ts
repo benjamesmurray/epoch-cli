@@ -16,8 +16,11 @@ import type { SessionID } from "./schema"
 import { SessionRetry } from "./retry"
 import { SessionStatus } from "./status"
 import { SessionSummary } from "./summary"
+import { SanitizerMiddleware } from "./sanitizer"
 import type { Provider } from "@/provider/provider"
 import { Question } from "@/question"
+
+import { Lock } from "../util/lock.js"
 
 export namespace SessionProcessor {
   const DOOM_LOOP_THRESHOLD = 3
@@ -454,6 +457,7 @@ export namespace SessionProcessor {
               const stream = llm.stream(streamInput)
 
               yield* stream.pipe(
+                SanitizerMiddleware.transform(),
                 Stream.tap((event) => handleEvent(event)),
                 Stream.takeUntil(() => ctx.needsCompaction),
                 Stream.runDrain,

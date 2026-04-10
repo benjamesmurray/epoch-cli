@@ -103,6 +103,53 @@ describe("session.llm.hasToolCalls", () => {
   })
 })
 
+describe("session.llm.parseGroundTruthRules", () => {
+  test("extracts operational facts, behavioral rules, and project-specific rules", () => {
+    const raw = `
+ZONE 1 & 3: OPERATIONAL FACTS (Anchors for high-attention regions)
+Fact 1: Something critical.
+ZONE 2: BEHAVIORAL RULE PACKS (Dynamic injection for the middle region)
+Rule 1: Be nice.
+ZONE 2: RULE LIBRARY
+Some more rules.
+ZONE 3: PROJECT-SPECIFIC RULES (Context-Aware Gaps)
+Project Rule 1: No external libraries.`
+
+    const result = LLM.parseGroundTruthRules(raw)
+    
+    expect(result.operationalFacts).toContain("Fact 1: Something critical.")
+    expect(result.operationalFacts).toContain("ZONE 1 & 3: OPERATIONAL FACTS")
+    
+    expect(result.behavioralRules).toContain("Rule 1: Be nice.")
+    expect(result.behavioralRules).toContain("ZONE 2: RULE LIBRARY")
+    
+    expect(result.projectSpecific).toContain("Project Rule 1: No external libraries.")
+  })
+
+  test("falls back to behavioralRules when markers are missing", () => {
+    const raw = `Just some plain text without any zone markers.`
+    const result = LLM.parseGroundTruthRules(raw)
+    
+    expect(result.operationalFacts).toBe("")
+    expect(result.projectSpecific).toBe("")
+    expect(result.behavioralRules).toBe(raw)
+  })
+
+  test("extracts correctly if project-specific rules are missing", () => {
+    const raw = `
+ZONE 1 & 3: OPERATIONAL FACTS
+Fact 1
+ZONE 2: BEHAVIORAL RULE PACKS
+Rule 1`
+
+    const result = LLM.parseGroundTruthRules(raw)
+    
+    expect(result.operationalFacts).toContain("Fact 1")
+    expect(result.behavioralRules).toContain("Rule 1")
+    expect(result.projectSpecific).toBe("")
+  })
+})
+
 type Capture = {
   url: URL
   headers: Headers
@@ -350,7 +397,7 @@ describe("session.llm.stream", () => {
           sessionID,
           model: resolved,
           agent,
-          system: ["You are a helpful assistant."],
+          system: { zone1: [], zone2: ["You are a helpful assistant."] },
           abort: new AbortController().signal,
           messages: [{ role: "user", content: "Hello" }],
           tools: {},
@@ -439,7 +486,7 @@ describe("session.llm.stream", () => {
           sessionID,
           model: resolved,
           agent,
-          system: ["You are a helpful assistant."],
+          system: { zone1: [], zone2: ["You are a helpful assistant."] },
           abort: ctrl.signal,
           messages: [{ role: "user", content: "Hello" }],
           tools: {},
@@ -517,7 +564,7 @@ describe("session.llm.stream", () => {
                 sessionID,
                 model: resolved,
                 agent,
-                system: ["You are a helpful assistant."],
+                system: { zone1: [], zone2: ["You are a helpful assistant."] },
                 messages: [{ role: "user", content: "Hello" }],
                 tools: {},
               })
@@ -606,7 +653,7 @@ describe("session.llm.stream", () => {
           model: resolved,
           agent,
           permission: [{ permission: "question", pattern: "*", action: "allow" }],
-          system: ["You are a helpful assistant."],
+          system: { zone1: [], zone2: ["You are a helpful assistant."] },
           abort: new AbortController().signal,
           messages: [{ role: "user", content: "Hello" }],
           tools: {
@@ -723,7 +770,7 @@ describe("session.llm.stream", () => {
           sessionID,
           model: resolved,
           agent,
-          system: ["You are a helpful assistant."],
+          system: { zone1: [], zone2: ["You are a helpful assistant."] },
           abort: new AbortController().signal,
           messages: [{ role: "user", content: "Hello" }],
           tools: {},
@@ -842,7 +889,7 @@ describe("session.llm.stream", () => {
           sessionID,
           model: resolved,
           agent,
-          system: ["You are a helpful assistant."],
+          system: { zone1: [], zone2: ["You are a helpful assistant."] },
           abort: new AbortController().signal,
           messages: [
             {
@@ -967,7 +1014,7 @@ describe("session.llm.stream", () => {
           sessionID,
           model: resolved,
           agent,
-          system: ["You are a helpful assistant."],
+          system: { zone1: [], zone2: ["You are a helpful assistant."] },
           abort: new AbortController().signal,
           messages: [{ role: "user", content: "Hello" }],
           tools: {},
@@ -1068,7 +1115,7 @@ describe("session.llm.stream", () => {
           sessionID,
           model: resolved,
           agent,
-          system: ["You are a helpful assistant."],
+          system: { zone1: [], zone2: ["You are a helpful assistant."] },
           abort: new AbortController().signal,
           messages: [{ role: "user", content: "Hello" }],
           tools: {},

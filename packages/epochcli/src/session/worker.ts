@@ -42,7 +42,7 @@ export namespace PostGenerationWorker {
             const historyText = JSON.stringify(input.chatHistory.slice(-5)) // recent history
             const extractionRes = yield* Effect.promise(() => generateText({
                  model: sideLanguage,
-                 system: "You are an architectural fact extractor. Analyze the provided chat history. Extract ONLY concrete, universally applicable architectural rules, stylistic corrections, or user preferences established in this session. Output them as a concise markdown list. If none are found, output 'NONE'.",
+                 system: "You are an architectural fact extractor. Analyze the provided chat history. Extract ONLY concrete, universally applicable architectural rules, stylistic corrections, or user preferences established in this session. Output them in TOON format exactly like this:\nrules[fact_id, trigger, behaviour]:\n  fact_01, \"When [condition/trigger]\", \"[The required behavior or preference]\"\n\nIf no concrete rules or corrections are found, output 'NONE'.",
                  prompt: `Chat History:\n${historyText}`,
                  abortSignal: input.abortSignal
             }))
@@ -53,7 +53,7 @@ export namespace PostGenerationWorker {
                  log.info("Facts extracted, writing to .assistant_rules.toon")
                  try {
                      const existing = yield* Effect.promise(() => fsNode.readFile(".assistant_rules.toon", "utf-8").catch(() => ""))
-                     yield* Effect.promise(() => fsNode.writeFile(".assistant_rules.toon", `${existing}\n\n# Auto-extracted Facts:\n${extractionRes.text}`))
+                     yield* Effect.promise(() => fsNode.writeFile(".assistant_rules.toon", `${existing}\n\n# Auto-extracted Circumstances:\n${extractionRes.text}`))
                  } catch (e) {
                      log.warn("Failed to write to .assistant_rules.toon", { error: String(e) })
                  }

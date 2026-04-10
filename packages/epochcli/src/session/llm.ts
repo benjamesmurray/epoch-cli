@@ -13,7 +13,7 @@ import type { Agent } from "@/agent/agent"
 import type { MessageV2 } from "./message-v2"
 import { Plugin } from "@/plugin"
 import { SystemPrompt } from "./system"
-import { PromptBuilder, type PromptPayload } from "./prompt/builder"
+import { PromptBuilder, type ZoneStructuredPayload } from "./prompt/builder"
 import { Flag } from "@/flag/flag"
 import { Permission } from "@/permission"
 import { Auth } from "@/auth"
@@ -32,7 +32,7 @@ export namespace LLM {
     model: Provider.Model
     agent: Agent.Info
     permission?: Permission.Ruleset
-    system: string[]
+    system: { zone1: string[]; zone2: string[] }
     messages: ModelMessage[]
     small?: boolean
     tools: Record<string, Tool>
@@ -80,6 +80,29 @@ export namespace LLM {
 
   export const defaultLayer = layer
 
+  export function parseGroundTruthRules(raw: string): { operationalFacts: string; behavioralRules: string; projectSpecific: string } {
+    const zones = {
+      operationalFacts: "",
+      behavioralRules: "",
+      projectSpecific: "",
+    }
+
+    const zone1Match = raw.match(/(ZONE 1 & 3:.*?)(?=ZONE 2:|$)/s)
+    if (zone1Match) zones.operationalFacts = zone1Match[1].trim()
+
+    const zone2Match = raw.match(/(ZONE 2: BEHAVIORAL RULE PACKS.*?)(?=ZONE 3: PROJECT-SPECIFIC RULES|$)/s)
+    if (zone2Match) zones.behavioralRules = zone2Match[1].trim()
+
+    const zone3Specific = raw.match(/(ZONE 3: PROJECT-SPECIFIC RULES.*?)$/s)
+    if (zone3Specific) zones.projectSpecific = zone3Specific[1].trim()
+
+    if (!zones.operationalFacts && !zones.behavioralRules && !zones.projectSpecific) {
+      zones.behavioralRules = raw.trim()
+    }
+
+    return zones
+  }
+
   export async function stream(input: StreamRequest) {
     const l = log
       .clone()
@@ -102,10 +125,10 @@ export namespace LLM {
     // TODO: move this to a proper hook
     const isOpenaiOauth = provider.id === "openai" && auth?.type === "oauth"
 
-    const payload: PromptPayload = {
-      zone1: [],
-      zone2: [],
-      zone3: [],
+    const payload: ZoneStructuredPayload = {
+      zone1_critical_rules: [],
+      zone2_context_files: [],
+      zone3_active_cursor: [],
     }
 
     // Phase 1: Pre-Generation (Clerk / local-side) - Task 1.4
@@ -150,7 +173,7 @@ export namespace LLM {
         }
         
         if (mcpContext) {
-            payload.zone1.push(mcpContext)
+            payload.zone1_critical_rules.push(mcpContext)
         }
       } catch (e) {
         log.warn("Phase 1 Pre-Generation MCP Context fetch failed", { error: String(e) })
@@ -167,39 +190,53 @@ export namespace LLM {
             log.debug("Fetching ground truth rules")
             const gtRes = await gtCli.client.callTool({ name: "gt_status", arguments: {} })
             if (gtRes.content && gtRes.content.length > 0 && gtRes.content[0].type === "text") {
-                 rulesContext = `Ground Truth Rules:\n${gtRes.content[0].text}\n`
+                 rulesContext = gtRes.content[0].text
             }
         } else {
              // Fallback rule load
              try {
                 const fsNode = await import("fs/promises")
-                const rulesFile = await fsNode.readFile(".assistant_rules.toon", "utf-8")
-                rulesContext = `Ground Truth Rules:\n${rulesFile}\n`
+                rulesContext = await fsNode.readFile(".assistant_rules.toon", "utf-8")
              } catch (e) {
                  // ignore missing file
              }
         }
         
         if (rulesContext) {
-           payload.zone2.push(rulesContext)
+           const parsedRules = parseGroundTruthRules(rulesContext)
+           if (parsedRules.operationalFacts) {
+               payload.zone1_critical_rules.push(parsedRules.operationalFacts)
+               payload.zone3_active_cursor.push(parsedRules.operationalFacts) // Repetition in zone 3
+           }
+           if (parsedRules.behavioralRules) payload.zone2_context_files.push(parsedRules.behavioralRules)
+           if (parsedRules.projectSpecific) payload.zone3_active_cursor.push(parsedRules.projectSpecific)
         }
       } catch (e) {
          log.warn("Phase 1 Pre-Generation Rules Context fetch failed", { error: String(e) })
       }
     }
 
-    payload.zone2.push(
+    if (input.system?.zone1) {
+      payload.zone1_critical_rules.push(...input.system.zone1)
+    }
+
+    payload.zone2_context_files.push(
       [
         // use agent prompt otherwise provider prompt
         ...(input.agent.prompt ? [input.agent.prompt] : SystemPrompt.provider(input.model)),
         // any custom prompt passed into this call
-        ...input.system,
+        ...(input.system?.zone2 ?? []),
         // any custom prompt from last user message
         ...(input.user.system ? [input.user.system] : []),
       ]
         .filter((x) => x)
         .join("\n\n"),
     )
+
+    if (input.user.cursorContext) {
+      const { file, line, code } = input.user.cursorContext
+      payload.zone3_active_cursor.push(`Active Cursor Context:\n  File: ${file}\n  Line ${line}: ${code} # <--- CURSOR HERE`)
+    }
 
     const system: string[] = [PromptBuilder.build(payload)]
     const header = system[0]
@@ -285,69 +322,24 @@ export namespace LLM {
       },
     )
 
-    const tools = await resolveTools(input)
-
-    // Loop detection middleware
-    for (const [toolName, toolDef] of Object.entries(tools)) {
-      if (toolDef.execute) {
-        const originalExecute = toolDef.execute
-        toolDef.execute = async (args, options) => {
-           // Check input.messages for identical tool calls
-           let identicalCount = 0
-           for (let i = input.messages.length - 1; i >= 0; i--) {
-              const msg = input.messages[i]
-              if (msg.role === "assistant" && Array.isArray(msg.content)) {
-                 const call = msg.content.find(c => c.type === "tool-call" && c.toolName === toolName)
-                 if (call && JSON.stringify((call as any).args) === JSON.stringify(args)) {
-                    identicalCount++
-                 } else if (call) {
-                    break // Different args, chain broken
-                 }
-              } else if (msg.role === "user" && msg.content && typeof msg.content === "string") {
-                  break // User interrupted or added new text
-              }
-           }
-           
-           if (identicalCount >= 3) {
-              log.warn(`Infinite loop detected for tool ${toolName}`, { args })
-              // Use local-side to generate an intervention
-              if (provider.id === "local-main") {
-                  try {
-                     const sideProviderConfig = cfg.provider?.["local-side"]
-                     if (sideProviderConfig) {
-                         log.info("Generating intervention directive with local-side Clerk")
-                         const sideLanguage = await Provider.getLanguage(
-                           await Provider.getModel("local-side" as any, "nemotron-3-nano-4b" as any)
-                         )
-                         const intervention = await generateText({
-                             model: sideLanguage,
-                             system: "You are an AI supervisor monitoring a main agent. The main agent is stuck in an infinite loop calling the same tool with the exact same arguments. Provide a concise, stern directive telling the agent to STOP calling this tool, explain that its current approach is failing, and instruct it to stop and rethink or try a completely different approach. Do not output anything other than the directive.",
-                             prompt: `Tool: ${toolName}\nArgs: ${JSON.stringify(args)}\n\nPlease provide the intervention directive:`
-                         })
-                         
-                         const interventionEvent: Log.EnhancedModelExecutionEvent = {
-                           timestamp: Date.now(),
-                           mainEpochId: input.sessionID,
-                           event: "END_GENERATE",
-                           providerId: "local-side",
-                           phase: "Phase 2",
-                           metrics: { wrap_up_triggered: true }
-                         }
-                         log.info(JSON.stringify(interventionEvent))
-                         
-                         return { error: `SYSTEM INTERVENTION: ${intervention.text}` }
-                     }
-                  } catch (e) {
-                      log.error("Failed to generate intervention with local-side", { error: String(e) })
-                  }
-              }
-              return { error: "SYSTEM INTERVENTION: You are stuck in a loop calling this tool with the exact same arguments. Stop and reconsider your approach." }
-           }
-           
-           return originalExecute(args, options)
-        }
+    const tools = Record.map(resolveTools(input), (toolDef, toolName) => {
+      if (!toolDef.execute) return toolDef
+      const originalExecute = toolDef.execute
+      return {
+        ...toolDef,
+        execute: async (args: any, options: any) => {
+          const interception = await interceptToolLoop({
+            toolName,
+            args,
+            messages: options.messages ?? input.messages,
+            provider,
+            cfg,
+          })
+          if (interception) return interception
+          return originalExecute(args, options)
+        },
       }
-    }
+    })
 
     // LiteLLM and some Anthropic proxies require the tools parameter to be present
     // when message history contains tool calls, even if no tools are being used.
@@ -733,5 +725,126 @@ export namespace LLM {
       }
     }
     return false
+  }
+
+  export async function interceptToolLoop(input: {
+    toolName: string
+    args: any
+    messages: ModelMessage[]
+    provider: any
+    cfg: Config.Info
+  }) {
+    let identicalCount = 0
+    let sequentialFailureCount = 0
+    let identicalChainActive = true
+    let failureChainActive = true
+    const attemptedArgs: any[] = []
+
+    // Scan backwards through messages
+    for (let i = input.messages.length - 1; i >= 0; i--) {
+      if (!identicalChainActive && !failureChainActive) break
+
+      const msg = input.messages[i]
+
+      if (msg.role === "assistant" && Array.isArray(msg.content)) {
+        const call = msg.content.find((c) => c.type === "tool-call" && c.toolName === input.toolName)
+        if (call) {
+          const callArgs = (call as any).args
+
+          // Identical arguments chain
+          if (identicalChainActive) {
+            if (JSON.stringify(callArgs) === JSON.stringify(input.args)) {
+              identicalCount++
+            } else {
+              identicalChainActive = false
+            }
+          }
+
+          // Sequential failures chain
+          if (failureChainActive) {
+            attemptedArgs.push(callArgs)
+            // Check if this specific call resulted in an error in the subsequent message
+            const nextMsg = input.messages[i + 1]
+            if (nextMsg && nextMsg.role === "user" && Array.isArray(nextMsg.content)) {
+              const result = nextMsg.content.find(
+                (c) => c.type === "tool-result" && c.toolCallId === (call as any).toolCallId,
+              )
+              if (result && (result as any).isError) {
+                sequentialFailureCount++
+              } else if (result) {
+                // Successful call to this tool, reset sequential failure count
+                failureChainActive = false
+              }
+            }
+          }
+        } else {
+          // Called a different tool, chain broken for both
+          identicalChainActive = false
+          failureChainActive = false
+        }
+      } else if (msg.role === "user" && typeof msg.content === "string") {
+        // User interrupted or added new text
+        identicalChainActive = false
+        failureChainActive = false
+      }
+    }
+
+    const isIdenticalLoop = identicalCount >= 3
+    const isFailureLoop = sequentialFailureCount >= 3
+
+    if (isIdenticalLoop || isFailureLoop) {
+      const loopType = isIdenticalLoop ? "IDENTICAL_ARGS" : "SEQUENTIAL_FAILURES"
+      log.warn(`Loop detected for tool ${input.toolName}`, { toolName: input.toolName, args: input.args, loopType, sequentialFailureCount })
+
+      // Use local-side to generate an intervention
+      if (input.provider.id === "local-main") {
+        try {
+          const sideProviderConfig = input.cfg.provider?.["local-side"]
+          if (sideProviderConfig) {
+            log.info("Generating intervention directive with local-side Clerk")
+            const sideLanguage = await Provider.getLanguage(
+              await Provider.getModel("local-side" as any, "nemotron-3-nano-4b" as any),
+            )
+
+            const systemPrompt =
+              "You are an AI supervisor monitoring a main agent. The main agent is stuck in a loop. Provide a concise, stern directive telling the agent to STOP calling this tool, explain why its current approach is failing (e.g. repeating same args, or repeatedly failing with varied args like capitalization errors), and instruct it to stop and rethink or try a completely different strategy. Do not output anything other than the directive."
+
+            const prompt = isIdenticalLoop
+              ? `Tool: ${input.toolName}\nArgs: ${JSON.stringify(input.args)}\nStatus: Stuck in an infinite loop with identical arguments.`
+              : `Tool: ${input.toolName}\nRecent Failed Attempts:\n${attemptedArgs
+                  .reverse()
+                  .map((a, idx) => `${idx + 1}. ${JSON.stringify(a)}`)
+                  .join("\n")}\nStatus: Stuck in a trial-and-error loop where all recent attempts have failed.`
+
+            const intervention = await generateText({
+              model: sideLanguage,
+              system: systemPrompt,
+              prompt: `${prompt}\n\nPlease provide the intervention directive:`,
+            })
+
+            const interventionEvent: Log.EnhancedModelExecutionEvent = {
+              timestamp: Date.now(),
+              mainEpochId: "test", // placeholder, will be real in stream()
+              event: "END_GENERATE",
+              providerId: "local-side",
+              phase: "Phase 2",
+              metrics: { loop_detected: true, loop_type: loopType },
+            }
+            log.info(JSON.stringify(interventionEvent))
+
+            return { error: `SYSTEM INTERVENTION: ${intervention.text}`, output: "", title: "", metadata: {} }
+          }
+        } catch (e) {
+          log.error("Failed to generate intervention with local-side", { error: String(e) })
+        }
+      }
+      return {
+        error: `SYSTEM INTERVENTION: You are stuck in a ${isIdenticalLoop ? "loop calling this tool with the exact same arguments" : "repeated failure loop with this tool"}. Stop and reconsider your approach.`,
+        output: "",
+        title: "",
+        metadata: {},
+      }
+    }
+    return null
   }
 }
