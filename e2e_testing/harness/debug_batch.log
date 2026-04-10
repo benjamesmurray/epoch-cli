@@ -55,3 +55,18 @@ Docker Mode: Enabled (epochcli-eval-env:latest)
     [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
     [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
     [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_plan
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_plan
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+    [eventbus-v2-run-1] 🛠️ Spec Tool Invoked: sc_init
+  > Agent Execution finished: Success (92.2s)
+  > Logs saved to: /home/benmurray/Projects/epochclievaluations/suite_2026-04-10T01-43-56-904Z/eventbus-v2-run-1/run.log
+  > Warning: Missing expected tools. Used: sc_init, sc_plan
+  > Evaluating tests inside Docker (.epochcli/tool/eventbus-v2-run-1)...
+  > Result: Tests Failed
+
+[2026-04-10T01:45:29.507Z] Starting eventbus-v2-run-2...
