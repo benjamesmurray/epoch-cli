@@ -137,7 +137,7 @@ export namespace LLM {
     // The Clerk detects user intent and shifts the active epochcli Agent.
     if (provider.id === "local-main") {
       try {
-        const sideModel = await Provider.getSideModel(); // 4B Clerk
+        const sideModel = await Provider.getSideModel() as Provider.Model; // 4B Clerk
         const sideLanguage = await Provider.getLanguage(sideModel);
         
         // Extract conversation tail for structural context (Task 1.1)

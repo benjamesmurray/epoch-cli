@@ -552,6 +552,7 @@ export namespace Config {
         .describe("Maximum number of agentic iterations before forcing text-only response"),
       maxSteps: z.number().int().positive().optional().describe("@deprecated Use 'steps' field instead."),
       permission: Permission.optional(),
+      side_model: ModelId.optional().describe("Force a specific model to be used for the background Supervisor (Clerk) duties."),
     })
     .catchall(z.any())
     .transform((agent, ctx) => {
@@ -1037,6 +1038,7 @@ export namespace Config {
             .describe("Timeout in milliseconds for model context protocol (MCP) requests"),
         })
         .optional(),
+      side_model: ModelId.optional().describe("Force a specific model to be used for the background Supervisor (Clerk) duties."),
     })
     .strict()
     .meta({

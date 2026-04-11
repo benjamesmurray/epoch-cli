@@ -912,6 +912,7 @@ export namespace Provider {
       query: string[],
     ) => Effect.Effect<{ providerID: ProviderID; modelID: string } | undefined>
     readonly getSmallModel: (providerID: ProviderID) => Effect.Effect<Model | undefined>
+    readonly getSideModel: () => Effect.Effect<Model | undefined>
     readonly defaultModel: () => Effect.Effect<{ providerID: ProviderID; modelID: ModelID }>
   }
 
@@ -1643,7 +1644,8 @@ export namespace Provider {
         const s = yield* InstanceState.get(state)
         
         // 2. Fall back strictly to the 'local-side' provider if it exists in the config
-        const sideProvider = s.providers["local-side"]
+        const sideProviderID = ProviderID.make("local-side")
+        const sideProvider = s.providers[sideProviderID]
         if (sideProvider) {
             // Prioritize known 4B models within THIS specific provider
             const priorityList = ["nemotron", "phi-3.5", "gemma-2-2b", "llama-3.2-3b", "qwen-2.5-3b"]
