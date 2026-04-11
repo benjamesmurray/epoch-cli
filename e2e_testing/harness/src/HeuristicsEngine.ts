@@ -11,6 +11,12 @@ export class HeuristicsEngine {
   private usedTools: Set<string> = new Set();
   public jsonRepairs: number = 0;
   private runId: string;
+  
+  // Performance metrics tracking
+  private tpsHistory: number[] = [];
+  private ttftHistory: number[] = [];
+  private totalTokens: number = 0;
+  private fullPrompts: any[] = [];
 
   constructor(runId: string, loopThreshold: number = 3) {
     this.loopThreshold = loopThreshold;
@@ -22,8 +28,30 @@ export class HeuristicsEngine {
    * Throws LoopException if an infinite loop is detected.
    */
   public processLine(line: string): void {
-    // Check for JSON repairs in epochcli audit logs
-    if (line.includes('"json_repaired":true')) {
+    // Check for EnhancedModelExecutionEvent JSON events
+    if (line.trim().startsWith('{') && line.includes('"event":')) {
+      try {
+        const event = JSON.parse(line.trim());
+        if (event.event === "START_GENERATE" && event.payload) {
+          this.fullPrompts.push(event.payload);
+        }
+        if (event.event === "END_GENERATE" && event.metrics) {
+          if (event.metrics.tps) this.tpsHistory.push(event.metrics.tps);
+          if (event.metrics.ttftMs) this.ttftHistory.push(event.metrics.ttftMs);
+          if (event.metrics.promptTokens) this.totalTokens += event.metrics.promptTokens;
+          if (event.metrics.completionTokens) this.totalTokens += event.metrics.completionTokens;
+          if (event.metrics.json_repaired) {
+              this.jsonRepairs++;
+              console.log(`    [${this.runId}] ⚠️ Model payload repaired by middleware (Total: ${this.jsonRepairs})`);
+          }
+        }
+      } catch (e) {
+        // Not a valid JSON event or parse failed, continue to standard pattern matching
+      }
+    }
+
+    // Check for JSON repairs in legacy epochcli audit logs (fallback)
+    if (line.includes('"json_repaired":true') && !line.includes('"event":')) {
       this.jsonRepairs++;
       console.log(`    [${this.runId}] ⚠️ Model payload repaired by middleware (Total: ${this.jsonRepairs})`);
     }
@@ -39,13 +67,13 @@ export class HeuristicsEngine {
 
     // Try Raw JSON first
     const jsonMatch = line.match(/name["\s:]+([a-zA-Z0-9_-]+)["\s,]+(?:arguments|args)["\s:]+({[^}]+})/i);
-    if (jsonMatch) {
+    if (jsonMatch && jsonMatch[1] && jsonMatch[2]) {
       toolName = jsonMatch[1];
       toolArgs = jsonMatch[2].trim();
     } else {
       // Try Pretty-printed ⚙ format
       const prettyMatch = line.match(/⚙\s+([a-zA-Z0-9_-]+)\s+({.+})/);
-      if (prettyMatch) {
+      if (prettyMatch && prettyMatch[1] && prettyMatch[2]) {
         toolName = prettyMatch[1];
         toolArgs = prettyMatch[2].trim();
       }
@@ -76,7 +104,7 @@ export class HeuristicsEngine {
     
     // Also explicitly track tool invocations by just the name if arguments aren't logged easily
     const specCliMatch = line.match(/(sc_init|sc_todo_start|sc_todo_complete|sc_plan|pm_query)/);
-    if (specCliMatch && !toolName) {
+    if (specCliMatch && specCliMatch[1] && !toolName) {
         this.usedTools.add(specCliMatch[1]);
         console.log(`    [${this.runId}] 🛠️ Spec Tool Invoked: ${specCliMatch[1]}`);
     }
@@ -88,6 +116,25 @@ export class HeuristicsEngine {
   
   public getUsedTools(): string[] {
       return Array.from(this.usedTools);
+  }
+
+  public getMetrics() {
+    const avgTps = this.tpsHistory.length > 0 
+      ? this.tpsHistory.reduce((a, b) => a + b, 0) / this.tpsHistory.length 
+      : undefined;
+    const avgTtftMs = this.ttftHistory.length > 0 
+      ? this.ttftHistory.reduce((a, b) => a + b, 0) / this.ttftHistory.length 
+      : undefined;
+    
+    return {
+      avgTps,
+      avgTtftMs,
+      totalTokens: this.totalTokens > 0 ? this.totalTokens : undefined
+    };
+  }
+
+  public getFullPrompts(): any[] {
+    return this.fullPrompts;
   }
 }
 

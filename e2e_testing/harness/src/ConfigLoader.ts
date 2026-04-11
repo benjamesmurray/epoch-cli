@@ -1,5 +1,5 @@
 import * as fs from "fs/promises";
-import { TestConfig } from "./types";
+import type { TestConfig } from "./types";
 
 export class ConfigLoader {
   public static async load(filePath: string): Promise<TestConfig[]> {

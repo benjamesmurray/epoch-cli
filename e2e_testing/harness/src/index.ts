@@ -2,7 +2,7 @@ import { ConfigLoader } from "./ConfigLoader";
 import { AgentRunner } from "./AgentRunner";
 import { TestEvaluator } from "./TestEvaluator";
 import { Reporter } from "./Reporter";
-import { RunResult } from "./types";
+import type { RunResult } from "./types";
 import { WorkspaceBuilder } from "./WorkspaceBuilder";
 import * as path from "path";
 import * as fs from "fs/promises";
@@ -68,6 +68,11 @@ async function main() {
       console.log(`  > Agent Execution finished: ${res.status} (${(res.durationMs / 1000).toFixed(1)}s)`);
       console.log(`  > Logs saved to: ${path.join(targetWorkspace, "run.log")}`);
 
+      if (res.fullPrompts && res.fullPrompts.length > 0) {
+          await fs.writeFile(path.join(targetWorkspace, "prompts.json"), JSON.stringify(res.fullPrompts, null, 2), "utf-8");
+          console.log(`  > Full prompts saved to: ${path.join(targetWorkspace, "prompts.json")}`);
+      }
+
       const usedExpectedTools = res.engine.detectSpecCliUsage(config.expectedTools);
       if (!usedExpectedTools) {
         console.log(`  > Warning: Missing expected tools. Used: ${res.engine.getUsedTools().join(", ")}`);
@@ -107,7 +112,10 @@ async function main() {
         usedExpectedTools,
         logPath: path.join(targetWorkspace, "run.log"),
         errorMessage,
-        jsonRepairs: res.engine.jsonRepairs
+        jsonRepairs: res.engine.jsonRepairs,
+        avgTps: res.avgTps,
+        avgTtftMs: res.avgTtftMs,
+        totalTokens: res.totalTokens
       });
     }
   }

@@ -34,7 +34,7 @@ export class WorkspaceBuilder {
           "npm": "@ai-sdk/openai-compatible",
           "name": "Local Nemotron (RTX 4090)",
           "options": {
-            "baseURL": "http://host.docker.internal:8086/v1",
+            "baseURL": "http://127.0.0.1:8086/v1",
             "apiKey": "2250"
           },
           "models": {
@@ -50,7 +50,7 @@ export class WorkspaceBuilder {
         },
         "project-map-cli": {
           "type": "local",
-          "command": ["/opt/project-map-cli-env/bin/python", "/cli/project-map-cli/src/project_map_cli/mcp/server.py"]
+          "command": ["/opt/project-map-cli-env/bin/python", "-m", "project_map_cli.mcp.server"]
         },
         "ground-truth-cli": {
           "type": "local",
@@ -67,7 +67,7 @@ export class WorkspaceBuilder {
     };
 
     await fs.writeFile(
-      path.join(epochcliDir, "epochcli.json"),
+      path.join(epochcliDir, "epochcli.jsonc"),
       JSON.stringify(epochConfig, null, 2),
       "utf-8"
     );

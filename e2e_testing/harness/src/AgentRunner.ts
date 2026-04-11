@@ -1,6 +1,6 @@
 import { spawn } from "bun";
 import { HeuristicsEngine, LoopException } from "./HeuristicsEngine";
-import { DockerConfig } from "./types";
+import type { DockerConfig } from "./types";
 import * as path from "path";
 import * as fs from "fs/promises";
 
@@ -9,6 +9,10 @@ export interface RunnerResult {
   status: "Success" | "Failed_Tests" | "Killed_Timeout" | "Killed_Loop" | "Error";
   engine: HeuristicsEngine;
   errorMessage?: string;
+  avgTps?: number;
+  avgTtftMs?: number;
+  totalTokens?: number;
+  fullPrompts: any[];
 }
 
 export class AgentRunner {
@@ -23,7 +27,7 @@ export class AgentRunner {
         const rawPromptString = command.slice(2).join(" ");
         // Strip out the leading/trailing quotes if they were added to keep it as one string
         const cleanArgs = rawPromptString.replace(/^"|"$/g, '');
-        const internalCommand = `git config --global --add safe.directory /workspace; HOME=/workspace LOG_LEVEL=INFO bun /cli/packages/epochcli/src/index.ts run --thinking --model local-main/gemma-4-26b-q4-xl "${cleanArgs}"`;
+        const internalCommand = `cp -a /etc/epochcli/. /workspace/ 2>/dev/null || true; git config --global --add safe.directory /workspace; HOME=/workspace LOG_LEVEL=INFO EPOCHCLI_DEBUG_FULL_PROMPT=true bun /cli/packages/epochcli/src/index.ts run --thinking --model local-main/gemma-4-26b-q4-xl "${cleanArgs}"`;
         
         this.command = [
             "docker", "run", "--rm", 
@@ -76,7 +80,8 @@ export class AgentRunner {
         signal: controller.signal,
         env: {
             ...process.env,
-            LOG_LEVEL: "INFO"
+            LOG_LEVEL: "INFO",
+            EPOCHCLI_DEBUG_FULL_PROMPT: "true"
         }
       });
 
@@ -156,11 +161,15 @@ export class AgentRunner {
     }
 
     const durationMs = Date.now() - startTime;
+    const metrics = this.engine.getMetrics();
+
     return {
       durationMs,
       status,
       engine: this.engine,
       errorMessage,
+      fullPrompts: this.engine.getFullPrompts(),
+      ...metrics
     };
   }
 }

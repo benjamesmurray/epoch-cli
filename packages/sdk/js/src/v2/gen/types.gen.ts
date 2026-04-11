@@ -123,6 +123,76 @@ export type EventPermissionReplied = {
   }
 }
 
+export type EventTuiPromptAppend = {
+  type: "tui.prompt.append"
+  properties: {
+    text: string
+    cursorContext?: unknown
+  }
+}
+
+export type EventTuiCommandExecute = {
+  type: "tui.command.execute"
+  properties: {
+    command:
+      | "session.list"
+      | "session.new"
+      | "session.share"
+      | "session.interrupt"
+      | "session.compact"
+      | "session.page.up"
+      | "session.page.down"
+      | "session.line.up"
+      | "session.line.down"
+      | "session.half.page.up"
+      | "session.half.page.down"
+      | "session.first"
+      | "session.last"
+      | "prompt.clear"
+      | "prompt.submit"
+      | "agent.cycle"
+      | string
+  }
+}
+
+export type EventTuiToastShow = {
+  type: "tui.toast.show"
+  properties: {
+    title?: string
+    message: string
+    variant: "info" | "success" | "warning" | "error"
+    /**
+     * Duration in milliseconds
+     */
+    duration?: number
+  }
+}
+
+export type EventTuiSessionSelect = {
+  type: "tui.session.select"
+  properties: {
+    /**
+     * Session ID to navigate to
+     */
+    sessionID: string
+  }
+}
+
+export type EventMcpToolsChanged = {
+  type: "mcp.tools.changed"
+  properties: {
+    server: string
+  }
+}
+
+export type EventMcpBrowserOpenFailed = {
+  type: "mcp.browser.open.failed"
+  properties: {
+    mcpName: string
+    url: string
+  }
+}
+
 export type SessionStatus =
   | {
       type: "idle"
@@ -265,75 +335,6 @@ export type EventTodoUpdated = {
   properties: {
     sessionID: string
     todos: Array<Todo>
-  }
-}
-
-export type EventTuiPromptAppend = {
-  type: "tui.prompt.append"
-  properties: {
-    text: string
-  }
-}
-
-export type EventTuiCommandExecute = {
-  type: "tui.command.execute"
-  properties: {
-    command:
-      | "session.list"
-      | "session.new"
-      | "session.share"
-      | "session.interrupt"
-      | "session.compact"
-      | "session.page.up"
-      | "session.page.down"
-      | "session.line.up"
-      | "session.line.down"
-      | "session.half.page.up"
-      | "session.half.page.down"
-      | "session.first"
-      | "session.last"
-      | "prompt.clear"
-      | "prompt.submit"
-      | "agent.cycle"
-      | string
-  }
-}
-
-export type EventTuiToastShow = {
-  type: "tui.toast.show"
-  properties: {
-    title?: string
-    message: string
-    variant: "info" | "success" | "warning" | "error"
-    /**
-     * Duration in milliseconds
-     */
-    duration?: number
-  }
-}
-
-export type EventTuiSessionSelect = {
-  type: "tui.session.select"
-  properties: {
-    /**
-     * Session ID to navigate to
-     */
-    sessionID: string
-  }
-}
-
-export type EventMcpToolsChanged = {
-  type: "mcp.tools.changed"
-  properties: {
-    server: string
-  }
-}
-
-export type EventMcpBrowserOpenFailed = {
-  type: "mcp.browser.open.failed"
-  properties: {
-    mcpName: string
-    url: string
   }
 }
 
@@ -539,6 +540,7 @@ export type UserMessage = {
     created: number
   }
   format?: OutputFormat
+  cursorContext?: unknown
   summary?: {
     title?: string
     body?: string
@@ -975,6 +977,12 @@ export type Event =
   | EventMessagePartDelta
   | EventPermissionAsked
   | EventPermissionReplied
+  | EventTuiPromptAppend
+  | EventTuiCommandExecute
+  | EventTuiToastShow
+  | EventTuiSessionSelect
+  | EventMcpToolsChanged
+  | EventMcpBrowserOpenFailed
   | EventSessionStatus
   | EventSessionIdle
   | EventQuestionAsked
@@ -984,12 +992,6 @@ export type Event =
   | EventFileEdited
   | EventFileWatcherUpdated
   | EventTodoUpdated
-  | EventTuiPromptAppend
-  | EventTuiCommandExecute
-  | EventTuiToastShow
-  | EventTuiSessionSelect
-  | EventMcpToolsChanged
-  | EventMcpBrowserOpenFailed
   | EventCommandExecuted
   | EventSessionDiff
   | EventSessionError
@@ -1218,6 +1220,10 @@ export type AgentConfig = {
    */
   maxSteps?: number
   permission?: PermissionConfig
+  /**
+   * Force a specific model to be used for the background Supervisor (Clerk) duties.
+   */
+  side_model?: string
   [key: string]:
     | unknown
     | string
@@ -1617,6 +1623,10 @@ export type Config = {
      */
     mcp_timeout?: number
   }
+  /**
+   * Force a specific model to be used for the background Supervisor (Clerk) duties.
+   */
+  side_model?: string
 }
 
 export type BadRequestError = {
@@ -3596,6 +3606,7 @@ export type SessionPromptData = {
       modelID: string
     }
     agent?: string
+    cursorContext?: unknown
     noReply?: boolean
     /**
      * @deprecated tools and permissions have been merged, you can set permissions on the session itself now
@@ -3796,6 +3807,7 @@ export type SessionPromptAsyncData = {
       modelID: string
     }
     agent?: string
+    cursorContext?: unknown
     noReply?: boolean
     /**
      * @deprecated tools and permissions have been merged, you can set permissions on the session itself now
@@ -4783,6 +4795,7 @@ export type McpDisconnectResponse = McpDisconnectResponses[keyof McpDisconnectRe
 export type TuiAppendPromptData = {
   body?: {
     text: string
+    cursorContext?: unknown
   }
   path?: never
   query?: {

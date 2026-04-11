@@ -1,4 +1,4 @@
-import { RunResult } from "./types";
+import type { RunResult } from "./types";
 import * as fs from "fs/promises";
 import * as path from "path";
 
@@ -14,11 +14,21 @@ export class Reporter {
     let errors = 0;
     
     let totalDuration = 0;
+    let totalTps = 0;
+    let tpsCount = 0;
+    let grandTotalTokens = 0;
 
     const rows: string[] = [];
 
     for (const res of results) {
       totalDuration += res.durationMs;
+      if (res.avgTps) {
+        totalTps += res.avgTps;
+        tpsCount++;
+      }
+      if (res.totalTokens) {
+        grandTotalTokens += res.totalTokens;
+      }
       
       switch (res.status) {
         case "Success": successes++; break;
@@ -31,16 +41,22 @@ export class Reporter {
       const durSeconds = (res.durationMs / 1000).toFixed(1);
       const toolsUsed = res.usedExpectedTools ? "✅" : "❌";
       const statusIcon = res.status === "Success" ? "✅" : (res.status === "Failed_Tests" ? "❌" : "⚠️");
+      const tps = res.avgTps ? res.avgTps.toFixed(2) : "-";
+      const ttft = res.avgTtftMs ? `${res.avgTtftMs.toFixed(0)}ms` : "-";
+      const tokens = res.totalTokens ? res.totalTokens.toLocaleString() : "-";
       
-      rows.push(`| ${res.runId} | ${res.iteration} | ${toolsUsed} | ${statusIcon} ${res.status} | ${res.jsonRepairs || 0} | ${durSeconds}s | ${res.errorMessage || "-"} |`);
+      rows.push(`| ${res.runId} | ${res.iteration} | ${toolsUsed} | ${statusIcon} ${res.status} | ${res.jsonRepairs || 0} | ${tps} | ${ttft} | ${tokens} | ${durSeconds}s | ${res.errorMessage || "-"} |`);
     }
 
     const avgDuration = totalRuns > 0 ? (totalDuration / totalRuns / 1000).toFixed(1) : "0";
+    const avgTps = tpsCount > 0 ? (totalTps / tpsCount).toFixed(2) : "0";
 
     const content = `# E2E Variance Report
 **Generated:** ${timestamp}
 **Total Runs:** ${totalRuns}
 **Average Duration:** ${avgDuration}s
+**Average TPS:** ${avgTps}
+**Total Tokens:** ${grandTotalTokens.toLocaleString()}
 
 ## Summary
 - **Successes:** ${successes}
@@ -50,8 +66,8 @@ export class Reporter {
 - **Errors:** ${errors}
 
 ## Details
-| Run ID | Iteration | Expected Tools | Status | JSON Repairs | Duration | Message |
-|--------|-----------|----------------|--------|--------------|----------|---------|
+| Run ID | Iteration | Expected Tools | Status | JSON Repairs | Avg TPS | Avg TTFT | Tokens | Duration | Message |
+|--------|-----------|----------------|--------|--------------|---------|----------|--------|----------|---------|
 ${rows.join("\n")}
 `;
 

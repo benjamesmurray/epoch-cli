@@ -23,4 +23,7 @@ export interface RunResult {
   logPath: string;
   errorMessage?: string;
   jsonRepairs?: number;
+  avgTps?: number;
+  avgTtftMs?: number;
+  totalTokens?: number;
 }

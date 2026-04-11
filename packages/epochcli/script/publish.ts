@@ -44,10 +44,10 @@ const tasks = Object.entries(binaries).map(async ([name]) => {
     await $`chmod -R 755 .`.cwd(`./dist/${name}`)
   }
   await $`bun pm pack`.cwd(`./dist/${name}`)
-  await $`npm publish *.tgz --access public --tag ${Script.channel}`.cwd(`./dist/${name}`)
+  await $`npm publish *.tgz --access public --tag ${Script.channel}`.cwd(`./dist/${name}`).nothrow()
 })
 await Promise.all(tasks)
-await $`cd ./dist/${pkg.name} && bun pm pack && npm publish *.tgz --access public --tag ${Script.channel}`
+await $`cd ./dist/${pkg.name} && bun pm pack && npm publish *.tgz --access public --tag ${Script.channel}`.nothrow()
 
 const image = "ghcr.io/benjamesmurray/epoch-cli"
 const platforms = "linux/amd64,linux/arm64"

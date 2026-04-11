@@ -1,5 +1,18 @@
 [
   {
+    "id": "system-prompt-hi",
+    "iterations": 1,
+    "timeoutMs": 60000,
+    "prompt": "Hi",
+    "expectedTools": [],
+    "runTargetDir": ".",
+    "docker": {
+      "imageName": "epochcli-eval-env:latest",
+      "network": "bridge",
+      "memoryLimit": "4g"
+    }
+  },
+  {
     "id": "eventbus-v2",
     "iterations": 10,
     "timeoutMs": 300000,

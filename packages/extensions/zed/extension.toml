@@ -1,7 +1,7 @@
 id = "epochcli"
 name = "Epoch CLI"
 description = "The open source coding agent."
-version = "1.3.17"
+version = "2.0.0"
 schema_version = 1
 authors = ["Anomaly"]
 repository = "https://github.com/benjamesmurray/epoch-cli"
@@ -11,26 +11,26 @@ name = "Epoch CLI"
 icon = "./icons/epochcli.svg"
 
 [agent_servers.epochcli.targets.darwin-aarch64]
-archive = "https://github.com/benjamesmurray/epoch-cli/releases/download/v1.3.17/epochcli-darwin-arm64.zip"
+archive = "https://github.com/benjamesmurray/epoch-cli/releases/download/v2.0.0/epochcli-darwin-arm64.zip"
 cmd = "./epochcli"
 args = ["acp"]
 
 [agent_servers.epochcli.targets.darwin-x86_64]
-archive = "https://github.com/benjamesmurray/epoch-cli/releases/download/v1.3.17/epochcli-darwin-x64.zip"
+archive = "https://github.com/benjamesmurray/epoch-cli/releases/download/v2.0.0/epochcli-darwin-x64.zip"
 cmd = "./epochcli"
 args = ["acp"]
 
 [agent_servers.epochcli.targets.linux-aarch64]
-archive = "https://github.com/benjamesmurray/epoch-cli/releases/download/v1.3.17/epochcli-linux-arm64.tar.gz"
+archive = "https://github.com/benjamesmurray/epoch-cli/releases/download/v2.0.0/epochcli-linux-arm64.tar.gz"
 cmd = "./epochcli"
 args = ["acp"]
 
 [agent_servers.epochcli.targets.linux-x86_64]
-archive = "https://github.com/benjamesmurray/epoch-cli/releases/download/v1.3.17/epochcli-linux-x64.tar.gz"
+archive = "https://github.com/benjamesmurray/epoch-cli/releases/download/v2.0.0/epochcli-linux-x64.tar.gz"
 cmd = "./epochcli"
 args = ["acp"]
 
 [agent_servers.epochcli.targets.windows-x86_64]
-archive = "https://github.com/benjamesmurray/epoch-cli/releases/download/v1.3.17/epochcli-windows-x64.zip"
+archive = "https://github.com/benjamesmurray/epoch-cli/releases/download/v2.0.0/epochcli-windows-x64.zip"
 cmd = "./epochcli.exe"
 args = ["acp"]

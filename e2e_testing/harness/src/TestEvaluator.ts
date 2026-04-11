@@ -1,6 +1,6 @@
 import { spawn } from "bun";
 import * as fs from "fs/promises";
-import { DockerConfig } from "./types";
+import type { DockerConfig } from "./types";
 import * as path from "path";
 
 export class TestEvaluator {

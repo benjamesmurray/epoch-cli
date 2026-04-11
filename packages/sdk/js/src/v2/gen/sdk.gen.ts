@@ -2097,6 +2097,7 @@ export class Session2 extends HeyApiClient {
         modelID: string
       }
       agent?: string
+      cursorContext?: unknown
       noReply?: boolean
       tools?: {
         [key: string]: boolean
@@ -2119,6 +2120,7 @@ export class Session2 extends HeyApiClient {
             { in: "body", key: "messageID" },
             { in: "body", key: "model" },
             { in: "body", key: "agent" },
+            { in: "body", key: "cursorContext" },
             { in: "body", key: "noReply" },
             { in: "body", key: "tools" },
             { in: "body", key: "format" },
@@ -2229,6 +2231,7 @@ export class Session2 extends HeyApiClient {
         modelID: string
       }
       agent?: string
+      cursorContext?: unknown
       noReply?: boolean
       tools?: {
         [key: string]: boolean
@@ -2251,6 +2254,7 @@ export class Session2 extends HeyApiClient {
             { in: "body", key: "messageID" },
             { in: "body", key: "model" },
             { in: "body", key: "agent" },
+            { in: "body", key: "cursorContext" },
             { in: "body", key: "noReply" },
             { in: "body", key: "tools" },
             { in: "body", key: "format" },
@@ -3497,6 +3501,7 @@ export class Tui extends HeyApiClient {
       directory?: string
       workspace?: string
       text?: string
+      cursorContext?: unknown
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -3508,6 +3513,7 @@ export class Tui extends HeyApiClient {
             { in: "query", key: "directory" },
             { in: "query", key: "workspace" },
             { in: "body", key: "text" },
+            { in: "body", key: "cursorContext" },
           ],
         },
       ],
