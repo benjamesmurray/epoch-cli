@@ -153,8 +153,9 @@ await $`rm -rf dist`
 
 const binaries: Record<string, string> = {}
 if (!skipInstall) {
-  await $`bun install --os="*" --cpu="*" @opentui/core@${pkg.dependencies["@opentui/core"]}`
-  await $`bun install --os="*" --cpu="*" @parcel/watcher@${pkg.dependencies["@parcel/watcher"]}`
+  const deps = (pkg as any).devDependencies || {}
+  await $`bun install --os="*" --cpu="*" @opentui/core@${deps["@opentui/core"]}`
+  await $`bun install --os="*" --cpu="*" @parcel/watcher@${deps["@parcel/watcher"]}`
 }
 for (const item of targets) {
   const name = [
@@ -179,6 +180,7 @@ for (const item of targets) {
   const bunfsRoot = item.os === "win32" ? "B:/~BUN/root/" : "/$bunfs/root/"
   const workerRelativePath = path.relative(dir, parserWorker).replaceAll("\\", "/")
 
+  const bin = item.os === "win32" ? "epochcli.exe" : "epochcli"
   await Bun.build({
     conditions: ["browser"],
     tsconfig: "./tsconfig.json",
@@ -190,7 +192,7 @@ for (const item of targets) {
       autoloadTsconfig: true,
       autoloadPackageJson: true,
       target: name.replace(pkg.name, "bun") as any,
-      outfile: `dist/${name}/bin/epochcli`,
+      outfile: `dist/${name}/bin/${bin}`,
       execArgv: [`--user-agent=epochcli/${Script.version}`, "--use-system-ca", "--"],
       windows: {},
     },
@@ -208,7 +210,7 @@ for (const item of targets) {
 
   // Smoke test: only run if binary is for current platform
   if (item.os === process.platform && item.arch === process.arch && !item.abi) {
-    const binaryPath = `dist/${name}/bin/epochcli`
+    const binaryPath = `dist/${name}/bin/${bin}`
     console.log(`Running smoke test: ${binaryPath} --version`)
     try {
       const versionOutput = await $`${binaryPath} --version`.text()

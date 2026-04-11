@@ -133,9 +133,9 @@ export function Prompt(props: PromptProps) {
   sdk.event.on(TuiEvent.PromptAppend.type, (evt) => {
     if (!input || input.isDestroyed) return
     input.insertText(evt.properties.text)
-    // @ts-expect-error cursorContext is omitted from the generated OpenAPI schema due to z.any()
+    // @ts-ignore cursorContext is omitted from the generated OpenAPI schema due to z.any()
     if (evt.properties.cursorContext) {
-      // @ts-expect-error
+      // @ts-ignore
       setStore("prompt", "cursorContext", evt.properties.cursorContext)
     }
     setTimeout(() => {
@@ -716,7 +716,7 @@ export function Prompt(props: PromptProps) {
           agent: local.agent.current().name,
           model: selectedModel,
           variant,
-          // @ts-expect-error
+          // @ts-ignore
           cursorContext: store.prompt.cursorContext,
           parts: [
             {

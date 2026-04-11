@@ -86,6 +86,7 @@
     "@epoch-ai/plugin": "workspace:*",
     "@epoch-ai/script": "workspace:*",
     "@epoch-ai/sdk": "workspace:*",
+    "epochcli-ai": "workspace:*",
     "typescript": "catalog:"
   },
   "repository": {
