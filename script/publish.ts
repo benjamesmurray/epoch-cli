@@ -59,11 +59,11 @@ await import(`../packages/sdk/js/script/build.ts`)
 
 if (Script.release) {
   if (!Script.preview) {
-    await $`git commit -am "release: v${Script.version}"`
-    await $`git tag v${Script.version}`
+    await $`git commit -am "release: v${Script.version}"`.nothrow()
+    await $`git tag v${Script.version}`.nothrow()
     await $`git fetch origin`
     await $`git cherry-pick HEAD..origin/dev`.nothrow()
-    await $`git push origin HEAD --tags --no-verify --force-with-lease`
+    await $`git push origin HEAD --tags --no-verify --force-with-lease`.nothrow()
     await new Promise((resolve) => setTimeout(resolve, 5_000))
   }
 
