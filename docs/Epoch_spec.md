@@ -19,7 +19,8 @@ Use --max-model-len to enforce the hard context cap.
 
 2. Core System Prompt Architecture
 Traditional, verbose instructions ("You are an expert," "Think step-by-step") are deprecated. They consume prefill tokens and degrade Time-to-First-Token (TTFT) without improving performance, as Gemma 4 is already pre-aligned with professional coding standards.
-The Zero-Fluff Base Identity: The system prompt should contain zero honorifics or role-playing. It should exclusively contain structural rules, tool schemas, and the dynamic context blocks.
+The Zero-Fluff Base Identity: The system prompt should contain zero honorifics, role-playing, or model identification. 
+Rule: Prohibit strings like "You are powered by model X" or "I am an AI." Every token must be used for structural rules, tool schemas, or dynamic context.
 Context Injection via TOON: Do not use JSON to pass large contextual datasets (like repository file trees or linter logs) into the prompt.
 Rule: Convert structured context to TOON (Token-Oriented Object Notation) before injection. By using YAML-style indentation and CSV-style rows instead of repeated JSON keys, you will save 30% - 60% of context tokens, vastly improving prefill latency.
 Markdown for Semantic Signaling: Use standard Markdown (#, ##) exclusively for structuring non-data text. The model's attention mechanism relies on plain-text semantic hierarchy to perform "needle-in-a-haystack" code retrieval.
@@ -39,7 +40,7 @@ The 4B side-model acts as the router, formatter, and memory manager. Because it 
 #### 3.3 The "Baton Pass" Event Loop
 Because both models share the same physical GPU compute and VRAM, they must never execute concurrently. The orchestration relies on a strict, three-phase "Baton Pass" sequential loop.
  * **Phase 1: Pre-Generation (The Clerk)**
-   * **Action:** The 4B Clerk initiates a Micro-Epoch. It intercepts the user's raw prompt, reads the massive TOON-compressed architectural files, runs RAG against the Ground Truth rules, and packages this into a highly optimized, injected prompt.
+   * **Action:** The 4B Clerk initiates a Micro-Epoch. It intercepts the user's prompt and analyzes a **Structural Transcript** of the conversation tail (including tool calls). It reads the TOON-compressed architectural files, runs RAG against the Ground Truth rules, and packages this into a highly optimized, persona-filtered prompt for the Main Model.
    * **State Change:** The Clerk emits an END_GENERATE event and completely terminates its process, freeing up maximum compute.
  * **Phase 2: Generation (The Main Model)**
    * **Action:** The 26B Main Model takes the "Baton" and begins its Stateful Execution. Unburdened by context prep or verbose parsing, it immediately begins reasoning and streaming code to the UI.
@@ -53,6 +54,15 @@ The High Watermark & Velocity: The system maintains a defined "High Watermark" (
 The Intercept & Wrap-Up Directive: If the Clerk predicts that the upcoming Phase 2 generation will breach the hard limit, it intercepts the standard workflow. It injects a high-priority Wrap-Up Directive into Zone 1 of the Main Model's prompt.
 Example Directive: `"CRITICAL: Context limit approaching. Finalize the immediate sub-task, do not initiate new architectural changes, and output your final <|tool_call|> to commit current state."*
 Seamless Epoch Transition: The 26B model complies, committing its current stable state and cleanly terminating its generation. This triggers Phase 3 (The Archivist) to summarize the truncated Epoch, immediately followed by a Phase 4 Purge. The user experiences a brief "Optimizing Workspace..." UI state, and a fresh Task-Epoch begins without data loss or engine failure.
+3.5 Role-Based Tool Routing (Agent-Centric Filtering)
+To reclaim context budget and prevent agentic drift, the system enforces strict tool-to-persona mapping. 
+*   **The Filter:** Instead of injecting all MCP schemas globally, the orchestrator filters the `tools` array based on the permissions of the active Agent persona (`build`, `plan`, `explore`).
+*   **Clerk Routing:** In Phase 1, the 4B Clerk identifies the lifecycle phase and shifts the active Agent. The orchestrator then loads only the tool pack allowed for that specific persona.
+*   **Inheritance:** Subagents (like `general`) automatically inherit the tool set of their parent agent to ensure execution consistency during parallel tasks.
+*   **KV Cache Preservation:** Tools are only swapped during explicit agent transitions (Mode Switches), ensuring the tool schemas remain static within a phase to maintain 100% KV cache hit rates.
+*   **Persona Lock (One-Shot):** To ensure stability during autonomous scaffolding, the system implements a filesystem-aware persona lock. For "one-shot" workflows, the agent is pinned to the `plan` persona until the `.spec-tasks-approved` file is detected, preventing premature shifts to implementation before planning is finalized.
+*   **Arbitration Mechanism:** If the Main Model believes the Clerk's environment pruning is incorrect (e.g., missing a required tool), it can invoke the `object_to_supervisor` tool.
+    *   **Deadlock Prevention:** The orchestration engine monitors for consecutive objections. If the Agent objects twice for the same reason, a circuit breaker triggers, honoring the Main Model's requested persona and overruling the Clerk's judgment.
 
 4. Thinking Mode & Turn Management
 The <|think|> protocol is the most powerful feature of the model, but it requires strict lifecycle management at the application layer to function correctly in a multi-turn chat GUI.
@@ -107,6 +117,7 @@ Critical Constraints: "No external libraries are allowed beyond what is in requi
 Identity/Personnel: "The Lead Architect is Sarah; all code reviews must be directed to her".
 Implemented as:
 Operational Facts: From operational_facts[12]{fact_id, zone, circumstance, content} in.assistant_rules.toon.
+Hallucination Defense: A strict directive: "Current Phase: [AGENT_NAME]. You are restricted to using only the tools currently defined in your schema."
 Current State (Spec CLI MCP): The immediate active task in progress from Tasks.md, current project phase from .epoch-context.md. 
 Critical Symbols (Project Map MCP): A highly condensed TOON-formatted list of the specific functions, classes, or imports immediately relevant to the active file. Using the ‘impact’ command.
 Zone 2: The Engine (Middle Section)
@@ -158,6 +169,12 @@ In your Pre-Generation phase, the 4B Clerk can run a lightning-fast classificati
 If the user asks "Can you refactor this class?", the Clerk injects the *Reasoning Discipline* rules and sets the System Instruction to `Thinking Effort = HIGH`. If the user asks "Why is my JSON failing?", the Clerk injects the *JSON Tool Calling* rules and sets `Thinking Effort = LOW`.
 The ground-truth-cli mcp helps to populate the .assistant_rules.toon file that the side model will use to place the operational facts in zone 1 and 3 and while placing behavioural rule packs in zone 2.
 
+The Arbitration Protocol (Escalation)
+Trigger: When the Main Model is blocked by missing tools or believes its assigned persona is incorrect.
+Behaviour: The model MUST invoke `object_to_supervisor` with a technical justification and the requested persona. This triggers a review by the Conversational Supervisor.
+Example: `object_to_supervisor({ reason: "I need pm_plan to analyze dependencies before coding", requestedAgent: "plan" })`
+Outcome: Ensures the superior reasoning of the 26B model can overrule the 4B pruner in complex edge cases.
+
 11. Telemetry and Architectural Validation
 To prove the efficacy of the Zero-Fluff optimizations, TOON compression, and dual-model architecture, the system enforces strict observability requirements. All LLM session activity must be piped through a robust logging interceptor capable of validating the sequential state-machine.
 11.1 Independent Lifecycle Tracking
@@ -178,6 +195,8 @@ interface EnhancedModelExecutionEvent {
   event: "START_GENERATE" | "END_GENERATE" | "ERROR";
   providerId: "local-main" | "local-side";
   phase: "Phase 1: Pre-Gen" | "Phase 2: Gen" | "Phase 3: Post-Gen";
+  activeAgent: "build" | "plan" | "explore"; 
+  toolCount: number; // Number of tools injected after filtering
   
   // Independent Lifecycle Tracking
   mainEpochId: string;
@@ -208,4 +227,6 @@ type ZoneStructuredPayload = {
 }
 
 Truncation Logic: When the promptTokens exceed a predefined threshold (e.g., > 10,000 tokens), the logging utility explicitly targets the zone2_context_files key. It slices the string and appends a ...[ZONE 2 TRUNCATED FOR LOGGING] marker. By structuring the payload this way prior to log committal, the system guarantees that Zone 1 (System Directives) and Zone 3 (Immediate Task) are 100% preserved in the telemetry for debugging purposes.
+
+stem Directives) and Zone 3 (Immediate Task) are 100% preserved in the telemetry for debugging purposes.
 

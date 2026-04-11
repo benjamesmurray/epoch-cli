@@ -114,6 +114,17 @@ export namespace Agent {
                 Permission.fromConfig({
                   question: "allow",
                   plan_enter: "allow",
+                  // Spec CLI Tool Pack
+                  sc_todo_list: "allow",
+                  sc_todo_start: "allow",
+                  sc_todo_complete: "allow",
+                  sc_epoch: "allow",
+                  sc_status: "allow",
+                  sc_guidance: "allow",
+                  sc_approve: "allow",
+                  sc_verify: "allow",
+                  sc_plan: "allow",
+                  sc_archive: "allow",
                 }),
                 user,
               ),
@@ -122,21 +133,35 @@ export namespace Agent {
             },
             plan: {
               name: "plan",
-              description: "Plan mode. Disallows all edit tools.",
+              description: "The Spec-Driven Engineer persona. Responsible for Requirements, Design, and Implementation Planning.",
               options: {},
               permission: Permission.merge(
                 defaults,
                 Permission.fromConfig({
                   question: "allow",
                   plan_exit: "allow",
+                  // Spec CLI Tool Pack
+                  sc_init: "allow",
+                  sc_plan: "allow",
+                  sc_guidance: "allow",
+                  sc_approve: "allow",
+                  sc_status: "allow",
+                  sc_verify: "allow",
+                  sc_refresh: "allow",
+                  sc_epoch: "allow",
+                  sc_mode: "allow",
+                  object_to_supervisor: "allow",
+                  // Project Map Tool Pack
+                  pm_query: "allow",
+                  pm_plan: "allow",
+                  pm_status: "allow",
+                  pm_verify: "allow",
                   external_directory: {
-                    [path.join(Global.Path.data, "plans", "*")]: "allow",
+                    [path.join("projects", "active", "*")]: "allow",
                   },
                   edit: {
                     "*": "deny",
-                    [path.join(".epochcli", "plans", "*.md")]: "allow",
-                    [path.relative(Instance.worktree, path.join(Global.Path.data, path.join("plans", "*.md")))]:
-                      "allow",
+                    [path.join("projects", "active", "**")]: "allow",
                   },
                 }),
                 user,
@@ -172,6 +197,11 @@ export namespace Agent {
                   websearch: "allow",
                   codesearch: "allow",
                   read: "allow",
+                  // Project Map Tool Pack
+                  pm_query: "allow",
+                  pm_plan: "allow",
+                  pm_status: "allow",
+                  pm_verify: "allow",
                   external_directory: {
                     "*": "ask",
                     ...Object.fromEntries(whitelistedDirs.map((dir) => [dir, "allow"])),

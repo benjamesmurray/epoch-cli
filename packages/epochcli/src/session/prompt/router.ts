@@ -1,3 +1,6 @@
+import { generateText } from "ai";
+import { Provider } from "@/provider/provider";
+
 export type RulePackID = 
   | "debugging_pack"
   | "refactoring_pack"
@@ -78,6 +81,67 @@ export class RuleRouter {
     // Always include core interaction
     packs.add("core_interaction_pack");
 
+    return Array.from(packs);
+  }
+
+  /**
+   * Uses the Clerk model (4B) to identify the appropriate agent persona based on user intent.
+   */
+  static async identifyAgent(input: string, clerkModel: any, groundTruths?: string): Promise<"build" | "plan" | "explore"> {
+    const { text } = await generateText({
+      model: clerkModel,
+      system: `You are the Conversational Supervisor for Gemini CLI. 
+Review the provided conversation transcript (User, Agent, and Tool interactions) to determine the most appropriate agent persona for the NEXT turn.
+
+Agent Personas:
+- "plan": High-level requirements, design, architecture, or implementation planning (using Spec CLI tools like sc_plan, sc_init). Stay in "plan" until all planning documents are completed and approved.
+- "build": Implementation, coding, bug fixes, or testing. Shift to "build" ONLY when planning is demonstrably finished (e.g., sc_todo_start was called and the agent is ready to write source code).
+- "explore": Read-only exploration, searching, or understanding the codebase. Use this if the user asks questions or the agent needs to research without making changes.
+
+Decision Logic:
+1. Identify the CURRENT active persona from the last few turns.
+2. Maintain PERSONA INERTIA: Do not shift personas unless there is a clear semantic signal that the phase has changed.
+3. If the agent calls "object_to_supervisor", HONOUR their request immediately unless it is obviously nonsensical.
+4. Planning tools (sc_plan, sc_init) are strong signals for "plan".
+5. Implementation tools (write, sc_todo_start) are strong signals for "build".
+6. If the agent is trying to write code but is in "plan" mode (and thus restricted), shift them to "build".
+
+${groundTruths ? `Project Operational Rules:\n${groundTruths}\n\n` : ''}Return ONLY the name of the agent in lowercase.`,
+      prompt: input,
+      abortSignal: AbortSignal.timeout(15000),
+      maxRetries: 0,
+    });
+
+    const identified = text.trim().toLowerCase();
+    if (identified.includes("plan")) return "plan";
+    if (identified.includes("explore")) return "explore";
+    return "build";
+  }
+
+  /**
+   * Uses the Clerk model (4B) to identify relevant behavioral rule packs.
+   */
+  static async identifyRulePacks(input: string, clerkModel: any): Promise<RulePackID[]> {
+    const { text } = await generateText({
+      model: clerkModel,
+      system: `Identify the relevant rule packs for the user request. 
+Options: debugging_pack, refactoring_pack, new_feature_pack, code_review_pack, context_mgmt_pack.
+Return the IDs as a comma-separated list.`,
+      prompt: input,
+      abortSignal: AbortSignal.timeout(15000),
+      maxRetries: 0,
+    });
+
+    const packs = new Set<RulePackID>();
+    const identified = text.toLowerCase();
+    
+    if (identified.includes("debugging")) packs.add("debugging_pack");
+    if (identified.includes("refactoring")) packs.add("refactoring_pack");
+    if (identified.includes("new_feature")) packs.add("new_feature_pack");
+    if (identified.includes("code_review")) packs.add("code_review_pack");
+    if (identified.includes("context_mgmt")) packs.add("context_mgmt_pack");
+    
+    packs.add("core_interaction_pack");
     return Array.from(packs);
   }
 }

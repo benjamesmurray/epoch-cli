@@ -1631,7 +1631,37 @@ export namespace Provider {
         }
       })
 
-      return Service.of({ list, getProvider, getModel, getLanguage, closest, getSmallModel, defaultModel })
+      const getSideModel = Effect.fn("Provider.getSideModel")(function* () {
+        const cfg = yield* config.get()
+
+        // 1. Check for explicit override in config
+        if (cfg.side_model) {
+          const parsed = parseModel(cfg.side_model)
+          return yield* getModel(parsed.providerID, parsed.modelID)
+        }
+
+        const s = yield* InstanceState.get(state)
+        
+        // 2. Fall back strictly to the 'local-side' provider if it exists in the config
+        const sideProvider = s.providers["local-side"]
+        if (sideProvider) {
+            // Prioritize known 4B models within THIS specific provider
+            const priorityList = ["nemotron", "phi-3.5", "gemma-2-2b", "llama-3.2-3b", "qwen-2.5-3b"]
+            for (const priority of priorityList) {
+                const match = Object.keys(sideProvider.models).find(m => m.toLowerCase().includes(priority))
+                if (match) return yield* getModel(ProviderID.make("local-side"), ModelID.make(match))
+            }
+
+            // Otherwise take the first model defined in this provider
+            const firstModel = Object.keys(sideProvider.models)[0]
+            if (firstModel) return yield* getModel(ProviderID.make("local-side"), ModelID.make(firstModel))
+        }
+
+        // 3. Absolute fallback to generic small model (bounded by provider)
+        return yield* getSmallModel(ProviderID.make("local-side"))
+      })
+
+      return Service.of({ list, getProvider, getModel, getLanguage, closest, getSmallModel, getSideModel, defaultModel })
     }),
   )
 
@@ -1667,6 +1697,10 @@ export namespace Provider {
 
   export async function getSmallModel(providerID: ProviderID) {
     return runPromise((svc) => svc.getSmallModel(providerID))
+  }
+
+  export async function getSideModel() {
+    return runPromise((svc) => svc.getSideModel())
   }
 
   export async function defaultModel() {

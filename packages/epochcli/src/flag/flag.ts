@@ -45,6 +45,7 @@ export namespace Flag {
   export const EPOCHCLI_SERVER_PASSWORD = process.env["EPOCHCLI_SERVER_PASSWORD"]
   export const EPOCHCLI_SERVER_USERNAME = process.env["EPOCHCLI_SERVER_USERNAME"]
   export const EPOCHCLI_ENABLE_QUESTION_TOOL = truthy("EPOCHCLI_ENABLE_QUESTION_TOOL")
+  export const EPOCHCLI_DEBUG_FULL_PROMPT = truthy("EPOCHCLI_DEBUG_FULL_PROMPT")
 
   // Experimental
   export const EPOCHCLI_EXPERIMENTAL = truthy("EPOCHCLI_EXPERIMENTAL")

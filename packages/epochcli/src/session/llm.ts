@@ -126,12 +126,144 @@ export namespace LLM {
     const isOpenaiOauth = provider.id === "openai" && auth?.type === "oauth"
 
     const payload: ZoneStructuredPayload = {
-      zone1_critical_rules: [],
+      zone1_critical_rules: [
+        `Current Phase: [${input.agent.name.toUpperCase()}]. You are restricted to using only the tools currently defined in your schema.`
+      ],
       zone2_context_files: [],
       zone3_active_cursor: [],
     }
 
-    // Phase 1: Pre-Generation (Clerk / local-side) - Task 1.4
+    // Phase 1: Intent Classification (Clerk / local-side) - Task 1.1
+    // The Clerk detects user intent and shifts the active epochcli Agent.
+    if (provider.id === "local-main") {
+      try {
+        const sideModel = await Provider.getSideModel(); // 4B Clerk
+        const sideLanguage = await Provider.getLanguage(sideModel);
+        
+        // Extract conversation tail for structural context (Task 1.1)
+        const tailCount = 10;
+        const recentMessages = input.messages.slice(-tailCount);
+        const conversationTail = recentMessages.map(m => {
+            let content = "";
+            if (typeof m.content === "string") {
+                content = m.content;
+            } else if (Array.isArray(m.content)) {
+                content = m.content
+                    .map(c => {
+                        if (c.type === "text") return c.text;
+                        if (c.type === "tool-call") return `[Tool Call: ${c.toolName}]`;
+                        if (c.type === "tool-result") return `[Tool Result: ${c.toolName}]`;
+                        return `[${c.type}]`;
+                    })
+                    .join(" ");
+            }
+            // Truncate individual message content to keep the transcript lean
+            const truncated = content.length > 300 ? content.slice(0, 250) + "... [truncated]" : content;
+            return `${m.role.toUpperCase()}: ${truncated}`;
+        }).join("\n\n");
+
+        if (conversationTail) {
+            const { RuleRouter } = await import("./prompt/router");
+            const { Agent } = await import("@/agent/agent");
+
+            // Debug info for the Clerk Turn
+            const sideProvider = await Provider.getProvider(sideModel.providerID);
+            console.log(`[CLERK] Using model: ${sideModel.providerID}/${sideModel.id} at ${sideProvider?.options?.baseURL}`);
+
+            let groundTruths = "";
+            try {
+              const fsNode = await import("fs/promises");
+              const rulesContext = await fsNode.readFile(".assistant_rules.toon", "utf-8");
+              const parsedRules = parseGroundTruthRules(rulesContext);
+              if (parsedRules.operationalFacts) groundTruths = parsedRules.operationalFacts;
+            } catch (e) {}
+
+            console.log(`[CLERK] Supervising conversation...`);
+            
+            // Task 4.2: Arbitration Mechanism
+            let identifiedAgent: string | undefined;
+            
+            // Check for initial persona lock (Spec CLI One-Shot)
+            const firstUserMsg = input.messages.find(m => m.role === "user");
+            let firstMsgText = "";
+            if (typeof firstUserMsg?.content === "string") {
+                firstMsgText = firstUserMsg.content;
+            } else if (Array.isArray(firstUserMsg?.content)) {
+                firstMsgText = firstUserMsg.content
+                    .filter(c => c.type === "text")
+                    .map(c => c.text)
+                    .join("\n");
+            }
+            const isOneShot = firstMsgText.toLowerCase().includes("one-shot") || firstMsgText.toLowerCase().includes("spec cli");
+            
+            // Check if planning is actually finished
+            let planningFinished = false;
+            try {
+                const fsNode = await import("fs/promises");
+                const pathNode = await import("path");
+                // We don't know the feature name easily here without parsing, 
+                // but we can look for any .spec-tasks-approved file in projects/active
+                const projectDir = "projects/active";
+                const entries = await fsNode.readdir(projectDir, { withFileTypes: true });
+                for (const entry of entries) {
+                    if (entry.isDirectory()) {
+                        const approvedFile = pathNode.join(projectDir, entry.name, ".spec-tasks-approved");
+                        const exists = await fsNode.access(approvedFile).then(() => true).catch(() => false);
+                        if (exists) {
+                            planningFinished = true;
+                            break;
+                        }
+                    }
+                }
+            } catch (e) {}
+
+            // Check for recent objections to the supervisor
+            let objectionCount = 0;
+            let requestedAgent: string | undefined;
+            for (let i = input.messages.length - 1; i >= 0; i--) {
+                const msg = input.messages[i];
+                if (msg.role === "assistant" && Array.isArray(msg.content)) {
+                    const call = msg.content.find(c => c.type === "tool-call" && c.toolName === "object_to_supervisor");
+                    if (call) {
+                        objectionCount++;
+                        requestedAgent = (call as any).args.requestedAgent;
+                    } else {
+                        break;
+                    }
+                }
+            }
+
+            if (objectionCount >= 2 && requestedAgent) {
+                console.log(`[CLERK] Arbitration threshold reached (${objectionCount} objections). Overruling Supervisor with: ${requestedAgent}`);
+                identifiedAgent = requestedAgent;
+            } else if (isOneShot && !planningFinished && identifiedAgent !== "explore") {
+                // Force 'plan' for one-shot workflows until planning is demonstrably finished
+                console.log(`[CLERK] One-Shot planning in progress. Locking persona to: plan`);
+                identifiedAgent = "plan";
+            } else {
+                identifiedAgent = await RuleRouter.identifyAgent(conversationTail, sideLanguage, groundTruths);
+            }
+
+            console.log(`[CLERK] Identified agent: ${identifiedAgent}`);
+            
+            if (identifiedAgent !== input.agent.name) {
+                log.info("Clerk identified agent shift", { from: input.agent.name, to: identifiedAgent });
+                const newAgent = await Agent.get(identifiedAgent);
+                if (newAgent) {
+                    console.log(`[CLERK] SHIFTING agent to: ${identifiedAgent}`);
+                    input.agent = newAgent;
+                    // Update the directive in Zone 1
+                    payload.zone1_critical_rules[0] = `Current Phase: [${input.agent.name.toUpperCase()}]. You are restricted to using only the tools currently defined in your schema.`;
+                }
+            }
+        }
+      } catch (e) {
+        console.error(`[CLERK] Intent classification failed: ${String(e)}`);
+        log.warn("Clerk intent classification failed", { error: String(e) })
+      }
+    }
+
+    // Phase 1: Context Fetching (Clerk / local-side) - Task 1.4
     // Attempt to fetch localized file trees and active path from MCP servers and compress them
     if (provider.id === "local-main") {
       try {
@@ -432,8 +564,9 @@ export namespace LLM {
                      model: sideLanguage,
                      system: "You are a JSON repair utility. The user will provide a broken JSON tool call. Your ONLY job is to output the repaired, valid JSON object that matches the intended schema. DO NOT output any markdown, explanations, or other text. ONLY the valid JSON object.",
                      prompt: `Broken JSON: ${(failed.toolCall as any).args}\n\nError: ${failed.error.message}`,
-                   })
-                   
+                     abortSignal: AbortSignal.timeout(15000),
+                     maxRetries: 0,
+                   })                   
                    try {
                      const repairedArgs = JSON.parse(repairResponse.text.trim())
                      log.info("Successfully repaired JSON with local-side")
@@ -535,6 +668,8 @@ export namespace LLM {
                 event: "START_GENERATE",
                 providerId: input.model.providerID,
                 phase,
+                activeAgent: input.agent.name,
+                toolCount: Object.keys(tools).length,
                 payload: truncatedPayload
               }
               console.log(JSON.stringify(startEvent))
@@ -549,6 +684,8 @@ export namespace LLM {
                   event: "END_GENERATE",
                   providerId: input.model.providerID,
                   phase,
+                  activeAgent: input.agent.name,
+                  toolCount: Object.keys(tools).length,
                   metrics: {
                     ttftMs: endTime - startTime,
                     promptTokens: (res.usage as any)?.promptTokens,
@@ -582,6 +719,8 @@ export namespace LLM {
                 event: "START_GENERATE",
                 providerId: input.model.providerID,
                 phase,
+                activeAgent: input.agent.name,
+                toolCount: Object.keys(tools).length,
                 payload: truncatedPayload
               }
               console.log(JSON.stringify(startEvent))
@@ -615,6 +754,8 @@ export namespace LLM {
                           event: "END_GENERATE",
                           providerId: input.model.providerID,
                           phase,
+                          activeAgent: input.agent.name,
+                          toolCount: Object.keys(tools).length,
                           metrics: {
                             ttftMs: firstTokenTime ? firstTokenTime - startTime : undefined,
                             tps: (tokenCount && firstTokenTime) ? (tokenCount / ((endTime - firstTokenTime) / 1000)) : undefined
@@ -734,8 +875,16 @@ export namespace LLM {
     provider: any
     cfg: Config.Info
   }) {
-    let identicalCount = 0
-    let sequentialFailureCount = 0
+    // Task 4.2: Arbitration Mechanism
+    if (input.toolName === "object_to_supervisor") {
+        return {
+            output: `OBJECTION RECORDED: The Supervisor (Clerk) will review your reasoning: "${input.args.reason}". Your requested persona (${input.args.requestedAgent}) will be considered for the next turn.`,
+            title: "Arbitration Request",
+            metadata: { ...input.args }
+        };
+    }
+
+    let identicalCount = 0;    let sequentialFailureCount = 0
     let identicalChainActive = true
     let failureChainActive = true
     const attemptedArgs: any[] = []
@@ -820,6 +969,7 @@ export namespace LLM {
               model: sideLanguage,
               system: systemPrompt,
               prompt: `${prompt}\n\nPlease provide the intervention directive:`,
+              abortSignal: AbortSignal.timeout(15000),              maxRetries: 0,
             })
 
             const interventionEvent: Log.EnhancedModelExecutionEvent = {
@@ -848,3 +998,4 @@ export namespace LLM {
     return null
   }
 }
+

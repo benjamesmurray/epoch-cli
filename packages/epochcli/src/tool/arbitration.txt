@@ -1,0 +1,5 @@
+Use this tool to object to the current agent persona assigned by the Supervisor (Clerk) if you believe it is incorrect or preventing you from completing your task. 
+
+Provide a clear reason why the current persona is wrong and specify which persona you believe should be active (e.g., "plan", "build", "explore"). 
+
+The Supervisor will review your objection and either concede (switching your persona) or enforce the current one. If you object multiple times for the same reason, your judgment will eventually overrule the Supervisor.

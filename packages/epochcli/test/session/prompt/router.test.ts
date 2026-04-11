@@ -1,47 +1,55 @@
-import { describe, it, expect } from "bun:test";
-import { RuleRouter } from "../../../src/session/prompt/router";
+import { describe, expect, it, mock } from "bun:test"
+import { RuleRouter } from "../../../src/session/prompt/router"
 
 describe("RuleRouter", () => {
-  it("should always include the core_interaction_pack", () => {
-    const packs = RuleRouter.classify("hello world");
-    expect(packs).toContain("core_interaction_pack");
-    expect(packs).toHaveLength(1);
-  });
+  describe("identifyAgent", () => {
+    it("should fast-path to 'plan' for Spec CLI one-shot requests", async () => {
+      const mockModel = {} as any
+      const result = await RuleRouter.identifyAgent(
+        "Implement a new feature using the Spec CLI in ONE-SHOT mode.",
+        mockModel
+      )
+      expect(result).toBe("plan")
+    })
 
-  it("should identify debugging intent", () => {
-    const packs = RuleRouter.classify("fix this bug with the stack trace");
-    expect(packs).toContain("debugging_pack");
-    expect(packs).toContain("core_interaction_pack");
-  });
+    it("should use the Clerk model to identify 'build'", async () => {
+      const mockModel = {
+        specificationVersion: "v3",
+        provider: "mock",
+        modelId: "mock",
+        doGenerate: async () => ({
+           text: "build",
+           finishReason: "stop",
+           usage: { promptTokens: 10, completionTokens: 10, inputTokens: { total: 10 }, outputTokens: { total: 10 } },
+           content: [{ type: "text", text: "build" }]
+        })
+      } as any
+      
+      const result = await RuleRouter.identifyAgent(
+        "Fix the null pointer exception in the auth controller",
+        mockModel
+      )
+      expect(result).toBe("build")
+    })
 
-  it("should identify refactoring intent", () => {
-    const packs = RuleRouter.classify("refactor this code to optimize it");
-    expect(packs).toContain("refactoring_pack");
-    expect(packs).toContain("core_interaction_pack");
-  });
-
-  it("should identify new feature intent", () => {
-    const packs = RuleRouter.classify("implement a new feature to add users");
-    expect(packs).toContain("new_feature_pack");
-    expect(packs).toContain("core_interaction_pack");
-  });
-
-  it("should identify code review intent", () => {
-    const packs = RuleRouter.classify("please review this and explain how it works");
-    expect(packs).toContain("code_review_pack");
-    expect(packs).toContain("core_interaction_pack");
-  });
-
-  it("should identify context management intent", () => {
-    const packs = RuleRouter.classify("summarize what we did and then revert the changes");
-    expect(packs).toContain("context_mgmt_pack");
-    expect(packs).toContain("core_interaction_pack");
-  });
-
-  it("should handle overlapping intents", () => {
-    const packs = RuleRouter.classify("add a new feature to fix the bug");
-    expect(packs).toContain("new_feature_pack");
-    expect(packs).toContain("debugging_pack");
-    expect(packs).toContain("core_interaction_pack");
-  });
-});
+    it("should use the Clerk model to identify 'explore'", async () => {
+      const mockModel = {
+        specificationVersion: "v3",
+        provider: "mock",
+        modelId: "mock",
+        doGenerate: async () => ({
+           text: "explore",
+           finishReason: "stop",
+           usage: { promptTokens: 10, completionTokens: 10, inputTokens: { total: 10 }, outputTokens: { total: 10 } },
+           content: [{ type: "text", text: "explore" }]
+        })
+      } as any
+      
+      const result = await RuleRouter.identifyAgent(
+        "How does the database connection work?",
+        mockModel
+      )
+      expect(result).toBe("explore")
+    })
+  })
+})

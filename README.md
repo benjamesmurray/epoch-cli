@@ -6,37 +6,47 @@ It is built to maximize the efficiency of local LLMs by intelligently routing ta
 
 ## Key Features
 
-### 🧠 Dual-Model Orchestration & Loop Supervisor
-Epoch CLI seamlessly coordinates between two local language models to prevent compute contention and optimize performance:
-- **`local-main` (e.g., 26B parameters)**: The heavy-lifter. Responsible for complex reasoning, code generation, and executing primary user directives.
-- **`local-side` (e.g., 4B parameters)**: The agile supervisor. Operates in the background to sanitize inputs, repair broken JSON outputs, extract persistent architectural rules, and **monitor the main model for hallucination loops**. If the main model gets stuck repeating identical tool calls, the side model intercepts and generates a stern, dynamic correction to pivot its strategy.
+### 🧠 Dual-Model Orchestration & Conversational Supervisor
+Epoch CLI seamlessly coordinates between two local language models using a "Baton Pass" event loop:
+- **`local-main` (e.g., 26B parameters)**: The execution lead. Responsible for complex reasoning, code generation, and primary task fulfillment.
+- **`local-side` (e.g., 4B parameters)**: The **Conversational Supervisor**. Analyzes a structural transcript of the conversation history (including tool calls) to manage environment state and persona discipline.
+- **Agent Routing & Persona Inertia**: The supervisor dynamically selects the active **Agent Persona** (`build`, `plan`, `explore`) based on semantic progress. It maintains "Persona Inertia," ensuring shifts only occur when logical phases are complete or the agent is fundamentally blocked.
+- **Arbitration Mechanism**: Empowering the main model to challenge environmental pruning. Through the `object_to_supervisor` tool, the main agent can object to a persona assignment. A circuit breaker ensures that persistent objections from the 26B model overrule the 4B supervisor to prevent deadlocks.
+
+### 🛡️ MCP Routing & Hallucination Defense
+To reclaim context budget and prevent agentic drift, Epoch CLI enforces strict role-based tool filtering:
+- **Role-Based Filtering**: Instead of injecting all MCP schemas globally (~8,000 tokens), the orchestrator injects only the "Tool Pack" relevant to the active agent (e.g., only Spec tools during planning). This reduces overhead by up to 85%.
+- **Structural Defense**: High-priority directives are injected into **Zone 1** of the prompt, explicitly restricting the model to the tools defined in its current schema, effectively neutralizing "Ghost Tool" hallucinations.
+- **Inheritance**: Subagents automatically inherit the tool set of their parent, ensuring consistent execution during parallel tasks.
+- **Persona Lock (One-Shot)**: For autonomous scaffolding, the system implements a filesystem-aware lock that pins the agent to `plan` until the planning documents are officially approved, preventing premature implementation shifts.
 
 ### 🏛️ Three Pillar MCP Architecture
 The CLI achieves "functional consciousness" and architectural awareness entirely through its deep integration with three core MCP servers:
-- **`mcp-spec-cli`**: Drives rigorous, specification-based workflows (Requirements -> Design -> Tasks -> Implementation -> Testing). Features an autonomous `one-shot` mode for uninterrupted execution.
-- **`project-map-cli`**: Provides structural awareness. The agent can query symbols, explore relationships, and understand the codebase layout without reading massive files directly.
-- **`ground-truth-cli`**: Scans the project to enforce codebase-specific rules and conventions via TOON (Token-Oriented Object Notation) formats, directly injected into the prompt.
+- **`mcp-spec-cli`**: Drives rigorous, specification-based workflows (Requirements -> Design -> Tasks -> Implementation -> Testing).
+- **`project-map-cli`**: Provides structural awareness. The agent can query symbols and explore relationships without reading massive files directly.
+- **`ground-truth-cli`**: Scans the project to enforce codebase-specific rules and conventions via TOON (Token-Oriented Object Notation) formats.
 
-### 💾 Epoch Continuity & Managed Cold Starts
-To navigate strict context window limits (e.g., 32k tokens) without losing the thread of complex tasks, Epoch CLI employs **managed cold starts**. 
-- The `mcp-spec-cli` server maintains an `.epoch-context.md` file that acts as the agent's short-term memory. 
-- Using the `sc_epoch` tool, the agent continuously tracks its active focus, pending intentions, hypotheses, and open questions.
-- If the context window fills up or the session is restarted, the system can perform a "cold start" by wiping the conversation history, but the agent instantly regains its functional consciousness by reading the `.epoch-context.md` file injected into the very top of its new prompt.
+### 💾 Positional Prompting & Managed Cold Starts
+Epoch CLI utilizes a **Positional Prompt Architecture** to exploit the transformer's U-shaped attention curve:
+- **Zone 1 (Head)**: Critical operational facts and hallucination defense.
+- **Zone 2 (Body)**: Behavioral rule packs and general context.
+- **Zone 3 (Tail)**: Fact reiteration and active cursor focus.
+- **Managed Cold Starts**: Maintains an `.epoch-context.md` file via Spec CLI to act as short-term memory, allowing the system to wipe conversation history (Purge) without losing task continuity.
 
-### ⚡ Ultra-Streamlined System Prompt
-The system prompt has been aggressively compressed to the theoretical minimum required for tool execution and basic formatting (e.g., specific rules for Gemma 4). By stripping out verbose role-playing, redundant examples, and conversational "fluff," the agent saves over 2,000 tokens of overhead per turn. This drastically improves Time-To-First-Token (TTFT) and maximizes the context window available for actual codebase reasoning.
-
-### 🧪 Automated E2E Testing Framework
-Includes robust end-to-end testing scripts (e.g., `e2e_testing/run_eventbus_v2_e2e.sh`) that force the agent to autonomously plan, implement, and test complex TypeScript utilities. The framework subsequently analyzes the telemetry logs to prove zero compute overlap, verify typing constraints, and monitor JSON repair rates.
+### 📊 Advanced Telemetry & E2E Testing
+Includes a robust E2E variance testing harness that monitors:
+- **Performance Metrics**: Real-time tracking of Tokens Per Second (TPS) and Time-To-First-Token (TTFT).
+- **Architectural Validation**: Detailed logging of `activeAgent` transitions and `toolCount` reduction.
+- **Stability Monitoring**: Automated tracking of JSON repair rates and loop detection interventions.
 
 ## Getting Started
 
 ### Prerequisites
 - [Bun](https://bun.sh/) runtime installed.
-- Local LLM inference servers running (e.g., via LM Studio or `llama.cpp`) on ports `8085` (main) and `8086` (side).
+- Local LLM inference servers running (e.g., via vLLM or `llama.cpp`) on ports `8085` (main) and `8086` (side).
 
 ### Configuration
-Epoch CLI is configured via the `.epochcli/epochcli.jsonc` file in your workspace. Ensure your local providers and MCP servers are mapped correctly:
+Epoch CLI is configured via the `.epochcli/epochcli.jsonc` file. Example configuration for local builds:
 
 ```jsonc
 {
@@ -51,9 +61,18 @@ Epoch CLI is configured via the `.epochcli/epochcli.jsonc` file in your workspac
     }
   },
   "mcp": {
-    "mcp-spec-cli": { "type": "local", "command": ["npx", "-y", "https://github.com/benjamesmurray/mcp-spec-cli"] },
-    "project-map-cli": { "type": "local", "command": ["project-map-cli/venv/bin/python", "project-map-cli/src/project_map_cli/mcp/server.py"] },
-    "ground-truth-cli": { "type": "local", "command": ["npx", "-y", "https://github.com/benjamesmurray/ground-truth-cli"] }
+    "mcp-spec-cli": { 
+      "type": "local", 
+      "command": ["node", "/path/to/cli/mcp-spec-cli/dist/index.js"] 
+    },
+    "project-map-cli": { 
+      "type": "local", 
+      "command": ["/path/to/cli/project-map-cli/venv/bin/python", "-m", "project_map_cli.mcp.server"] 
+    },
+    "ground-truth-cli": { 
+      "type": "local", 
+      "command": ["npx", "-y", "https://github.com/benjamesmurray/ground-truth-cli"] 
+    }
   }
 }
 ```
@@ -65,14 +84,9 @@ Start the interactive TUI:
 bun packages/epochcli/src/index.ts
 ```
 
-Run an autonomous, one-shot command:
-```bash
-bun packages/epochcli/src/index.ts run "Use the Spec CLI to initialize a new project called 'example' in one-shot mode."
-```
-
 ## Documentation
-- [MCP Configuration Guide](docs/MCP_config_guide.md) - Guide to connecting external tools.
 - [Epoch Spec](docs/Epoch_spec.md) - Deep dive into the orchestration specification.
+- [MCP Configuration Guide](docs/MCP_config_guide.md) - Detailed setup for tool servers.
 
 ## License
 MIT

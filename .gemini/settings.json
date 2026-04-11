@@ -22,10 +22,9 @@
       ]
     },
     "mcp-spec-cli": {
-      "command": "npx",
+      "command": "node",
       "args": [
-        "-y",
-        "https://github.com/benjamesmurray/mcp-spec-cli"
+        "/home/benmurray/Projects/cli/mcp-spec-cli/dist/index.js"
       ],
       "trust": true
     },

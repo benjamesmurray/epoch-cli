@@ -11,6 +11,7 @@ import { TodoWriteTool } from "./todo"
 import { WebFetchTool } from "./webfetch"
 import { RevertFileTool } from "./revert"
 import { WriteTool } from "./write"
+import { ArbitrationTool } from "./arbitration"
 import { InvalidTool } from "./invalid"
 import { SkillTool } from "./skill"
 import type { Agent } from "../agent/agent"
@@ -155,6 +156,7 @@ export namespace ToolRegistry {
       const lsp = yield* build(LspTool)
       const batch = yield* build(BatchTool)
       const plan = yield* build(PlanExitTool)
+      const arbitrate = yield* build(ArbitrationTool)
 
       const all = Effect.fn("ToolRegistry.all")(function* (custom: Tool.Info[]) {
         const cfg = yield* config.get()
@@ -177,6 +179,7 @@ export namespace ToolRegistry {
           code,
           skill,
           patch,
+          arbitrate,
           ...(Flag.EPOCHCLI_EXPERIMENTAL_LSP_TOOL ? [lsp] : []),
           ...(cfg.experimental?.batch_tool === true ? [batch] : []),
           ...(Flag.EPOCHCLI_EXPERIMENTAL_PLAN_MODE && Flag.EPOCHCLI_CLIENT === "cli" ? [plan] : []),

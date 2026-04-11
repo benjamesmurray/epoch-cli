@@ -209,45 +209,11 @@ export namespace SessionPrompt {
         const subtasks = firstUser.parts.filter((p): p is MessageV2.SubtaskPart => p.type === "subtask")
         const onlySubtasks = subtasks.length > 0 && firstUser.parts.every((p) => p.type === "subtask")
 
-        const ag = yield* agents.get("title")
-        if (!ag) return
-        const mdl = ag.model
-          ? yield* provider.getModel(ag.model.providerID, ag.model.modelID)
-          : ((yield* provider.getSmallModel(input.providerID)) ??
-            (yield* provider.getModel(input.providerID, input.modelID)))
-        const msgs = onlySubtasks
-          ? [{ role: "user" as const, content: subtasks.map((p) => p.prompt).join("\n") }]
-          : yield* MessageV2.toModelMessagesEffect(context, mdl)
-        const text = yield* Effect.promise(async (signal) => {
-          const result = await LLM.stream({
-            agent: ag,
-            user: firstInfo,
-            system: {
-              zone1: [],
-              zone2: [],
-            },
-            small: true,
-            tools: {},
-            model: mdl,
-            abort: signal,
-            sessionID: input.session.id,
-            retries: 2,
-            messages: [{ role: "user", content: "Generate a title for this conversation:\n" }, ...msgs],
-          })
-          return result.text
-        })
-        const cleaned = text
-          .replace(/<think>[\s\S]*?<\/think>\s*/g, "")
-          .split("\n")
-          .map((line) => line.trim())
-          .find((line) => line.length > 0)
-        if (!cleaned) return
-        const t = cleaned.length > 100 ? cleaned.substring(0, 97) + "..." : cleaned
         yield* sessions
-          .setTitle({ sessionID: input.session.id, title: t })
+          .setTitle({ sessionID: input.session.id, title: "Session" })
           .pipe(
             Effect.catchCause((cause) =>
-              Effect.sync(() => log.error("failed to generate title", { error: Cause.squash(cause) })),
+              Effect.sync(() => log.error("failed to set title", { error: Cause.squash(cause) })),
             ),
           )
       })
@@ -396,6 +362,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         processor: Pick<SessionProcessor.Handle, "message" | "partFromToolCall">
         bypassAgentCheck: boolean
         messages: MessageV2.WithParts[]
+        parentPermission?: Permission.Ruleset
       }) {
         using _ = log.time("resolveTools")
         const tools: Record<string, AITool> = {}
@@ -431,7 +398,11 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                 ...req,
                 sessionID: input.session.id,
                 tool: { messageID: input.processor.message.id, callID: options.toolCallId },
-                ruleset: Permission.merge(input.agent.permission, input.session.permission ?? []),
+                ruleset: Permission.merge(
+                  input.agent.permission,
+                  input.parentPermission ?? [],
+                  input.session.permission ?? [],
+                ),
               }),
             ),
         })
@@ -475,6 +446,8 @@ NOTE: At any point in time through this workflow you should feel free to ask the
             },
           })
         }
+
+        const mergedPermission = Permission.merge(input.agent.permission, input.parentPermission ?? [])
 
         for (const [key, item] of Object.entries(yield* mcp.tools())) {
           const execute = item.execute
@@ -547,7 +520,12 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                 }
               }),
             )
-          tools[key] = item
+
+          // Filter MCP tools based on agent permissions
+          const perm = Permission.evaluate(key, "", mergedPermission)
+          if (perm.action === "allow") {
+            tools[key] = item
+          }
         }
 
         return tools
@@ -1464,6 +1442,16 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                 const lastUserMsg = msgs.findLast((m) => m.info.role === "user")
                 const bypassAgentCheck = lastUserMsg?.parts.some((p) => p.type === "agent") ?? false
 
+                // Subagent Inheritance: Find the last non-synthetic user agent to use as parent permission
+                const lastNonSyntheticUser = msgs.findLast((m) => m.info.role === "user" && !m.parts.some(p => p.type === "text" && p.synthetic))
+                let parentPermission: Permission.Ruleset | undefined = undefined
+                if (lastNonSyntheticUser && lastNonSyntheticUser.info.agent !== agent.name) {
+                  const parentAgent = yield* agents.get(lastNonSyntheticUser.info.agent)
+                  if (parentAgent) {
+                    parentPermission = parentAgent.permission
+                  }
+                }
+
                 const tools = yield* resolveTools({
                   agent,
                   session,
@@ -1472,6 +1460,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                   processor: handle,
                   bypassAgentCheck,
                   messages: msgs,
+                  parentPermission,
                 })
 
                 if (lastUser.format?.type === "json_schema") {

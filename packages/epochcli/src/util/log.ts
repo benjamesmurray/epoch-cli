@@ -2,6 +2,7 @@ import path from "path"
 import fs from "fs/promises"
 import { createWriteStream } from "fs"
 import { Global } from "../global"
+import { Flag } from "../flag/flag"
 import z from "zod"
 import { Glob } from "./glob"
 
@@ -18,6 +19,8 @@ export namespace Log {
     event: "START_GENERATE" | "END_GENERATE" | "ERROR";
     providerId: "local-main" | "local-side" | string;
     phase: "Phase 1: Pre-Gen" | "Phase 2: Gen" | "Phase 3: Post-Gen" | string;
+    activeAgent?: string;
+    toolCount?: number;
 
     mainEpochId: string;
     clerkMicroEpochId?: string;
@@ -39,6 +42,7 @@ export namespace Log {
 
   export function truncatePayload(payload: ZoneStructuredPayload | any | undefined): ZoneStructuredPayload | undefined {
     if (!payload) return undefined;
+    if (Flag.EPOCHCLI_DEBUG_FULL_PROMPT) return payload;
 
     // Always preserve zone1 and zone3, truncate zone2 specifically for logging
     return {

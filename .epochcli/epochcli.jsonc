@@ -38,11 +38,11 @@
   "mcp": {
     "mcp-spec-cli": {
       "type": "local",
-      "command": ["npx", "-y", "https://github.com/benjamesmurray/mcp-spec-cli"]
+      "command": ["node", "/home/benmurray/Projects/cli/mcp-spec-cli/dist/index.js"]
     },
     "project-map-cli": {
       "type": "local",
-      "command": ["/home/benmurray/Projects/cli/project-map-cli/venv/bin/python", "/home/benmurray/Projects/cli/project-map-cli/src/project_map_cli/mcp/server.py"]
+      "command": ["/home/benmurray/Projects/cli/project-map-cli/venv/bin/python", "-m", "project_map_cli.mcp.server"]
     },
     "ground-truth-cli": {
       "type": "local",
