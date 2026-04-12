@@ -1,0 +1,77 @@
+# streamline-codebase - Task List
+
+## Implementation Tasks
+
+- [x] 1. **Root Configuration & Auxiliary Cleanup**
+    - [x] 1.1. Remove deleted workspaces from `package.json`
+        - *Goal*: Ensure the monorepo no longer tracks removed packages.
+        - *Files*: `package.json`
+        - *Dependencies*: None
+        - *Details*: Remove `packages/slack`, `packages/function`, and any other deleted paths from the `workspaces` array.
+        - *Requirements*: Project Configuration Update
+    - [x] 1.2. Remove auxiliary folders and files
+        - *Goal*: Physically delete unused infrastructure and integration code.
+        - *Files*: `infra/`, `packages/function/`, `packages/slack/`, `packages/extensions/zed/`, `packages/containers/`, `nix/`, `flake.nix`, `flake.lock`
+        - *Dependencies*: 1.1
+        - *Details*: Delete the directories and files listed.
+        - *Requirements*: Infrastructure & Backend Removal, Integrations & Extensions Removal, Containerization Cleanup, Nix Configuration Removal
+    - [x] 1.3. Remove specialized root scripts
+        - *Goal*: Cleanup script directory of obsolete tools.
+        - *Files*: `script/sync-zed.ts`, `fix-migration.ts`, `fix-shares.ts`
+        - *Dependencies*: 1.2
+        - *Details*: Delete these specific script files.
+        - *Requirements*: Script Cleanup
+
+- [x] 2. **Epoch CLI Internal Streamlining**
+    - [x] 2.1. Remove Share logic and SQL schemas
+        - *Goal*: Strip "Share" functionality from the core CLI.
+        - *Files*: `packages/epochcli/src/share/`, `packages/epochcli/src/session/schema.ts`, `packages/epochcli/src/session/session.sql.ts`
+        - *Dependencies*: 1.2
+        - *Details*: Delete the `src/share` directory. Update `schema.ts` and `session.sql.ts` to remove `share` related fields and tables.
+        - *Requirements*: Epoch CLI Streamlining
+    - [x] 2.2. Remove Share UI from TUI Command Palette
+        - *Goal*: Remove share-related commands from the user interface.
+        - *Files*: `packages/epochcli/src/cli/cmd/tui/routes/session/index.tsx`
+        - *Dependencies*: 2.1
+        - *Details*: Remove "session.share", "session.unshare", and related command registrations.
+        - *Requirements*: TUI UI Cleanup
+    - [x] 2.3. Remove Share URL from TUI Sidebar
+        - *Goal*: Cleanup session metadata display.
+        - *Files*: `packages/epochcli/src/cli/cmd/tui/routes/session/sidebar.tsx`
+        - *Dependencies*: 2.1
+        - *Details*: Remove the code rendering `session()!.share?.url`.
+        - *Requirements*: TUI UI Cleanup
+    - [x] 2.4. Cleanup TUI Tips and Documentation
+        - *Goal*: Ensure help text remains accurate.
+        - *Files*: `packages/epochcli/src/cli/cmd/tui/feature-plugins/home/tips-view.tsx`
+        - *Dependencies*: 2.1
+        - *Details*: Remove tips referring to `/share` and `/unshare`.
+        - *Requirements*: TUI UI Cleanup
+
+- [x] 3. **Test Suite Alignment**
+    - [x] 3.1. Delete share-related test files
+        - *Goal*: Prevent test failures from missing code.
+        - *Files*: `packages/epochcli/test/share/`, `packages/epochcli/test/cli/import.test.ts`
+        - *Dependencies*: 2.1
+        - *Details*: Remove tests that strictly validate sharing functionality.
+        - *Requirements*: Project builds and type-checks successfully
+    - [x] 3.2. Update migration and config tests
+        - *Goal*: Ensure test suite reflects new configuration schema.
+        - *Files*: `packages/epochcli/test/config/config.test.ts`, `packages/epochcli/test/storage/json-migration.test.ts`
+        - *Dependencies*: 2.1, 3.1
+        - *Details*: Remove tests for `autoshare` migration and session share record migration.
+        - *Requirements*: Project builds and type-checks successfully
+
+- [x] 4. **Final Validation**
+    - [x] 4.1. Run Type Checks and Build
+        - *Goal*: Verify project integrity.
+        - *Files*: N/A
+        - *Dependencies*: All previous tasks
+        - *Details*: Execute `bun turbo typecheck` and `bun run build`.
+        - *Requirements*: Project builds and type-checks successfully
+    - [x] 4.2. Run E2E Tests
+        - *Goal*: Ensure core functionality is untouched.
+        - *Files*: N/A
+        - *Dependencies*: 4.1
+        - *Details*: Execute `bun run test:e2e` (or equivalent harness command).
+        - *Requirements*: No regressions in core MCP server functionality or E2E testing harness

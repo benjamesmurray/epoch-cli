@@ -88,6 +88,10 @@ export class RuleRouter {
    * Uses the Clerk model (4B) to identify the appropriate agent persona based on user intent.
    */
   static async identifyAgent(input: string, clerkModel: any, groundTruths?: string): Promise<"build" | "plan" | "explore"> {
+    if (input.includes("ONE-SHOT")) {
+      return "plan";
+    }
+
     const { text } = await generateText({
       model: clerkModel,
       system: `You are the Conversational Supervisor for Gemini CLI. 
@@ -121,13 +125,21 @@ ${groundTruths ? `Project Operational Rules:\n${groundTruths}\n\n` : ''}Return O
   /**
    * Uses the Clerk model (4B) to identify relevant behavioral rule packs.
    */
-  static async identifyRulePacks(input: string, clerkModel: any): Promise<RulePackID[]> {
+  static async identifyRulePacks(transcript: string, clerkModel: any): Promise<RulePackID[]> {
     const { text } = await generateText({
       model: clerkModel,
-      system: `Identify the relevant rule packs for the user request. 
-Options: debugging_pack, refactoring_pack, new_feature_pack, code_review_pack, context_mgmt_pack.
-Return the IDs as a comma-separated list.`,
-      prompt: input,
+      system: `You are the Conversational Supervisor for Gemini CLI. 
+Review the provided conversation transcript (User, Agent, and Tool interactions) to identify the relevant behavioral rule packs for the NEXT turn.
+
+Available Rule Packs:
+- debugging_pack: Focuses on root cause analysis, stack trace isolation, and bug fixing discipline. Use if errors or bugs are reported.
+- refactoring_pack: Focuses on execution planning, architectural consistency, and performance metrics. Use if optimization or cleanup is requested.
+- new_feature_pack: Focuses on directory structure validation, null-safety, and persistent state logging. Use if adding new logic or files.
+- code_review_pack: Focuses on vulnerability explanation, trade-off analysis, and security flagging. Use for explanations or code analysis.
+- context_mgmt_pack: Focuses on context summarization, contradiction detection, and task hand-offs. Use if context window is getting full or tasks are being transitioned.
+
+Return ONLY a comma-separated list of the relevant rule pack IDs. Always include core_interaction_pack as the baseline.`,
+      prompt: transcript,
       abortSignal: AbortSignal.timeout(15000),
       maxRetries: 0,
     });

@@ -556,14 +556,7 @@ export const GithubRunCommand = cmd({
           ],
         })
         subscribeSessionEvents()
-        shareId = await (async () => {
-          if (share === false) return
-          if (!share && repoData.data.private) return
-          await Session.share(session.id)
-          return session.id.slice(-8)
-        })()
         console.log("epochcli session", session.id)
-
         // Handle event types:
         // REPO_EVENTS (schedule, workflow_dispatch): no issue/PR context, output to logs/PR only
         // USER_EVENTS on PR (pull_request, pull_request_review_comment, issue_comment on PR): work on PR branch

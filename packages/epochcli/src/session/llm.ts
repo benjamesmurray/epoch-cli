@@ -80,7 +80,7 @@ export namespace LLM {
 
   export const defaultLayer = layer
 
-  export function parseGroundTruthRules(raw: string): { operationalFacts: string; behavioralRules: string; projectSpecific: string } {
+  export function parseGroundTruthRules(raw: string, activePacks: string[] = ["core_interaction_pack"]): { operationalFacts: string; behavioralRules: string; projectSpecific: string } {
     const zones = {
       operationalFacts: "",
       behavioralRules: "",
@@ -88,10 +88,56 @@ export namespace LLM {
     }
 
     const zone1Match = raw.match(/(ZONE 1 & 3:.*?)(?=ZONE 2:|$)/s)
-    if (zone1Match) zones.operationalFacts = zone1Match[1].trim()
+    if (zone1Match) {
+      const factsStr = zone1Match[1]
+      const factsRegex = /fact_\d+,\s*"[^"]+",\s*"[^"]+",\s*"([^"]+)"/g
+      const extractedFacts: string[] = []
+      let match
+      while ((match = factsRegex.exec(factsStr)) !== null) {
+        extractedFacts.push(`- ${match[1]}`)
+      }
+      if (extractedFacts.length > 0) {
+        zones.operationalFacts = `ZONE 1 & 3: OPERATIONAL FACTS\n${extractedFacts.join("\n")}`
+      } else {
+        zones.operationalFacts = factsStr.trim()
+      }
+    }
 
     const zone2Match = raw.match(/(ZONE 2: BEHAVIORAL RULE PACKS.*?)(?=ZONE 3: PROJECT-SPECIFIC RULES|$)/s)
-    if (zone2Match) zones.behavioralRules = zone2Match[1].trim()
+    if (zone2Match) {
+      const zone2Str = zone2Match[1]
+      
+      const ruleIds = new Set<string>()
+      for (const targetPack of activePacks) {
+        const packRegex = new RegExp(`${targetPack}:\\s*\\[(.*?)\\]`)
+        const packMatch = zone2Str.match(packRegex)
+        if (packMatch) {
+          packMatch[1].split(',').forEach((s: string) => {
+            const id = s.trim().split('.').pop() || ""
+            if (id) ruleIds.add(id)
+          })
+        }
+      }
+      
+      if (ruleIds.size > 0) {
+        const rulesRegex = /([a-z]+_\d+),\s*"([^"]+)",\s*"([^"]+)",\s*"([^"]+)"/g
+        const extractedRules: string[] = []
+        let rMatch
+        while ((rMatch = rulesRegex.exec(zone2Str)) !== null) {
+          if (ruleIds.has(rMatch[1])) {
+             extractedRules.push(`Trigger: ${rMatch[2]}\nBehaviour: ${rMatch[3]}\nExample: ${rMatch[4]}\n`)
+          }
+        }
+        
+        if (extractedRules.length > 0) {
+           zones.behavioralRules = `ZONE 2: BEHAVIORAL RULES\n\n${extractedRules.join("\n")}`
+        } else {
+           zones.behavioralRules = zone2Str.trim()
+        }
+      } else {
+        zones.behavioralRules = zone2Str.trim()
+      }
+    }
 
     const zone3Specific = raw.match(/(ZONE 3: PROJECT-SPECIFIC RULES.*?)$/s)
     if (zone3Specific) zones.projectSpecific = zone3Specific[1].trim()
@@ -133,6 +179,8 @@ export namespace LLM {
       zone3_active_cursor: [],
     }
 
+    let activeRulePacks: string[] = ["core_interaction_pack"];
+
     // Phase 1: Intent Classification (Clerk / local-side) - Task 1.1
     // The Clerk detects user intent and shifts the active epochcli Agent.
     if (provider.id === "local-main") {
@@ -168,17 +216,18 @@ export namespace LLM {
 
             // Debug info for the Clerk Turn
             const sideProvider = await Provider.getProvider(sideModel.providerID);
-            console.log(`[CLERK] Using model: ${sideModel.providerID}/${sideModel.id} at ${sideProvider?.options?.baseURL}`);
+            l.debug("clerk", { message: `Using model: ${sideModel.providerID}/${sideModel.id} at ${sideProvider?.options?.baseURL}` });
 
             let groundTruths = "";
             try {
               const fsNode = await import("fs/promises");
               const rulesContext = await fsNode.readFile(".assistant_rules.toon", "utf-8");
-              const parsedRules = parseGroundTruthRules(rulesContext);
+              // Use an empty array for packs here since we just want operational facts for the Clerk
+              const parsedRules = parseGroundTruthRules(rulesContext, []);
               if (parsedRules.operationalFacts) groundTruths = parsedRules.operationalFacts;
             } catch (e) {}
 
-            console.log(`[CLERK] Supervising conversation...`);
+            l.debug("clerk", { message: "Supervising conversation..." });
             
             // Task 4.2: Arbitration Mechanism
             let identifiedAgent: string | undefined;
@@ -233,24 +282,33 @@ export namespace LLM {
                 }
             }
 
-            if (objectionCount >= 2 && requestedAgent) {
-                console.log(`[CLERK] Arbitration threshold reached (${objectionCount} objections). Overruling Supervisor with: ${requestedAgent}`);
-                identifiedAgent = requestedAgent;
-            } else if (isOneShot && !planningFinished && identifiedAgent !== "explore") {
-                // Force 'plan' for one-shot workflows until planning is demonstrably finished
-                console.log(`[CLERK] One-Shot planning in progress. Locking persona to: plan`);
-                identifiedAgent = "plan";
-            } else {
-                identifiedAgent = await RuleRouter.identifyAgent(conversationTail, sideLanguage, groundTruths);
-            }
+            // Concurrently identify agent and rule packs
+            const [identifiedAgentResult, identifiedPacks] = await Promise.all([
+                (async () => {
+                    if (objectionCount >= 2 && requestedAgent) {
+                        l.debug("clerk", { message: `Arbitration threshold reached (${objectionCount} objections). Overruling Supervisor with: ${requestedAgent}` });
+                        return requestedAgent;
+                    } else if (isOneShot && !planningFinished) {
+                        l.debug("clerk", { message: "One-Shot planning in progress. Locking persona to: plan" });
+                        return "plan";
+                    } else {
+                        return RuleRouter.identifyAgent(conversationTail, sideLanguage, groundTruths);
+                    }
+                })(),
+                RuleRouter.identifyRulePacks(conversationTail, sideLanguage)
+            ]);
 
-            console.log(`[CLERK] Identified agent: ${identifiedAgent}`);
+            identifiedAgent = identifiedAgentResult;
+            activeRulePacks = identifiedPacks;
+
+            l.debug("clerk", { message: `Identified agent: ${identifiedAgent}` });
+            l.debug("clerk", { message: `Identified rule packs: ${activeRulePacks.join(", ")}` });
             
             if (identifiedAgent !== input.agent.name) {
-                log.info("Clerk identified agent shift", { from: input.agent.name, to: identifiedAgent });
+                log.debug("Clerk identified agent shift", { from: input.agent.name, to: identifiedAgent });
                 const newAgent = await Agent.get(identifiedAgent);
                 if (newAgent) {
-                    console.log(`[CLERK] SHIFTING agent to: ${identifiedAgent}`);
+                    l.debug("clerk", { message: `SHIFTING agent to: ${identifiedAgent}` });
                     input.agent = newAgent;
                     // Update the directive in Zone 1
                     payload.zone1_critical_rules[0] = `Current Phase: [${input.agent.name.toUpperCase()}]. You are restricted to using only the tools currently defined in your schema.`;
@@ -258,7 +316,7 @@ export namespace LLM {
             }
         }
       } catch (e) {
-        console.error(`[CLERK] Intent classification failed: ${String(e)}`);
+        l.error("clerk", { message: "Intent classification failed", error: String(e) });
         log.warn("Clerk intent classification failed", { error: String(e) })
       }
     }
@@ -335,7 +393,7 @@ export namespace LLM {
         }
         
         if (rulesContext) {
-           const parsedRules = parseGroundTruthRules(rulesContext)
+           const parsedRules = parseGroundTruthRules(rulesContext, activeRulePacks)
            if (parsedRules.operationalFacts) {
                payload.zone1_critical_rules.push(parsedRules.operationalFacts)
                payload.zone3_active_cursor.push(parsedRules.operationalFacts) // Repetition in zone 3
@@ -556,7 +614,7 @@ export namespace LLM {
             try {
                const sideProviderConfig = cfg.provider?.["local-side"]
                if (sideProviderConfig) {
-                   log.info("Attempting to repair broken JSON tool call with local-side Clerk")
+                   log.debug("Attempting to repair broken JSON tool call with local-side Clerk")
                    const sideLanguage = await Provider.getLanguage(
                      await Provider.getModel("local-side" as any, "nemotron-3-nano-4b" as any) // or default local-side model
                    )
@@ -579,7 +637,7 @@ export namespace LLM {
                        phase: "Phase 2",
                        metrics: { json_repaired: true }
                      }
-                     log.info(JSON.stringify(repairEvent))
+                     l.info("json repair", repairEvent)
 
                      return {
                        ...failed.toolCall,
@@ -672,7 +730,7 @@ export namespace LLM {
                 toolCount: Object.keys(tools).length,
                 payload: truncatedPayload
               }
-              console.log(JSON.stringify(startEvent))
+              l.debug("model execution start", startEvent)
 
               try {
                 const res = await doGenerate()
@@ -692,7 +750,7 @@ export namespace LLM {
                     tps: (res.usage as any)?.completionTokens ? ((res.usage as any).completionTokens / ((endTime - startTime) / 1000)) : undefined
                   }
                 }
-                console.log(JSON.stringify(endEvent))
+                l.debug("model execution end", endEvent)
                 return res
               } catch (e) {
                 const errorEvent: Log.EnhancedModelExecutionEvent = {
@@ -703,7 +761,7 @@ export namespace LLM {
                   phase,
                   payload: { error: String(e) }
                 }
-                console.error(JSON.stringify(errorEvent))
+                l.error("model execution error", errorEvent)
                 throw e
               }
             },
@@ -723,7 +781,7 @@ export namespace LLM {
                 toolCount: Object.keys(tools).length,
                 payload: truncatedPayload
               }
-              console.log(JSON.stringify(startEvent))
+              l.debug("model execution start", startEvent)
 
               try {
                 const { stream, ...rest } = await doStream()
@@ -761,7 +819,7 @@ export namespace LLM {
                             tps: (tokenCount && firstTokenTime) ? (tokenCount / ((endTime - firstTokenTime) / 1000)) : undefined
                           }
                         }
-                        console.log(JSON.stringify(endEvent))
+                        l.debug("model execution end", endEvent)
                         controller.close()
                       } else {
                         controller.enqueue(value)
@@ -775,7 +833,7 @@ export namespace LLM {
                         phase,
                         payload: { error: String(e) }
                       }
-                      console.error(JSON.stringify(errorEvent))
+                      l.error("model execution error", errorEvent)
                       controller.error(e)
                     }
                   },
@@ -794,7 +852,7 @@ export namespace LLM {
                   phase,
                   payload: { error: String(e) }
                 }
-                console.error(JSON.stringify(errorEvent))
+                l.error("model execution error", errorEvent)
                 throw e
               }
             }
@@ -950,7 +1008,7 @@ export namespace LLM {
         try {
           const sideProviderConfig = input.cfg.provider?.["local-side"]
           if (sideProviderConfig) {
-            log.info("Generating intervention directive with local-side Clerk")
+            log.debug("Generating intervention directive with local-side Clerk")
             const sideLanguage = await Provider.getLanguage(
               await Provider.getModel("local-side" as any, "nemotron-3-nano-4b" as any),
             )
@@ -980,7 +1038,7 @@ export namespace LLM {
               phase: "Phase 2",
               metrics: { loop_detected: true, loop_type: loopType },
             }
-            log.info(JSON.stringify(interventionEvent))
+            log.info("intervention", interventionEvent)
 
             return { error: `SYSTEM INTERVENTION: ${intervention.text}`, output: "", title: "", metadata: {} }
           }

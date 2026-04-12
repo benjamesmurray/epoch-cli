@@ -44,6 +44,11 @@ export namespace Log {
     if (!payload) return undefined;
     if (Flag.EPOCHCLI_DEBUG_FULL_PROMPT) return payload;
 
+    // If it's not a plain object (e.g. string or array), return it as is or handle appropriately
+    if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
+      return payload;
+    }
+
     // Always preserve zone1 and zone3, truncate zone2 specifically for logging
     return {
       ...payload,

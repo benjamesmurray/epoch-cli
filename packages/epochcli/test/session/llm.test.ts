@@ -104,31 +104,79 @@ describe("session.llm.hasToolCalls", () => {
 })
 
 describe("session.llm.parseGroundTruthRules", () => {
-  test("extracts operational facts, behavioral rules, and project-specific rules", () => {
+  test("extracts and formats operational facts correctly", () => {
     const raw = `
 ZONE 1 & 3: OPERATIONAL FACTS (Anchors for high-attention regions)
-Fact 1: Something critical.
-ZONE 2: BEHAVIORAL RULE PACKS (Dynamic injection for the middle region)
-Rule 1: Be nice.
-ZONE 2: RULE LIBRARY
-Some more rules.
-ZONE 3: PROJECT-SPECIFIC RULES (Context-Aware Gaps)
-Project Rule 1: No external libraries.`
-
-    const result = LLM.parseGroundTruthRules(raw)
-    
-    expect(result.operationalFacts).toContain("Fact 1: Something critical.")
+These are immutable truths extracted by the MCP scan or defined by the engine.
+operational_facts[22]{fact_id, zone, circumstance, content}:
+fact_01, "zone_1", "Always", "The environment context limit is strictly 32K tokens."
+fact_02, "zone_1", "Always", "Always use parallel tools."
+ZONE 2: BEHAVIORAL RULE PACKS
+`
+    const result = LLM.parseGroundTruthRules(raw, ["new_feature_pack"])
     expect(result.operationalFacts).toContain("ZONE 1 & 3: OPERATIONAL FACTS")
-    
-    expect(result.behavioralRules).toContain("Rule 1: Be nice.")
-    expect(result.behavioralRules).toContain("ZONE 2: RULE LIBRARY")
-    
-    expect(result.projectSpecific).toContain("Project Rule 1: No external libraries.")
+    expect(result.operationalFacts).toContain("- The environment context limit is strictly 32K tokens.")
+    expect(result.operationalFacts).toContain("- Always use parallel tools.")
+    expect(result.operationalFacts).not.toContain("fact_01")
+    expect(result.operationalFacts).not.toContain("zone_1")
   })
 
-  test("falls back to behavioralRules when markers are missing", () => {
+  test("filters behavioral rules based on active agent pack", () => {
+    const raw = `
+ZONE 1 & 3: OPERATIONAL FACTS
+fact_01, "zone_1", "Always", "Fact 1"
+ZONE 2: BEHAVIORAL RULE PACKS
+rule_packs:
+new_feature_pack: [domains.epistemic.epi_01, domains.reasoning.reas_01]
+context_mgmt_pack: [domains.memory.mem_01]
+
+ZONE 2: RULE LIBRARY
+domains:
+epistemic:
+epi_01, "Trigger 1", "Behaviour 1", "Example 1"
+epi_02, "Trigger 2", "Behaviour 2", "Example 2"
+reasoning:
+reas_01, "Trigger 3", "Behaviour 3", "Example 3"
+memory:
+mem_01, "Trigger 4", "Behaviour 4", "Example 4"
+ZONE 3: PROJECT-SPECIFIC RULES
+Some specific rules
+`
+
+    // Test with "build" agent (maps to new_feature_pack)
+    const buildResult = LLM.parseGroundTruthRules(raw, ["new_feature_pack"])
+    expect(buildResult.behavioralRules).toContain("Trigger 1")
+    expect(buildResult.behavioralRules).toContain("Behaviour 1")
+    expect(buildResult.behavioralRules).toContain("Trigger 3")
+    expect(buildResult.behavioralRules).not.toContain("Trigger 2")
+    expect(buildResult.behavioralRules).not.toContain("Trigger 4")
+
+    // Test with "explore" agent (maps to context_mgmt_pack)
+    const exploreResult = LLM.parseGroundTruthRules(raw, ["context_mgmt_pack"])
+    expect(exploreResult.behavioralRules).toContain("Trigger 4")
+    expect(exploreResult.behavioralRules).not.toContain("Trigger 1")
+  })
+
+  test("combines multiple rule packs correctly", () => {
+    const raw = `
+ZONE 2: BEHAVIORAL RULE PACKS
+rule_packs:
+debugging_pack: [domains.epi_01]
+refactoring_pack: [domains.reas_01]
+
+ZONE 2: RULE LIBRARY
+domains:
+epi_01, "Trigger 1", "Behaviour 1", "Example 1"
+reas_01, "Trigger 2", "Behaviour 2", "Example 2"
+`
+    const result = LLM.parseGroundTruthRules(raw, ["debugging_pack", "refactoring_pack"])
+    expect(result.behavioralRules).toContain("Trigger 1")
+    expect(result.behavioralRules).toContain("Trigger 2")
+  })
+
+  test("falls back to raw text when markers are missing", () => {
     const raw = `Just some plain text without any zone markers.`
-    const result = LLM.parseGroundTruthRules(raw)
+    const result = LLM.parseGroundTruthRules(raw, ["new_feature_pack"])
     
     expect(result.operationalFacts).toBe("")
     expect(result.projectSpecific).toBe("")
@@ -138,14 +186,14 @@ Project Rule 1: No external libraries.`
   test("extracts correctly if project-specific rules are missing", () => {
     const raw = `
 ZONE 1 & 3: OPERATIONAL FACTS
-Fact 1
+fact_01, "zone_1", "Always", "Fact 1"
 ZONE 2: BEHAVIORAL RULE PACKS
 Rule 1`
 
-    const result = LLM.parseGroundTruthRules(raw)
+    const result = LLM.parseGroundTruthRules(raw, ["new_feature_pack"])
     
     expect(result.operationalFacts).toContain("Fact 1")
-    expect(result.behavioralRules).toContain("Rule 1")
+    expect(result.behavioralRules).toContain("Rule 1") // Falls back to raw zone 2 string if pack matches fail
     expect(result.projectSpecific).toBe("")
   })
 })

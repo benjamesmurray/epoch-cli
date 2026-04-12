@@ -1045,6 +1045,61 @@ export namespace ProviderTransform {
       schema = sanitizeGemini(schema)
     }
 
+    if (model.api?.id?.includes("gemma-4") || model.id?.includes("big-pickle")) {
+      const sanitizeGemma4 = (obj: any, isRoot = true): any => {
+        if (obj === null || typeof obj !== "object") {
+          return obj
+        }
+
+        if (Array.isArray(obj)) {
+          return obj.map((v) => sanitizeGemma4(v, isRoot))
+        }
+
+        const result: any = {}
+        for (const [key, value] of Object.entries(obj)) {
+          if (key === "description" && typeof value === "string") {
+            result[key] = value.replace(/"/g, "'")
+          } else if (key === "anyOf" || key === "oneOf" || key === "allOf") {
+            // Handled below
+          } else if (typeof value === "object" && value !== null) {
+            result[key] = sanitizeGemma4(value, false)
+          } else {
+            result[key] = value
+          }
+        }
+
+        if (obj.anyOf || obj.oneOf || obj.allOf) {
+          const combiner = obj.anyOf || obj.oneOf || obj.allOf
+          if (Array.isArray(combiner) && combiner.length > 0) {
+            const firstValid = combiner.find((c: any) => c && c.type && c.type !== "null") || combiner[0]
+            const sanitizedFirst = sanitizeGemma4(firstValid, isRoot)
+            Object.assign(result, sanitizedFirst)
+          }
+        }
+
+        // Flatten nested properties: if it's not the root tool arguments object,
+        // and it's an object with properties, turn it into a string to prevent Gemma 4 JSON breaking.
+        if (!isRoot && result.type === "object" && result.properties) {
+          result.type = "string"
+          if (!result.description) {
+             result.description = "JSON stringified object"
+          }
+          delete result.properties
+          delete result.required
+        }
+
+        // Remove properties/required from non-object types
+        if (result.type && result.type !== "object") {
+          delete result.properties
+          delete result.required
+        }
+
+        return result
+      }
+
+      schema = sanitizeGemma4(schema, true)
+    }
+
     return schema as JSONSchema7
   }
 }

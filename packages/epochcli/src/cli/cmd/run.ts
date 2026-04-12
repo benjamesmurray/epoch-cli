@@ -398,21 +398,6 @@ export const RunCommand = cmd({
       return result.data?.id
     }
 
-    async function share(sdk: EpochClient, sessionID: string) {
-      const cfg = await sdk.config.get()
-      if (!cfg.data) return
-      if (cfg.data.share !== "auto" && !Flag.EPOCHCLI_AUTO_SHARE && !args.share) return
-      const res = await sdk.session.share({ sessionID }).catch((error) => {
-        if (error instanceof Error && error.message.includes("disabled")) {
-          UI.println(UI.Style.TEXT_DANGER_BOLD + "!  " + error.message)
-        }
-        return { error }
-      })
-      if (!res.error && "data" in res && res.data?.share?.url) {
-        UI.println(UI.Style.TEXT_INFO_BOLD + "~  " + res.data.share.url)
-      }
-    }
-
     async function execute(sdk: EpochClient) {
       function tool(part: ToolPart) {
         try {
@@ -637,10 +622,8 @@ export const RunCommand = cmd({
         UI.error("Session not found")
         process.exit(1)
       }
-      await share(sdk, sessionID)
 
-      loop().catch((e) => {
-        console.error(e)
+      loop().catch((e) => {        console.error(e)
         process.exit(1)
       })
 

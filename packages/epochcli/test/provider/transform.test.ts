@@ -787,6 +787,76 @@ describe("ProviderTransform.schema - gemini non-object properties removal", () =
   })
 })
 
+describe("ProviderTransform.schema - gemma4 schema flattening", () => {
+  const gemma4Model = {
+    providerID: "local",
+    id: "gemma-4",
+    api: {
+      id: "gemma-4",
+    },
+  } as any
+
+  test("flattens nested object parameters", () => {
+    const schema = {
+      type: "object",
+      properties: {
+        data: {
+          type: "object",
+          description: "A nested object",
+          properties: { name: { type: "string" } },
+          required: ["name"],
+        },
+        simple: { type: "string" }
+      },
+    } as any
+
+    const result = ProviderTransform.schema(gemma4Model, schema) as any
+
+    // The root keeps its properties, but nested 'data' becomes a string
+    expect(result.properties.data.type).toBe("string")
+    expect(result.properties.data.properties).toBeUndefined()
+    expect(result.properties.data.required).toBeUndefined()
+    expect(result.properties.simple.type).toBe("string")
+  })
+
+  test("replaces double quotes with single quotes in descriptions", () => {
+    const schema = {
+      type: "object",
+      properties: {
+        data: {
+          type: "string",
+          description: 'This is a "description" with "quotes"',
+        },
+      },
+    } as any
+
+    const result = ProviderTransform.schema(gemma4Model, schema) as any
+
+    expect(result.properties.data.description).toBe("This is a 'description' with 'quotes'")
+  })
+
+  test("simplifies anyOf/oneOf/allOf to the first valid type", () => {
+    const schema = {
+      type: "object",
+      properties: {
+        data: {
+          anyOf: [{ type: "null" }, { type: "string" }, { type: "number" }],
+        },
+        data2: {
+          oneOf: [{ type: "boolean" }],
+        },
+      },
+    } as any
+
+    const result = ProviderTransform.schema(gemma4Model, schema) as any
+
+    expect(result.properties.data.type).toBe("string")
+    expect(result.properties.data.anyOf).toBeUndefined()
+    expect(result.properties.data2.type).toBe("boolean")
+    expect(result.properties.data2.oneOf).toBeUndefined()
+  })
+})
+
 describe("ProviderTransform.message - DeepSeek reasoning content", () => {
   test("DeepSeek with tool calls includes reasoning_content in providerOptions", () => {
     const msgs = [
