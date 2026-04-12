@@ -26,7 +26,7 @@
     },
     "packages/epochcli": {
       "name": "epochcli-ai",
-      "version": "2.1.1",
+      "version": "2.2.0",
       "bin": {
         "epochcli": "bin/epochcli",
       },
@@ -58,10 +58,10 @@
         "@clack/prompts": "1.0.0-alpha.1",
         "@effect/language-service": "0.79.0",
         "@effect/platform-node": "4.0.0-beta.43",
-        "@epoch-ai/plugin": "2.1.1",
-        "@epoch-ai/script": "2.1.1",
-        "@epoch-ai/sdk": "2.1.1",
-        "@epoch-ai/util": "2.1.1",
+        "@epoch-ai/plugin": "workspace:*",
+        "@epoch-ai/script": "workspace:*",
+        "@epoch-ai/sdk": "workspace:*",
+        "@epoch-ai/util": "workspace:*",
         "@gitlab/gitlab-ai-provider": "3.6.0",
         "@hono/node-server": "1.19.11",
         "@hono/node-ws": "1.3.0",
@@ -153,25 +153,25 @@
         "zod-to-json-schema": "3.24.5",
       },
       "optionalDependencies": {
-        "epochcli-ai-darwin-arm64": "2.1.1",
-        "epochcli-ai-darwin-x64": "2.1.1",
-        "epochcli-ai-darwin-x64-baseline": "2.1.1",
-        "epochcli-ai-linux-arm64": "2.1.1",
-        "epochcli-ai-linux-arm64-musl": "2.1.1",
-        "epochcli-ai-linux-x64": "2.1.1",
-        "epochcli-ai-linux-x64-baseline": "2.1.1",
-        "epochcli-ai-linux-x64-baseline-musl": "2.1.1",
-        "epochcli-ai-linux-x64-musl": "2.1.1",
-        "epochcli-ai-windows-arm64": "2.1.1",
-        "epochcli-ai-windows-x64": "2.1.1",
-        "epochcli-ai-windows-x64-baseline": "2.1.1",
+        "epochcli-ai-darwin-arm64": "2.2.0",
+        "epochcli-ai-darwin-x64": "2.2.0",
+        "epochcli-ai-darwin-x64-baseline": "2.2.0",
+        "epochcli-ai-linux-arm64": "2.2.0",
+        "epochcli-ai-linux-arm64-musl": "2.2.0",
+        "epochcli-ai-linux-x64": "2.2.0",
+        "epochcli-ai-linux-x64-baseline": "2.2.0",
+        "epochcli-ai-linux-x64-baseline-musl": "2.2.0",
+        "epochcli-ai-linux-x64-musl": "2.2.0",
+        "epochcli-ai-windows-arm64": "2.2.0",
+        "epochcli-ai-windows-x64": "2.2.0",
+        "epochcli-ai-windows-x64-baseline": "2.2.0",
       },
     },
     "packages/plugin": {
       "name": "@epoch-ai/plugin",
-      "version": "2.1.1",
+      "version": "2.2.0",
       "dependencies": {
-        "@epoch-ai/sdk": "2.1.1",
+        "@epoch-ai/sdk": "2.2.0",
         "zod": "catalog:",
       },
       "devDependencies": {
@@ -193,7 +193,7 @@
     },
     "packages/script": {
       "name": "@epoch-ai/script",
-      "version": "2.1.1",
+      "version": "2.2.0",
       "dependencies": {
         "semver": "^7.6.3",
       },
@@ -204,7 +204,7 @@
     },
     "packages/sdk/js": {
       "name": "@epoch-ai/sdk",
-      "version": "2.1.1",
+      "version": "2.2.0",
       "dependencies": {
         "cross-spawn": "catalog:",
       },
@@ -219,7 +219,7 @@
     },
     "packages/util": {
       "name": "@epoch-ai/util",
-      "version": "2.1.1",
+      "version": "2.2.0",
       "dependencies": {
         "zod": "catalog:",
       },
@@ -1405,26 +1405,6 @@
     "env-paths": ["env-paths@2.2.1", "", {}, "sha512-+h1lkLKhZMTYjog1VEpJNG7NZJWcuc2DDk/qsqSTRRCOXiLjeQ1d1/udrUGhqMxUgAlwKNZ0cf2uqan5GLuS2A=="],
 
     "epochcli-ai": ["epochcli-ai@workspace:packages/epochcli"],
-
-    "epochcli-ai-darwin-arm64": ["epochcli-ai-darwin-arm64@2.1.1", "", { "os": "darwin", "cpu": "arm64" }, "sha512-YIrFkHnFj7Y16bl5FObNK1X2Rb2BP9qckaWlkCNeTpO7yjfD3eMONGGR8G3x6rIXNSC9EtpC6YuCetkNCuPf6g=="],
-
-    "epochcli-ai-darwin-x64": ["epochcli-ai-darwin-x64@2.1.1", "", { "os": "darwin", "cpu": "x64" }, "sha512-qCATHIXIvKgx/gIc3R2azau5hKfDEc9zLuMA6XY8J+y+wa3VDTyaJcdMqbAtvVeo3N2gf3R8BZQMK6egSWPftg=="],
-
-    "epochcli-ai-darwin-x64-baseline": ["epochcli-ai-darwin-x64-baseline@2.1.1", "", { "os": "darwin", "cpu": "x64" }, "sha512-7ewYtvE8Tmjcni6NFWhn4+AVwl+gvh7IhEtW/2z+7F2uq8HKdw9v7RYJ/M1jH7yUFdiDzNu3cR/E22sSJ0OngA=="],
-
-    "epochcli-ai-linux-arm64": ["epochcli-ai-linux-arm64@2.1.1", "", { "os": "linux", "cpu": "arm64" }, "sha512-pPON4iPXSRUEQlmEbHqk9nkzv3h/9FhcgeY8uN+ZNIf+2N4OKlu54Gql3WKx0LY3Ccbl32nu9VNaqNaVk+Q0tQ=="],
-
-    "epochcli-ai-linux-arm64-musl": ["epochcli-ai-linux-arm64-musl@2.1.1", "", { "os": "linux", "cpu": "arm64" }, "sha512-uhhLtL7NIdZUe0XNXMBErLXr2wfpuIJra/RgJkS2lWmoMJSw2xOFepEf8YVofz4jgPzHE2slj1f3BZByOZAMgA=="],
-
-    "epochcli-ai-linux-x64-baseline": ["epochcli-ai-linux-x64-baseline@2.1.1", "", { "os": "linux", "cpu": "x64" }, "sha512-hPHsJ6aMeOhi0Nwe4K16m/hMI9jlOoX7E4rd8yLUywvRr1UTXssHoJFKgtI2nyv0b1AlPHGSgcEBGpKzFQ55/g=="],
-
-    "epochcli-ai-linux-x64-baseline-musl": ["epochcli-ai-linux-x64-baseline-musl@2.1.1", "", { "os": "linux", "cpu": "x64" }, "sha512-uZL0AROjy42/+N2SmtLvXRajMFDiVu3Vmj9Q0VvCXfi8QHBSNhMk7CcCViXxTYYVrBZpEgFINjIfzaL5Cx6CeA=="],
-
-    "epochcli-ai-linux-x64-musl": ["epochcli-ai-linux-x64-musl@2.1.1", "", { "os": "linux", "cpu": "x64" }, "sha512-WcEZ0Ed310NE/ucFA+Vz9FDy8Q1KuxvuFDzD0AqAXP6WHxpLlcI6ICYJ4huBpFn+rX99Q0mmoYa3G+Baqv35+w=="],
-
-    "epochcli-ai-windows-arm64": ["epochcli-ai-windows-arm64@2.1.1", "", { "os": "win32", "cpu": "arm64" }, "sha512-LMp1FOKzdq7Ymm2L/3pYTxCWJrhVcBAvmkfupMEzDf9AkUnTIRn1dIxpyfF4VtoPWmllTnd2otmYP2WLOpTg2Q=="],
-
-    "epochcli-ai-windows-x64": ["epochcli-ai-windows-x64@2.1.1", "", { "os": "win32", "cpu": "x64" }, "sha512-fbJLopMgwTeJ1lmp3QJr9Zo5VYeL16gwSx9LoUubOg+r9CD9mDnZjsFXHDcxlVlSfGdnYDJj48knDALTk2NXxw=="],
 
     "es-define-property": ["es-define-property@1.0.1", "", {}, "sha512-e3nRfgfUZ4rNGL232gUgX06QNyyez04KdjFrF+LTRoOXmrOgFKDg4BCdsjW8EnT69eqdYGmRpJwiPVYNrCaW3g=="],
 
