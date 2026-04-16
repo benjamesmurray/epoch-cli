@@ -1,87 +1,95 @@
-# Epoch CLI - MCP Configuration Guide
+# Guide: Setting Up MCP Servers with `mcpx`
 
-This guide explains how to configure and enable the Model Context Protocol (MCP) server tools within your Epoch CLI project. By setting up these servers in your `.epochcli` configuration, you empower your agent with powerful architectural mapping, workflow management, and ground-truth enforcement.
+This guide explains how to configure Model Context Protocol (MCP) servers within this project using the `mcpx` CLI utility. By using `mcpx`, we reduce prompt bloat by replacing massive JSON schemas with a single, discoverable CLI interface.
 
-## The Configuration File
+## 1. Installation
 
-All MCP server configurations for a project are managed inside the `.epochcli/epochcli.jsonc` file. This file contains project-specific settings, including providers, models, permissions, and tool flags.
+`mcpx` is a Go-based binary that turns MCP servers into composable shell commands.
 
-To enable the local MCP servers, you will add an `"mcp"` object to the root of this JSON document. The format expects the name of the server mapped to its connection configuration (e.g., `type: "local"` and the command used to run it).
+```bash
+# Via npm
+npm install -g mcpx-go
 
-### Example Configuration
+# Via Homebrew (macOS)
+brew tap lydakis/mcpx
+brew install --cask mcpx
+```
 
-Open your `/home/benmurray/Projects/cli/.epochcli/epochcli.jsonc` file and update the `"mcp"` section to include the three core CLI tools:
+## 2. Registering Servers
+
+`mcpx` stores its configuration in `~/.config/mcpx/config.toml`. You can add servers using the `mcpx add` command or by editing the file manually.
+
+### Using `mcpx add`
+Point `mcpx` at a local manifest file (JSON or TOML) or a direct MCP endpoint:
+
+```bash
+# Add from a local manifest
+mcpx add ./path/to/mcp-manifest.json --name my-server --overwrite
+
+# Add from a remote endpoint
+mcpx add https://docs.mcp.cloudflare.com/mcp
+```
+
+### Manual Configuration
+You can add entries directly to `~/.config/mcpx/config.toml`:
+
+```toml
+[servers.project-map-cli]
+command = "/home/benmurray/Projects/cli/project-map-cli/venv/bin/python"
+args = ["-m", "project_map_cli.mcp.server"]
+
+[servers.github]
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-github"]
+env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }
+```
+
+## 3. `epochcli` Integration
+
+To enable `mcpx` in `epochcli`, update your `.epochcli/epochcli.jsonc` file:
 
 ```jsonc
 {
-  "$schema": "https://opencode.ai/config.json",
-  "provider": { /* ... */ },
-  "model": "local-main/gemma-4-26b-q4-xl",
-  
-  // Define your MCP servers here
-  "mcp": {
-    "mcp-spec-cli": {
-      "type": "local",
-      // Assumes mcp-spec-cli is compiled and linked/accessible
-      "command": ["node", "mcp-spec-cli/dist/index.js"]
-    },
-    "project-map-cli": {
-      "type": "local",
-      // Python CLI using project-map-mcp entry point
-      "command": ["python", "project-map-cli/src/project_map_cli/mcp/server.py"] 
-      // (or however you execute your python virtual environment, e.g., ["uv", "run", "--directory", "project-map-cli", "project-map-mcp"])
-    },
-    "ground-truth-cli": {
-      "type": "local",
-      "command": ["npx", "-y", "https://github.com/benjamesmurray/ground-truth-cli"]
-    }
+  "mcpx": {
+    "enabled": true,
+    "binaryPath": "/path/to/mcpx" // Optional: defaults to global 'mcpx'
   },
-
-  "tools": {
-    "github-triage": false,
-    "github-pr-search": false
-  }
+  "mcp": {} // Leave empty to disable standard schema-based MCP tools
 }
 ```
 
-*Note: Ensure that the paths in the `"command"` array correctly resolve to the compiled/executable entry points for each server relative to where you run Epoch CLI, or use absolute paths / globally installed binaries.*
+When enabled, `epochcli` will only expose a single `mcpx` tool to the LLM. The agent will discover capabilities dynamically by running `mcpx <server> --help`.
 
-## The Core MCP Tools
+## 4. Usage and Composition
 
-Once configured, the Epoch CLI will automatically connect to these servers on startup and expose their tools to the agent:
+Once configured, tools can be called using standard shell composition:
 
-1. **`mcp-spec-cli`**: Manages specification-driven development workflows. It acts as an autopilot, tracking the state of your feature (Requirements -> Design -> Tasks -> Implementation -> Testing) and maintaining short-term context.
-2. **`project-map-cli`**: Provides architectural awareness. Instead of wasting tokens reading the entire filesystem, the agent can query `pm_query` to find symbols, get localized file contexts, or plan refactoring impact.
-3. **`ground-truth-cli`**: The project constitution tool. Scans the codebase to understand established architectural rules and dependencies, keeping the agent aligned with the project's conventions.
+```bash
+# List all servers
+mcpx
 
----
+# List tools for a server
+mcpx github
 
-## Toggling "One-Shot" Mode in `mcp-spec-cli`
+# Inspect a specific tool's schema
+mcpx github search-repositories --help
 
-The `mcp-spec-cli` tool enforces a rigorous workflow loop. By default, it operates in **`step-through`** mode, meaning the agent will pause to ask for human approval at the end of each phase (e.g., after drafting requirements, or after designing).
-
-If you want the agent to operate fully autonomously without waiting for human confirmation at each phase, you can toggle **`one-shot`** mode.
-
-### How to Toggle One-Shot Mode
-
-**1. When initializing a new project:**
-When the agent starts a new feature, it calls the `sc_init` tool. You can instruct the agent to start in one-shot mode immediately:
-
-```
-Initialize a new feature called "auth-system" using one-shot mode.
+# Call a tool and pipe to jq
+mcpx github search-repositories --query=mcp | jq -r '.items[0].full_name'
 ```
 
-The agent will then invoke the tool as:
-`{"name": "auth-system", "mode": "one-shot"}`
+## 5. Command Shims (Optional)
 
-**2. Mid-Project via `sc_mode`:**
-If a project is already active and you decide you no longer want to approve each step, you can ask the agent to toggle the mode on the fly:
+You can install local passthrough shims so that `<server>` works as a standalone command in your terminal:
 
+```bash
+mcpx shim install project-map-cli
+project-map-cli pm_status
 ```
-Switch the spec workflow to one-shot mode.
-```
 
-The agent will invoke the `sc_mode` tool:
-`{"mode": "one-shot"}`
+## 6. Project Servers
 
-When `one-shot` mode is active, the `mcp-spec-cli` will automatically instruct the agent to resolve any ambiguities on its own, assume approval for the generated documents, and seamlessly jump from Requirements all the way to Implementation tasks!
+The following project-specific servers are pre-configured in `mcpx`:
+- `mcp-spec-cli`: Management of specification-driven development.
+- `project-map-cli`: Architectural mapping and symbol analysis.
+- `ground-truth-cli`: Synthesis of behavioral rules and operational facts.

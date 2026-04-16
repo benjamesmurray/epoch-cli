@@ -237,8 +237,19 @@ export namespace Skill {
     Layer.provide(AppFileSystem.defaultLayer),
   )
 
-  export function fmt(list: Info[], opts: { verbose: boolean }) {
+  export function fmt(list: Info[], opts: { verbose: boolean; gemma?: boolean }) {
     if (list.length === 0) return "No skills are currently available."
+
+    if (opts.gemma) {
+      return [
+        "<available_skills>",
+        ...list.map(
+          (skill) =>
+            `- **${skill.name}**: ${skill.description} (Location: ${pathToFileURL(skill.location).href})`,
+        ),
+        "</available_skills>",
+      ].join("\n")
+    }
 
     if (opts.verbose) {
       return [

@@ -1,1 +1,1 @@
-{"routes":[{"deps":[],"handler":{"pid":5306,"qualname":"core.context.providers.context_provider_server.create_item"},"method":"POST","path":"/hello","request_model":"Item","response_model":null,"tags":[]},{"deps":[],"handler":{"pid":5306,"qualname":"core.context.providers.context_provider_server.stream_random_chars"},"method":"POST","path":"/random","request_model":"RandomBody","response_model":null,"tags":[]}]}
+{"routes":[]}

@@ -112,7 +112,7 @@ Decision Logic:
 
 ${groundTruths ? `Project Operational Rules:\n${groundTruths}\n\n` : ''}Return ONLY the name of the agent in lowercase.`,
       prompt: input,
-      abortSignal: AbortSignal.timeout(15000),
+      abortSignal: AbortSignal.timeout(60000),
       maxRetries: 0,
     });
 
@@ -140,7 +140,7 @@ Available Rule Packs:
 
 Return ONLY a comma-separated list of the relevant rule pack IDs. Always include core_interaction_pack as the baseline.`,
       prompt: transcript,
-      abortSignal: AbortSignal.timeout(15000),
+      abortSignal: AbortSignal.timeout(60000),
       maxRetries: 0,
     });
 
@@ -155,5 +155,26 @@ Return ONLY a comma-separated list of the relevant rule pack IDs. Always include
     
     packs.add("core_interaction_pack");
     return Array.from(packs);
+  }
+
+  /**
+   * Uses the Clerk model (4B) to determine if the next turn requires "high" or "low" thinking effort.
+   */
+  static async identifyThinkingEffort(transcript: string, clerkModel: any): Promise<"high" | "low"> {
+    const { text } = await generateText({
+      model: clerkModel,
+      system: `You are the Conversational Supervisor. 
+Determine the required "Thinking Effort" for the NEXT turn based on the complexity of the task.
+
+- "high": Complex reasoning, architecture design, multi-file refactoring, difficult debugging, or new feature implementation. Use this if the task requires deep logical chaining or structural changes.
+- "low": Simple questions, boilerplate generation, single-file edits, status checks, or conversational responses. Use this for low-complexity tasks to maximize efficiency.
+
+Return ONLY "high" or "low". Default to "low" for ambiguous cases.`,
+      prompt: transcript,
+      abortSignal: AbortSignal.timeout(60000),
+      maxRetries: 0,
+    });
+
+    return text.trim().toLowerCase().includes("high") ? "high" : "low";
   }
 }

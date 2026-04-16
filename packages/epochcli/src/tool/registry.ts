@@ -41,6 +41,8 @@ import { LSP } from "../lsp"
 import { FileTime } from "../file/time"
 import { Instruction } from "../session/instruction"
 import { AppFileSystem } from "../filesystem"
+import { MCP } from "../mcp"
+import * as CrossSpawnSpawner from "@/effect/cross-spawn-spawner"
 
 export namespace ToolRegistry {
   const log = Log.create({ service: "tool.registry" })
@@ -74,11 +76,13 @@ export namespace ToolRegistry {
     | FileTime.Service
     | Instruction.Service
     | AppFileSystem.Service
+    | MCP.Service
   > = Layer.effect(
     Service,
     Effect.gen(function* () {
       const config = yield* Config.Service
       const plugin = yield* Plugin.Service
+      const mcp = yield* MCP.Service
 
       const build = <T extends Tool.Info>(tool: T | Effect.Effect<T, never, any>) =>
         Effect.isEffect(tool) ? tool : Effect.succeed(tool)
@@ -162,7 +166,9 @@ export namespace ToolRegistry {
         const cfg = yield* config.get()
         const question = ["app", "cli", "desktop"].includes(Flag.EPOCHCLI_CLIENT) || Flag.EPOCHCLI_ENABLE_QUESTION_TOOL
 
-        return [
+        const mcpxTool = yield* mcp.mcpx()
+
+        const tools: (Tool.Info | (Tool.Def & { id: string }))[] = [
           invalid,
           ...(question ? [ask] : []),
           bash,
@@ -185,12 +191,26 @@ export namespace ToolRegistry {
           ...(Flag.EPOCHCLI_EXPERIMENTAL_PLAN_MODE && Flag.EPOCHCLI_CLIENT === "cli" ? [plan] : []),
           ...custom,
         ]
+
+        if (mcpxTool) {
+          tools.push({
+            id: "mcpx",
+            init: () => Promise.resolve(mcpxTool),
+          })
+        } else {
+          const mcpTools = yield* mcp.tools()
+          for (const [id, def] of Object.entries(mcpTools)) {
+            tools.push({ id, ...def })
+          }
+        }
+
+        return tools
       })
 
       const ids = Effect.fn("ToolRegistry.ids")(function* () {
         const s = yield* InstanceState.get(state)
-        const tools = yield* all(s.custom)
-        return tools.map((t) => t.id)
+        const allTools = yield* all(s.custom)
+        return allTools.map((t) => t.id)
       })
 
       const tools = Effect.fn("ToolRegistry.tools")(function* (
@@ -200,30 +220,32 @@ export namespace ToolRegistry {
         const s = yield* InstanceState.get(state)
         const allTools = yield* all(s.custom)
         const filtered = allTools.filter((tool) => {
-          if (tool.id === "codesearch" || tool.id === "websearch") {
+          const id = tool.id
+          if (id === "codesearch" || id === "websearch") {
             return model.providerID === ProviderID.epochcli || Flag.EPOCHCLI_ENABLE_EXA
           }
 
           const usePatch =
             !!Env.get("EPOCHCLI_E2E_LLM_URL") ||
             (model.modelID.includes("gpt-") && !model.modelID.includes("oss") && !model.modelID.includes("gpt-4"))
-          if (tool.id === "apply_patch") return usePatch
-          if (tool.id === "edit" || tool.id === "write" || tool.id === "revert_file") return !usePatch
+          if (id === "apply_patch") return usePatch
+          if (id === "edit" || id === "write" || id === "revert_file") return !usePatch
 
           return true
         })
         return yield* Effect.forEach(
           filtered,
-          Effect.fnUntraced(function* (tool: Tool.Info) {
-            using _ = log.time(tool.id)
-            const next = yield* Effect.promise(() => tool.init({ agent }))
+          Effect.fnUntraced(function* (tool: Tool.Info | (Tool.Def & { id: string })) {
+            const id = tool.id
+            using _ = log.time(id)
+            const next = "init" in tool ? yield* Effect.promise(() => tool.init({ agent })) : tool
             const output = {
               description: next.description,
               parameters: next.parameters,
             }
-            yield* plugin.trigger("tool.definition", { toolID: tool.id }, output)
+            yield* plugin.trigger("tool.definition", { toolID: id }, output)
             return {
-              id: tool.id,
+              id,
               description: output.description,
               parameters: output.parameters,
               execute: next.execute,
@@ -238,7 +260,7 @@ export namespace ToolRegistry {
     }),
   )
 
-  export const defaultLayer = Layer.unwrap(
+  export const defaultLayer: Layer.Layer<Service> = Layer.unwrap(
     Effect.sync(() =>
       layer.pipe(
         Layer.provide(Config.defaultLayer),
@@ -249,6 +271,7 @@ export namespace ToolRegistry {
         Layer.provide(FileTime.defaultLayer),
         Layer.provide(Instruction.defaultLayer),
         Layer.provide(AppFileSystem.defaultLayer),
+        Layer.provide(MCP.defaultLayer),
       ),
     ),
   )

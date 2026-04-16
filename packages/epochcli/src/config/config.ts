@@ -430,6 +430,16 @@ export namespace Config {
       ref: "McpRemoteConfig",
     })
 
+  export const Mcpx = z
+    .object({
+      binaryPath: z.string().optional().describe("Path to the mcpx binary"),
+      enabled: z.boolean().optional().default(true).describe("Enable mcpx-based tool discovery and execution"),
+    })
+    .strict()
+    .meta({
+      ref: "McpxConfig",
+    })
+
   export const Mcp = z.discriminatedUnion("type", [McpLocal, McpRemote])
   export type Mcp = z.infer<typeof Mcp>
 
@@ -932,6 +942,7 @@ export namespace Config {
         )
         .optional()
         .describe("MCP (Model Context Protocol) server configurations"),
+      mcpx: Mcpx.optional().describe("mcpx CLI utility configuration"),
       formatter: z
         .union([
           z.literal(false),

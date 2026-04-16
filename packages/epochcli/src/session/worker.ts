@@ -71,7 +71,7 @@ export namespace PostGenerationWorker {
                  // or summarize the completion. In a full implementation, we might call sc_todo_complete.
                  // This fulfills the autonomous call requirement.
                  try {
-                     const listRes = yield* Effect.promise(() => specCli.client.callTool({ name: "sc_todo_list", arguments: {} }))
+                     const listRes = yield* Effect.promise(() => specCli.callTool({ name: "sc_todo_list", arguments: {} }))
                      const content = (listRes as any).content as any[]
                      if (content && content.length > 0 && content[0].type === "text") {
                           // Very basic regex to find the first active/in-progress task

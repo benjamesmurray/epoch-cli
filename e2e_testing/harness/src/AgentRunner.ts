@@ -20,14 +20,25 @@ export class AgentRunner {
   private cwd: string;
   private timeoutMs: number;
   private engine: HeuristicsEngine;
+  private abortOnGenerate: boolean;
+  private runId: string;
+  private isAborting: boolean = false;
+  private docker?: DockerConfig;
 
-  constructor(command: string[], cwd: string, timeoutMs: number, docker?: DockerConfig, runId: string = "run") {
+  constructor(command: string[], cwd: string, timeoutMs: number, docker?: DockerConfig, runId: string = "run", abortOnGenerate: boolean = false) {
+    this.runId = runId;
+    this.abortOnGenerate = abortOnGenerate;
+    this.docker = docker;
     if (docker) {
-        // e.g. command = ["epochcli", "run", "--model local-main/...", "prompt"]
-        const rawPromptString = command.slice(2).join(" ");
-        // Strip out the leading/trailing quotes if they were added to keep it as one string
-        const cleanArgs = rawPromptString.replace(/^"|"$/g, '');
-        const internalCommand = `cp -a /etc/epochcli/. /workspace/ 2>/dev/null || true; git config --global --add safe.directory /workspace; HOME=/workspace LOG_LEVEL=INFO EPOCHCLI_DEBUG_FULL_PROMPT=true bun /cli/packages/epochcli/src/index.ts run --thinking --model local-main/gemma-4-26b-q4-xl "${cleanArgs}"`;
+        // Extract the prompt assuming the format is `["epochcli", "run", "prompt"]`
+        const promptString = command.slice(2).join(" ");
+        const cleanArgs = promptString.replace(/^"|"$/g, '');
+        
+        // Pass the model defined in the test_config.json via the `--model` flag, defaulting if not found
+        // Note: the test config model is typically embedded in the epochcli.jsonc but the CLI prioritizes the flag
+        const modelArg = docker.model ? `--model ${docker.model}` : "";
+        
+        const internalCommand = `cp -a /etc/epochcli/. /workspace/ 2>/dev/null || true; git config --global --add safe.directory /workspace; HOME=/workspace LOG_LEVEL=DEBUG EPOCHCLI_DEBUG_FULL_PROMPT=true bun /cli/packages/epochcli/src/index.ts run --thinking --print-logs --log-level=DEBUG ${modelArg} "${cleanArgs}"`;
         
         this.command = [
             "docker", "run", "--rm", 
@@ -38,7 +49,8 @@ export class AgentRunner {
             "-w", "/workspace",
             "-e", "GITHUB_TOKEN=mock-token-for-docker",
             "-e", "GITHUB_MODELS_TOKEN=mock-token-for-docker",
-            "-e", "XDG_DATA_HOME=/workspace/.local/share"
+            "-e", "XDG_DATA_HOME=/workspace/.local/share",
+            "-e", "EPOCHCLI_LIBC=glibc"
         ];
         if (docker.memoryLimit) {
             this.command.push("--memory", docker.memoryLimit);
@@ -53,6 +65,23 @@ export class AgentRunner {
 
     this.timeoutMs = timeoutMs;
     this.engine = new HeuristicsEngine(runId);
+  }
+
+  private async cleanupPermissions() {
+    if (!this.docker) return;
+    // Force permissions fix via a small ephemeral container
+    const cleanupCmd = [
+        "docker", "run", "--rm",
+        "-v", `${this.cwd}:/workspace`,
+        this.docker.imageName,
+        "chmod", "-R", "777", "/workspace"
+    ];
+    try {
+        const proc = spawn({ cmd: cleanupCmd });
+        await proc.exited;
+    } catch (e) {
+        console.error(`    [${this.runId}] ⚠️ Failed to cleanup permissions: ${e}`);
+    }
   }
 
   public async run(): Promise<RunnerResult> {
@@ -108,6 +137,13 @@ export class AgentRunner {
             for (const line of lines) {
               try {
                 this.engine.processLine(line);
+                if (this.abortOnGenerate && this.engine.hasFullPayload() && !this.isAborting) {
+                  this.isAborting = true;
+                  console.log(`    [${this.runId}] 🛑 Aborting execution as requested (--abort-on-generate)`);
+                  controller.abort();
+                  proc.kill(9); // Forceful kill
+                  return;
+                }
               } catch (e) {
                 if (e instanceof LoopException) {
                   controller.abort();
@@ -158,6 +194,7 @@ export class AgentRunner {
     } finally {
       clearTimeout(timeoutId);
       await logFile.close();
+      await this.cleanupPermissions();
     }
 
     const durationMs = Date.now() - startTime;

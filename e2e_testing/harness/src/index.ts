@@ -8,7 +8,7 @@ import * as path from "path";
 import * as fs from "fs/promises";
 import { parseArgs } from "util";
 
-const EVALUATIONS_WORKSPACE = "/home/benmurray/Projects/epochclievaluations";
+const EVALUATIONS_WORKSPACE = "/home/benmurray/Projects/cli/e2e_testing/results";
 const LOCAL_EPOCHCLI_CMD = path.join(EVALUATIONS_WORKSPACE, "bin/epochcli");
 
 async function main() {
@@ -16,7 +16,8 @@ async function main() {
     args: process.argv.slice(2),
     options: {
       iterations: { type: "string" },
-      config: { type: "string" }
+      config: { type: "string" },
+      "abort-on-generate": { type: "boolean" }
     },
     allowPositionals: true
   });
@@ -53,7 +54,7 @@ async function main() {
       if (config.docker) {
           // Docker execution path: Unique isolated directory per run inside the suite folder
           targetWorkspace = path.join(suiteDir, runId);
-          await WorkspaceBuilder.buildDockerWorkspace(targetWorkspace);
+          await WorkspaceBuilder.buildDockerWorkspace(targetWorkspace, config);
           
           cmd = ["epochcli", "run", prompt]; // Placeholder, replaced inside AgentRunner constructor
       } else {
@@ -63,10 +64,34 @@ async function main() {
           cmd = [LOCAL_EPOCHCLI_CMD, "run", prompt];
       }
 
-      const runner = new AgentRunner(cmd, targetWorkspace, config.timeoutMs, config.docker, runId);
+      const runner = new AgentRunner(cmd, targetWorkspace, config.timeoutMs, config.docker, runId, values["abort-on-generate"]);
       const res = await runner.run();
       console.log(`  > Agent Execution finished: ${res.status} (${(res.durationMs / 1000).toFixed(1)}s)`);
-      console.log(`  > Logs saved to: ${path.join(targetWorkspace, "run.log")}`);
+      const logPath = path.join(targetWorkspace, "run.log");
+      console.log(`  > Logs saved to: ${logPath}`);
+
+      // Extract initial payload directly from the log file for robustness
+      try {
+          const logContent = await fs.readFile(logPath, "utf-8");
+          const lines = logContent.split("\n");
+          const startLine = lines.find(l => l.includes("event=START_GENERATE"));
+          if (startLine) {
+              const payloadMatch = startLine.match(/payload=([\[{].*?[\]}])(?=\s+\w+=|\s+[\w\s]+$|$)/);
+              const toolsMatch = startLine.match(/tools=([\[{].*?[\]}])(?=\s+\w+=|\s+[\w\s]+$|$)/);
+              if (payloadMatch) {
+                  const initialPayload = {
+                      payload: JSON.parse(payloadMatch[1]),
+                      tools: toolsMatch ? JSON.parse(toolsMatch[1]) : []
+                  };
+                  await fs.writeFile(path.join(targetWorkspace, "initial_payload.json"), JSON.stringify(initialPayload, null, 2), "utf-8");
+                  console.log(`  > Initial payload saved to: ${path.join(targetWorkspace, "initial_payload.json")}`);
+              } else {
+                  console.log(`  > Could not extract payload from START_GENERATE line`);
+              }
+          }
+      } catch (e: any) {
+          console.log(`  > Failed to extract initial payload: ${e.message}`);
+      }
 
       if (res.fullPrompts && res.fullPrompts.length > 0) {
           await fs.writeFile(path.join(targetWorkspace, "prompts.json"), JSON.stringify(res.fullPrompts, null, 2), "utf-8");

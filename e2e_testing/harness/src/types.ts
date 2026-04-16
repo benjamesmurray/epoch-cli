@@ -2,6 +2,7 @@ export interface DockerConfig {
   imageName: string;
   network: "none" | "host" | "bridge";
   memoryLimit?: string;
+  model?: string;
 }
 
 export interface TestConfig {
@@ -11,6 +12,7 @@ export interface TestConfig {
   prompt: string;
   expectedTools: string[];
   runTargetDir: string; // e.g., ".epochcli/tool/$RUN_ID"
+  epochcli?: any;
   docker?: DockerConfig;
 }
 

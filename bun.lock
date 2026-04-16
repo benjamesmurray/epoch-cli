@@ -1406,6 +1406,30 @@
 
     "epochcli-ai": ["epochcli-ai@workspace:packages/epochcli"],
 
+    "epochcli-ai-darwin-arm64": ["epochcli-ai-darwin-arm64@2.2.0", "", { "os": "darwin", "cpu": "arm64" }, "sha512-c7pJ8luW5pl4/p0oR3D3cNTnDwknZ2I0seL2nac/zL5iRAccrkApEGndAQZceAS4g6vWJMhHMehdz4VddHBEHw=="],
+
+    "epochcli-ai-darwin-x64": ["epochcli-ai-darwin-x64@2.2.0", "", { "os": "darwin", "cpu": "x64" }, "sha512-la7VKe2sioFmFllMtuSJOCxwftnWxv9/PmZISNNTwKyGM9hoZcWnH6dkcDGShog+OG6cZnTr+FwHyHTarJIEiw=="],
+
+    "epochcli-ai-darwin-x64-baseline": ["epochcli-ai-darwin-x64-baseline@2.2.0", "", { "os": "darwin", "cpu": "x64" }, "sha512-5KTXrrWVzFciFYrJMCGcDFHLBZYAU1Tb/yayA0QQJgEG6J90pZK/knA3LHl+sFiPPN1+4K40gARH2cGOguPIBQ=="],
+
+    "epochcli-ai-linux-arm64": ["epochcli-ai-linux-arm64@2.2.0", "", { "os": "linux", "cpu": "arm64" }, "sha512-9vbkcXajn+p18ELq/XjX47Q2ftmR+F+KOCFmCBLQTGWQErKD9YdgZgUR5jBelk/DeHmWv79p2wzdFdehpBGwMw=="],
+
+    "epochcli-ai-linux-arm64-musl": ["epochcli-ai-linux-arm64-musl@2.2.0", "", { "os": "linux", "cpu": "arm64" }, "sha512-l+wqbUnMaeQKlaEYr9iF/qs1VkiLWCYoFCp6zjFailAZLDRvcuW/oRNplQei4VQvvLjawd1drS9xhTe7jxG9rQ=="],
+
+    "epochcli-ai-linux-x64": ["epochcli-ai-linux-x64@2.2.0", "", { "os": "linux", "cpu": "x64" }, "sha512-3Pllp14s9Qd98ywQz/+nW3HoyjFLw1+Kvxe9CPF3rpaKyU7V0qOmeNIAxCGEU7yHGsAqZvu9TuaVWMGwqrQjmw=="],
+
+    "epochcli-ai-linux-x64-baseline": ["epochcli-ai-linux-x64-baseline@2.2.0", "", { "os": "linux", "cpu": "x64" }, "sha512-vY0Glw2iaBMLAL6PexVp7Qgi5XeIV4fofimFQaf92VJslBYW+NUG0bW+Kz0w8TIqL5Mo5T7bc/QCJ/SNxVqffQ=="],
+
+    "epochcli-ai-linux-x64-baseline-musl": ["epochcli-ai-linux-x64-baseline-musl@2.2.0", "", { "os": "linux", "cpu": "x64" }, "sha512-RCvDP3shiuKrdaT4JsFbabf2A51gq3KPGWSBCfHKnswJ2OYx27Kq+VB0LNagFvghW4jZqFPVuzECauuZCbdjRw=="],
+
+    "epochcli-ai-linux-x64-musl": ["epochcli-ai-linux-x64-musl@2.2.0", "", { "os": "linux", "cpu": "x64" }, "sha512-gDb/Qx3p1tyzVQj5Xx+7m7gLI1NWtGRtv3TVboe44xl9B62pfE0gz7EhUXGZtvIqeDOG2rL2UUSinqiK9+QVXg=="],
+
+    "epochcli-ai-windows-arm64": ["epochcli-ai-windows-arm64@2.2.0", "", { "os": "win32", "cpu": "arm64" }, "sha512-Jg1DPkYqIQYB9NkWixMS6xSmwhZ+GuoKmI5QUr3706+dRfmU1hfnScoOXa6j/07Ct2zxefmIcv1DcavKgZRA5g=="],
+
+    "epochcli-ai-windows-x64": ["epochcli-ai-windows-x64@2.2.0", "", { "os": "win32", "cpu": "x64" }, "sha512-wVSHwB2kITxfkfuO8i4+u88VVdRUMmn7S64pvV/FGwWMpg0LcjaZEKwIncQ96rK/kHs/rJv4+RCqNAEmcenNeQ=="],
+
+    "epochcli-ai-windows-x64-baseline": ["epochcli-ai-windows-x64-baseline@2.2.0", "", { "os": "win32", "cpu": "x64" }, "sha512-8bunTMCdj3J4KUVxm7wRKDpR+BR6PUlc3XOjhUIByAl5XKdVhog5YHhDkei9fh8LeLVzqMrGYJ5rCcKZiwQE0Q=="],
+
     "es-define-property": ["es-define-property@1.0.1", "", {}, "sha512-e3nRfgfUZ4rNGL232gUgX06QNyyez04KdjFrF+LTRoOXmrOgFKDg4BCdsjW8EnT69eqdYGmRpJwiPVYNrCaW3g=="],
 
     "es-errors": ["es-errors@1.3.0", "", {}, "sha512-Zf5H2Kxt2xjTvbJvP2ZWLEICxA6j+hAmMzIlypy4xcBg1vKVnx89Wy0GbS+kf5cwCVFFzdCFh2XSCFNULS6csw=="],

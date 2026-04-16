@@ -35,19 +35,10 @@
       "packages/opencode/migration/*": "deny",
     },
   },
-  "mcp": {
-    "mcp-spec-cli": {
-      "type": "local",
-      "command": ["node", "/home/benmurray/Projects/cli/mcp-spec-cli/dist/index.js"]
-    },
-    "project-map-cli": {
-      "type": "local",
-      "command": ["/home/benmurray/Projects/cli/project-map-cli/venv/bin/python", "-m", "project_map_cli.mcp.server"]
-    },
-    "ground-truth-cli": {
-      "type": "local",
-      "command": ["npx", "-y", "https://github.com/benjamesmurray/ground-truth-cli"]
-    }
+  "mcp": {},
+  "mcpx": {
+    "enabled": true,
+    "binaryPath": "/home/benmurray/.npm-global/lib/node_modules/mcpx-go/vendor/mcpx"
   },
   "experimental": {
     "mcp_timeout": 120000

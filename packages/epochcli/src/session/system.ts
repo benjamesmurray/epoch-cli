@@ -65,4 +65,23 @@ export namespace SystemPrompt {
       Skill.fmt(list, { verbose: true }),
     ].join("\n")
   }
+
+  /**
+   * Zone 2: Behavioral rules and broad context.
+   */
+  export function zone2(agent: Agent.Info, model: Provider.Model): string {
+    const parts: string[] = []
+    
+    parts.push("=== ZONE 2: BEHAVIORAL RULES & GENERAL CONTEXT ===")
+    
+    // Add agent specific prompt if any
+    if (agent.prompt) {
+      parts.push(agent.prompt)
+    } else {
+      // Fallback to provider default prompt
+      parts.push(...provider(model))
+    }
+    
+    return parts.join("\n\n")
+  }
 }

@@ -1,11 +1,12 @@
 import * as fs from "fs/promises";
 import * as path from "path";
+import type { TestConfig } from "./types";
 
 export class WorkspaceBuilder {
   /**
    * Prepares an isolated workspace directory with the specific configs.
    */
-  public static async buildDockerWorkspace(hostRunDir: string): Promise<void> {
+  public static async buildDockerWorkspace(hostRunDir: string, config: TestConfig): Promise<void> {
     await fs.mkdir(hostRunDir, { recursive: true });
 
     // Create the .epochcli config folder
@@ -15,18 +16,17 @@ export class WorkspaceBuilder {
     // Generate the epochcli.jsonc payload matching the user's dual-model config
     // but pointing to the offline MCP installations and host's LLM ports.
     const epochConfig = {
-      "$schema": "https://opencode.ai/config.json",
+      ...config.epochcli,
       "provider": {
         "local-main": {
           "npm": "@ai-sdk/openai-compatible",
-          "name": "Local Gemma (RTX 4090)",
+          "name": "Local Gemma (H100 x 8)",
           "options": {
-            "baseURL": "http://host.docker.internal:8085/v1",
+            "baseURL": "http://localhost:8085/v1",
             "apiKey": "2250"
           },
           "models": {
             "gemma-4-26b-q4-xl": { "name": "Gemma 4 26B" },
-            "gemma-4-q5": { "name": "Gemma 4 26B Q5" },
             "qwen-3.5": { "name": "Qwen 3.5" }
           }
         },
@@ -34,7 +34,7 @@ export class WorkspaceBuilder {
           "npm": "@ai-sdk/openai-compatible",
           "name": "Local Nemotron (RTX 4090)",
           "options": {
-            "baseURL": "http://127.0.0.1:8086/v1",
+            "baseURL": "http://localhost:8086/v1",
             "apiKey": "2250"
           },
           "models": {
@@ -44,6 +44,7 @@ export class WorkspaceBuilder {
       },
       "model": "local-main/gemma-4-26b-q4-xl",
       "mcp": {
+        ...config.epochcli?.mcp,
         "mcp-spec-cli": {
           "type": "local",
           "command": ["mcp-spec-cli"]
@@ -66,9 +67,30 @@ export class WorkspaceBuilder {
       }
     };
 
+
     await fs.writeFile(
       path.join(epochcliDir, "epochcli.jsonc"),
       JSON.stringify(epochConfig, null, 2),
+      "utf-8"
+    );
+
+    // Create mcpx config file
+    const mcpxConfigDir = path.join(hostRunDir, ".config", "mcpx");
+    await fs.mkdir(mcpxConfigDir, { recursive: true });
+    const mcpxConfig = `
+[servers.mcp-spec-cli]
+command = "mcp-spec-cli"
+
+[servers.project-map-cli]
+command = "/opt/project-map-cli-env/bin/python"
+args = ["-m", "project_map_cli.mcp.server"]
+
+[servers.ground-truth-cli]
+command = "ground-truth-cli"
+`;
+    await fs.writeFile(
+      path.join(mcpxConfigDir, "config.toml"),
+      mcpxConfig,
       "utf-8"
     );
 
@@ -94,6 +116,19 @@ export class WorkspaceBuilder {
         path.join(authDir, "auth.json"),
         JSON.stringify(mockAuth, null, 2),
         "utf-8"
+    );
+
+    // Inject guidelines for Zone 4 testing
+    await fs.writeFile(
+      path.join(hostRunDir, "AGENTS.md"),
+      "# Project Guidelines\n- Use functional programming patterns.\n- Ensure all components are accessible.",
+      "utf-8"
+    );
+
+    await fs.writeFile(
+      path.join(hostRunDir, ".cursorrules"),
+      "Preferred Style: Tailwind CSS for styling.",
+      "utf-8"
     );
   }
 }

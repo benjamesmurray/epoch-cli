@@ -38,24 +38,20 @@ export namespace Log {
     };
 
     payload?: ZoneStructuredPayload | any;
+    tools?: any[] | Record<string, any>;
   }
 
   export function truncatePayload(payload: ZoneStructuredPayload | any | undefined): ZoneStructuredPayload | undefined {
     if (!payload) return undefined;
-    if (Flag.EPOCHCLI_DEBUG_FULL_PROMPT) return payload;
+    
+    // Deep clone to avoid mutating the original payload
+    const truncated = { ...payload };
 
-    // If it's not a plain object (e.g. string or array), return it as is or handle appropriately
-    if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
-      return payload;
+    if (truncated.zone2_context_files && truncated.zone2_context_files.length > 0) {
+      truncated.zone2_context_files = "...[ZONE 2 TRUNCATED FOR LOGGING]";
     }
 
-    // Always preserve zone1 and zone3, truncate zone2 specifically for logging
-    return {
-      ...payload,
-      zone2_context_files: payload.zone2_context_files 
-        ? "...[ZONE 2 TRUNCATED FOR LOGGING]"
-        : payload.zone2_context_files
-    }
+    return truncated;
   }
 
   export const Level = z.enum(["DEBUG", "INFO", "WARN", "ERROR"]).meta({ ref: "LogLevel", description: "Log level" })

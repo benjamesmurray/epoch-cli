@@ -29,25 +29,47 @@ export class HeuristicsEngine {
    */
   public processLine(line: string): void {
     // Check for EnhancedModelExecutionEvent JSON events
-    if (line.trim().startsWith('{') && line.includes('"event":')) {
+    if (line.includes('event=START_GENERATE')) {
       try {
-        const event = JSON.parse(line.trim());
-        if (event.event === "START_GENERATE" && event.payload) {
-          this.fullPrompts.push(event.payload);
-        }
-        if (event.event === "END_GENERATE" && event.metrics) {
-          if (event.metrics.tps) this.tpsHistory.push(event.metrics.tps);
-          if (event.metrics.ttftMs) this.ttftHistory.push(event.metrics.ttftMs);
-          if (event.metrics.promptTokens) this.totalTokens += event.metrics.promptTokens;
-          if (event.metrics.completionTokens) this.totalTokens += event.metrics.completionTokens;
-          if (event.metrics.json_repaired) {
-              this.jsonRepairs++;
-              console.log(`    [${this.runId}] ⚠️ Model payload repaired by middleware (Total: ${this.jsonRepairs})`);
+        // Robust extraction that handles both quoted and unquoted values in Log.EnhancedModelExecutionEvent format
+        // We match until the next tag (e.g. " tools=") or the end of the line message
+        const payloadMatch = line.match(/payload=([\[{].*?[\]}])(?=\s+\w+=|\s+[\w\s]+$|$)/);
+        const toolsMatch = line.match(/tools=([\[{].*?[\]}])(?=\s+\w+=|\s+[\w\s]+$|$)/);
+        
+        if (payloadMatch) {
+          try {
+            const parsedPayload = JSON.parse(payloadMatch[1]);
+            this.fullPrompts.push({
+                payload: parsedPayload,
+                tools: toolsMatch ? JSON.parse(toolsMatch[1]) : []
+            });
+            console.log(`    [${this.runId}] ✅ Captured initial payload (${payloadMatch[1].length} bytes)`);
+          } catch (parseErr: any) {
+            console.log(`    [${this.runId}] ❌ Failed to parse payload JSON: ${parseErr.message}`);
           }
+        } else {
+           console.log(`    [${this.runId}] ❌ event=START_GENERATE found but payload regex failed`);
         }
       } catch (e) {
-        // Not a valid JSON event or parse failed, continue to standard pattern matching
+        // Parse failed, continue
       }
+    }
+
+    if (line.includes('event=END_GENERATE')) {
+        try {
+            const metricsMatch = line.match(/metrics=({.*?})(?:\s|$)/);
+            if (metricsMatch) {
+                const metrics = JSON.parse(metricsMatch[1]);
+                if (metrics.tps) this.tpsHistory.push(metrics.tps);
+                if (metrics.ttftMs) this.ttftHistory.push(metrics.ttftMs);
+                if (metrics.promptTokens) this.totalTokens += metrics.promptTokens;
+                if (metrics.completionTokens) this.totalTokens += metrics.completionTokens;
+                if (metrics.json_repaired) {
+                    this.jsonRepairs++;
+                    console.log(`    [${this.runId}] ⚠️ Model payload repaired by middleware (Total: ${this.jsonRepairs})`);
+                }
+            }
+        } catch (e) {}
     }
 
     // Check for JSON repairs in legacy epochcli audit logs (fallback)
@@ -103,10 +125,12 @@ export class HeuristicsEngine {
     }
     
     // Also explicitly track tool invocations by just the name if arguments aren't logged easily
-    const specCliMatch = line.match(/(sc_init|sc_todo_start|sc_todo_complete|sc_plan|pm_query)/);
-    if (specCliMatch && specCliMatch[1] && !toolName) {
-        this.usedTools.add(specCliMatch[1]);
-        console.log(`    [${this.runId}] 🛠️ Spec Tool Invoked: ${specCliMatch[1]}`);
+    if (line.match(/^(DEBUG|INFO|ERROR|WARN)\s/) && !line.includes('event=START_GENERATE')) {
+        const specCliMatch = line.match(/(sc_init|sc_todo_start|sc_todo_complete|sc_plan|pm_query)/);
+        if (specCliMatch && specCliMatch[1] && !toolName) {
+            this.usedTools.add(specCliMatch[1]);
+            console.log(`    [${this.runId}] 🛠️ Spec Tool Invoked: ${specCliMatch[1]}`);
+        }
     }
   }
 
@@ -135,6 +159,10 @@ export class HeuristicsEngine {
 
   public getFullPrompts(): any[] {
     return this.fullPrompts;
+  }
+
+  public hasFullPayload(): boolean {
+    return this.fullPrompts.length > 0;
   }
 }
 

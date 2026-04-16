@@ -1,5 +1,6 @@
 import { dynamicTool, type Tool, jsonSchema, type JSONSchema7 } from "ai"
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
+import { Tool as ToolSvc } from "../tool/tool"
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js"
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
@@ -17,6 +18,8 @@ import { Instance } from "../project/instance"
 import { Installation } from "../installation"
 import { withTimeout } from "@/util/timeout"
 import { AppFileSystem } from "@/filesystem"
+import { Truncate } from "../tool/truncate"
+import { Process } from "@/util/process"
 import { McpOAuthProvider } from "./oauth-provider"
 import { McpOAuthCallback } from "./oauth-callback"
 import { McpAuth } from "./auth"
@@ -29,6 +32,7 @@ import { InstanceState } from "@/effect/instance-state"
 import { makeRuntime } from "@/effect/run-service"
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 import * as CrossSpawnSpawner from "@/effect/cross-spawn-spawner"
+import { NodeFileSystem, NodePath } from "@effect/platform-node"
 
 export namespace MCP {
   const log = Log.create({ service: "mcp" })
@@ -130,22 +134,12 @@ export namespace MCP {
   const sanitize = (s: string) => s.replace(/[^a-zA-Z0-9_-]/g, "_")
 
   // Convert MCP tool definition to AI SDK Tool type
-  function convertMcpTool(mcpTool: MCPToolDef, client: MCPClient, timeout?: number): Tool {
-    const inputSchema = mcpTool.inputSchema
-
-    // Spread first, then override type to ensure it's always "object"
-    const schema: JSONSchema7 = {
-      ...(inputSchema as JSONSchema7),
-      type: "object",
-      properties: (inputSchema.properties ?? {}) as JSONSchema7["properties"],
-      additionalProperties: false,
-    }
-
-    return dynamicTool({
+  function convertMcpTool(mcpTool: MCPToolDef, client: MCPClient, timeout?: number): ToolSvc.Def {
+    return {
       description: mcpTool.description ?? "",
-      inputSchema: jsonSchema(schema),
-      execute: async (args: unknown) => {
-        return client.callTool(
+      parameters: z.any() as any, // We rely on the model's schema-following
+      execute: async (args: unknown, ctx: ToolSvc.Context) => {
+        const result = (await client.callTool(
           {
             name: mcpTool.name,
             arguments: (args || {}) as Record<string, unknown>,
@@ -155,9 +149,20 @@ export namespace MCP {
             resetTimeoutOnProgress: true,
             timeout,
           },
-        )
+        )) as any
+
+        const output = (result.content || [])
+          .filter((c: any) => c.type === "text")
+          .map((c: any) => c.text)
+          .join("\n")
+
+        return {
+          output,
+          title: mcpTool.name,
+          metadata: { ...result },
+        }
       },
-    })
+    }
   }
 
   function defs(key: string, client: MCPClient, timeout?: number) {
@@ -166,10 +171,7 @@ export namespace MCP {
       catch: (err) => (err instanceof Error ? err : new Error(String(err))),
     }).pipe(
       Effect.map((result) => result.tools),
-      Effect.catch((err) => {
-        log.error("failed to get tools from client", { key, error: err })
-        return Effect.succeed(undefined)
-      }),
+      Effect.orElseSucceed(() => undefined),
     )
   }
 
@@ -215,7 +217,8 @@ export namespace MCP {
   export interface Interface {
     readonly status: () => Effect.Effect<Record<string, Status>>
     readonly clients: () => Effect.Effect<Record<string, MCPClient>>
-    readonly tools: () => Effect.Effect<Record<string, Tool>>
+    readonly tools: () => Effect.Effect<Record<string, ToolSvc.Def>>
+    readonly mcpx: () => Effect.Effect<ToolSvc.Def | undefined>
     readonly prompts: () => Effect.Effect<Record<string, PromptInfo & { client: string }>>
     readonly resources: () => Effect.Effect<Record<string, ResourceInfo & { client: string }>>
     readonly add: (name: string, mcp: Config.Mcp) => Effect.Effect<{ status: Record<string, Status> | Status }>
@@ -247,6 +250,7 @@ export namespace MCP {
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
       const auth = yield* McpAuth.Service
       const bus = yield* Bus.Service
+      const truncate = yield* Truncate.Service
 
       type Transport = StdioClientTransport | StreamableHTTPClientTransport | SSEClientTransport
 
@@ -609,7 +613,7 @@ export namespace MCP {
       })
 
       const tools = Effect.fn("MCP.tools")(function* () {
-        const result: Record<string, Tool> = {}
+        const result: Record<string, ToolSvc.Def> = {}
         const s = yield* InstanceState.get(state)
 
         const cfg = yield* cfgSvc.get()
@@ -659,6 +663,74 @@ export namespace MCP {
       const prompts = Effect.fn("MCP.prompts")(function* () {
         const s = yield* InstanceState.get(state)
         return yield* collectFromConnected(s, (c) => c.listPrompts().then((r) => r.prompts), "prompts")
+      })
+
+      const mcpx = Effect.fn("MCP.mcpx")(function* () {
+        const config = yield* cfgSvc.get()
+        if (config.mcpx?.enabled === false) return undefined
+
+        // Default to the found global path if not specified
+        const binary = config.mcpx?.binaryPath || "mcpx"
+
+        return {
+          description:
+            "Execute an MCP tool via the mcpx CLI. This tool bypasses standard JSON-RPC bloat and allows for shell-like composition of MCP operations. Discover capabilities by running 'mcpx <server> --help'.",
+          parameters: z.object({
+            server: z.string().describe("The name of the MCP server (e.g. 'mcp-spec-cli', 'project-map-cli')"),
+            tool: z.string().describe("The name of the tool to invoke (e.g. 'sc_init', 'pm_query')"),
+            args: z
+              .array(z.string())
+              .describe("Positional arguments to pass to the tool. IMPORTANT: When an argument contains complex strings, spaces, or quotes, pass the EXACT literal string. Do NOT add extra quotes around the string, they will be properly escaped. Example: `[\"--description\", \"Implement a strictly typed Event Sourcing Bus\"]`")
+              .optional(),
+            flags: z
+              .record(z.string(), z.string())
+              .describe("Named flags to pass to the tool (e.g. { 'path': '/foo' } becomes --path /foo). Prefer using flags over args where possible.")
+              .optional(),
+          }) as any,
+          execute: async (input: any, ctx: ToolSvc.Context) => {
+            const args = [input.server, input.tool]
+            if (Array.isArray(input.args)) {
+              for (const arg of input.args) {
+                if (typeof arg === "string") args.push(arg)
+                else if (typeof arg === "object") args.push(JSON.stringify(arg))
+                else args.push(String(arg))
+              }
+            }
+            
+            for (const [k, v] of Object.entries(input.flags ?? {})) {
+              args.push(`--${k}`, String(v))
+            }
+
+            const commandLine = [binary, ...args].join(" ")
+            log.info("executing mcpx", { command: commandLine })
+
+            const res = await Process.run([binary, ...args], {
+              cwd: Instance.directory,
+              nothrow: true,
+            })
+
+            let output = res.stdout.toString()
+            if (res.code !== 0) {
+              const stderr = res.stderr.toString()
+              log.error("mcpx failed", {
+                command: commandLine,
+                exit: res.code,
+                stderr,
+              })
+              output += `\n\nError (Exit ${res.code}): ${stderr}`
+            }
+
+            const { content, truncated, outputPath } = (await runPromise((_) =>
+              truncate.output(output, {}, undefined),
+            )) as any
+
+            return {
+              output: content,
+              title: `mcpx ${input.server} ${input.tool}`,
+              metadata: { exit: res.code, truncated, outputPath, command: commandLine },
+            }
+          },
+        }
       })
 
       const resources = Effect.fn("MCP.resources")(function* () {
@@ -853,6 +925,7 @@ export namespace MCP {
         status,
         clients,
         tools,
+        mcpx,
         prompts,
         resources,
         add,
@@ -867,7 +940,7 @@ export namespace MCP {
         supportsOAuth,
         hasStoredTokens,
         getAuthStatus,
-      })
+      } as any)
     }),
   )
 
@@ -875,13 +948,16 @@ export namespace MCP {
 
   // --- Per-service runtime ---
 
-  export const defaultLayer = layer.pipe(
+  export const defaultLayer: Layer.Layer<Service, never, never> = layer.pipe(
     Layer.provide(McpAuth.layer),
     Layer.provide(Bus.layer),
     Layer.provide(Config.defaultLayer),
     Layer.provide(CrossSpawnSpawner.defaultLayer),
     Layer.provide(AppFileSystem.defaultLayer),
-  )
+    Layer.provide(Truncate.defaultLayer),
+    Layer.provide(NodeFileSystem.layer),
+    Layer.provide(NodePath.layer),
+  ) as any
 
   const { runPromise } = makeRuntime(Service, defaultLayer)
 
@@ -892,6 +968,8 @@ export namespace MCP {
   export const clients = async () => runPromise((svc) => svc.clients())
 
   export const tools = async () => runPromise((svc) => svc.tools())
+
+  export const mcpx = async () => runPromise((svc) => svc.mcpx())
 
   export const prompts = async () => runPromise((svc) => svc.prompts())
 

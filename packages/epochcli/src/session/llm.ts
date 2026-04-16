@@ -177,7 +177,6 @@ export namespace LLM {
     const payload: ZoneStructuredPayload = {
       zone1_critical_rules: [
         `Current Phase: [${input.agent.name.toUpperCase()}]. You are restricted to using only the tools currently defined in your schema.`,
-        ...input.system.zone1
       ],
       zone2_context_files: [...input.system.zone2],
       zone3_active_cursor: [],
@@ -187,6 +186,10 @@ export namespace LLM {
     if (input.operationalFacts && input.operationalFacts.length > 0) {
       payload.zone1_critical_rules.push(...input.operationalFacts)
       payload.zone3_active_cursor.push(...input.operationalFacts)
+    }
+
+    if (input.system?.zone1) {
+      payload.zone1_critical_rules.push(...input.system.zone1)
     }
 
     if (input.instructions && input.instructions.length > 0) {
@@ -424,10 +427,6 @@ export namespace LLM {
       }
     }
 
-    if (input.system?.zone1) {
-      payload.zone1_critical_rules.push(...input.system.zone1)
-    }
-
     payload.zone2_context_files.push(
       [
         // use agent prompt otherwise provider prompt
@@ -482,6 +481,9 @@ export namespace LLM {
       mergeDeep(input.agent.options),
       mergeDeep(variant),
     )
+    if (input.operationalFacts && input.operationalFacts.length > 0) {
+      options.operationalFacts = input.operationalFacts
+    }
     if (isOpenaiOauth) {
       options.instructions = system.join("\n")
     }
@@ -744,7 +746,7 @@ Ready to process user request strictly under these parameters.
           {
             specificationVersion: "v3" as const,
             async transformParams(args) {
-              if (args.type === "stream") {
+              if (args.type === "stream" || args.type === "generate") {
                 const targetMessages = ProviderTransform.message(args.params.prompt as ModelMessage[], input.model, options)
                 const targetKey = ProviderTransform.sdkKey(input.model.api.npm) ?? input.model.providerID
                 const isAzure = input.model.api.npm === "@ai-sdk/azure"
@@ -968,7 +970,7 @@ Ready to process user request strictly under these parameters.
           continue
         }
         if (Array.isArray(last.content) && Array.isArray(msg.content)) {
-          last.content.push(...msg.content)
+          ;(last.content as any[]).push(...msg.content)
           continue
         }
       }

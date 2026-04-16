@@ -2,33 +2,77 @@
 
 This sub-directory contains the TypeScript execution engine (`bun run src/index.ts`) for the end-to-end variance testing harness.
 
+## Architecture
+
+The harness is a multi-stage orchestration system designed to measure the performance, reliability, and variance of the Epoch CLI across multiple iterations of the same task.
+
+### 1. Workspace Isolation (`WorkspaceBuilder`)
+Every test run starts with a completely clean environment.
+- **Docker Mode**: Creates a host directory and mounts it into a fresh `epochcli-eval-env` container.
+- **Local Mode**: Uses a temporary directory on the host.
+- **Context Injection**: Automatically populates `.epochcli/epochcli.jsonc` with the necessary provider and environment settings to connect the containerized agent to the host's LLM server.
+
+### 2. Live Monitoring (`HeuristicsEngine`)
+The harness streams the agent's output and applies real-time heuristics:
+- **Loop Detection**: Kills the process if the agent invokes the same tool with the same arguments multiple times in a row (configurable threshold, default: 3).
+- **JSON Repair Tracking**: Detects and logs when the internal middleware has to "bridge" or repair malformed model outputs.
+- **Performance Metrics**: Captures Tokens Per Second (TPS), Time To First Token (TTFT), and total token counts for every turn.
+- **Tool Validation**: Tracks which tools were actually invoked versus the `expectedTools` list in the configuration.
+
+### 3. Evaluation (`TestEvaluator`)
+After the agent finishes its task, the harness enters the evaluation phase:
+- It executes `bun test` (or a specified test runner) within the target workspace.
+- A run is only marked as `Success` if the agent completes AND the resulting code passes all functional tests.
+
+### 4. Evidence & Reporting
+The harness generates a comprehensive audit trail for every run in `e2e_testing/results/suite_[timestamp]/`:
+- **`run.log`**: The full combined stdout/stderr of the execution.
+- **`initial_payload.json`**: The exact prompt and tool definitions sent to the model on the first turn.
+- **`prompts.json`**: The full conversation history (all turns) with exact prompt content.
+- **`variance_report.md`**: A summary report aggregating metrics (TPS, TTFT, Duration, Status) across all iterations for statistical analysis.
+
 ## Container Specifications
 
 The tests run inside ephemeral Docker containers (`epochcli-eval-env`) built via `build-image.sh`. The container environment simulates a clean, isolated local developer machine with the following specs:
 
 - **Base OS**: Debian Bookworm (`node:22-bookworm`)
-- **Runtime Dependencies**:
-  - Node.js v22
-  - Bun (latest)
-  - Python 3 + pip
-  - Git
-- **Offline MCP Servers**:
-  - `ground-truth-cli` (installed globally via npm)
-  - `mcp-spec-cli` (installed globally from local source snapshot)
-  - `project-map-cli` (installed globally in a dedicated python virtual environment)
-- **Baseline Context Files**: The container has `.assistant_rules.toon`, `AGENTS.md`, and `.editorconfig` baked into `/etc/epochcli/`.
-- **CPU Limits**: Unbounded by default, runs on the host CPU.
-- **Memory Limits**: Bounded by the `memoryLimit` specified in `test_config.json` (e.g., `4g` for 4 Gigabytes).
-- **Disk Space**: Uses the host Docker overlay filesystem. The isolated run directory is mounted from the host at `/workspace` and is fully read-write.
-- **Host Codebase**: The entire CLI codebase (`/home/benmurray/Projects/cli`) is mounted read-only (`:ro`) into the container at `/cli`. This allows the agent to run the absolute latest, uncommitted local code without needing to rebuild the Docker image for every typescript change.
+- **Runtime Dependencies**: Node.js v22, Bun (latest), Python 3 + pip, Git.
+- **Offline MCP Servers**: `ground-truth-cli`, `mcp-spec-cli`, and `project-map-cli` are pre-installed.
+- **Baseline Context Files**: Baked-in `.assistant_rules.toon`, `AGENTS.md`, and `.editorconfig`.
+- **Memory Limits**: Bounded by the `memoryLimit` specified in `test_config.json` (e.g., `4g`).
+- **Host Codebase**: The entire CLI codebase is mounted read-only (`:ro`) into the container at `/cli`. This allows the agent to run the absolute latest code without needing to rebuild the Docker image.
 
-## Launching from Host vs Container
+## Configuration (`TestConfig`)
 
-The harness itself runs on the *host* machine (via `bun run src/index.ts`), but it orchestrates and kicks off the actual test execution *inside* the Docker container using `docker run`.
+Scenarios are defined in JSON files (e.g., `test_config.json`, `thinking_config.json`):
 
-When a test scenario includes the `"docker"` configuration block in `test_config.json`, the harness will:
-1. Generate an isolated directory for the specific test run on the host.
-2. Create an isolated `.epochcli/epochcli.jsonc` file that configures the agent to connect to the host's LLM server (via `host.docker.internal`).
-3. Spawn a `docker run` process that executes `bun /cli/packages/epochcli/src/index.ts run ...` inside the container.
+```json
+{
+  "id": "refactor-task",
+  "iterations": 5,
+  "timeoutMs": 120000,
+  "prompt": "Refactor the session management system...",
+  "expectedTools": ["sc_init", "sc_plan"],
+  "runTargetDir": ".",
+  "docker": {
+    "imageName": "epochcli-eval-env:latest",
+    "network": "host",
+    "memoryLimit": "4g"
+  }
+}
+```
 
-If the `"docker"` block is omitted, the test simply runs directly on the host machine in a temporary folder. This is useful for rapid debugging of the harness logic itself, but Docker mode should be used for all formal evaluations to ensure isolation and accurate baseline contexts.
+## Launching from Host
+
+The harness itself runs on the *host* machine:
+
+```bash
+# Run the default test suite
+bun run src/index.ts
+
+# Run a specific config with iteration override
+bun run src/index.ts --config thinking_config.json --iterations 3
+
+# Capture initial payloads quickly by aborting as soon as the model is invoked
+bun run src/index.ts --abort-on-generate
+```

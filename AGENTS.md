@@ -1,9 +1,3 @@
-- To regenerate the JavaScript SDK, run `./packages/sdk/js/script/build.ts`.
-- ALWAYS USE PARALLEL TOOLS WHEN APPLICABLE.
-- The default branch in this repo is `dev`.
-- Local `main` ref may not exist; use `dev` or `origin/dev` for diffs.
-- Prefer automation: execute requested actions without confirmation unless blocked by missing info or safety/irreversibility.
-
 ## Style Guide
 
 ### General Principles
@@ -31,3 +25,46 @@
 - Avoid mocks as much as possible. Test actual implementation, do not duplicate logic into tests.
 - Tests cannot run from repo root (guard: `do-not-run-tests-from-root`); run from package dirs like `packages/epochcli`.
 - Always run `bun typecheck` from package directories (e.g., `packages/epochcli`), never `tsc` directly.
+
+## MCPX Tooling & Execution Guide
+
+You have access to a terminal environment via the `mcpx` tool. You must not look for raw JSON-RPC schemas; instead, you will interface with all external capabilities using standard shell commands.
+
+**Universal Syntax:** You must always route your commands through the `mcpx` CLI using the following exact structure:
+`mcpx <server_name> <tool_name> [--flag=value]`
+
+**Self-Discovery (CRITICAL):**
+If you do not know the exact arguments for a specific tool, **do not guess**. Run the help command first to pull the schema-aware documentation:
+`mcpx <server_name> <tool_name> --help`
+
+### 1. Project Constitution & Rules (`ground-truth-cli`)
+Use this server to read the rigid behavioral constraints and technical context of the current repository. *If starting a new session, run the scan to orient yourself.*
+* **Check Orientation:** `mcpx ground-truth-cli gt_status`
+* **Scan Repo & Build Rules:** `mcpx ground-truth-cli gt_exec --action="scan" --path="."`
+* **Force Rule Refresh:** `mcpx ground-truth-cli gt_refresh`
+
+### 2. Workflow State Machine (`mcp-spec-cli`)
+Use this server to manage your workflow state (Requirements → Design → Tasks). Do not manage this state in your own memory; rely on the CLI.
+* **Start a New Feature:** `mcpx mcp-spec-cli sc_init --name="<feature_name>"`
+* **Pull Phase Instructions:** `mcpx mcp-spec-cli sc_guidance` (Run this if you are ever confused about what to do next).
+* **Progress the Workflow:** `mcpx mcp-spec-cli sc_plan --instruction="<optional_context>"`
+* **Approve Drafted Phase:** `mcpx mcp-spec-cli sc_approve`
+* **Manage Tasks:** `mcpx mcp-spec-cli sc_todo_list` / `mcpx mcp-spec-cli sc_todo_start --id="<task_id>"` / `mcpx mcp-spec-cli sc_todo_complete --id="<task_id>"`
+
+### 3. Codebase Navigation (`project-map-cli`)
+Use this server to read and understand the repository architecture without reading raw, token-heavy files. It responds in dense TOON (Token-Oriented Object Notation).
+* **Initialize/Refresh Map:** `mcpx project-map-cli pm_init --profile=light`
+* **Check Map Status:** `mcpx project-map-cli pm_status`
+* **Search for Symbols/Context:** `mcpx project-map-cli pm_query --query="<search_string>"` or `--path="<file_path>"`
+* **Analyze Blast Radius:** `mcpx project-map-cli pm_plan --fqn="<fully_qualified_name>"`
+
+**Execution Rule:** When invoking these via your `mcpx` JSON tool, map the server name to the `server` parameter, the tool name to the `tool` parameter, and supply the flags accurately in the `flags` or `args` payload.
+
+## Behavioral Constraints
+Trigger: Generating code in response to a user prompt.
+Behaviour: Suppress conversational filler, apologies, and concluding remarks. Output ONLY context and code.
+Example: Correct: 'Update condition: if (x > 0).' Incorrect: 'Certainly! I can help. if (x > 0). Let me know!'
+
+Trigger: User asks a non-coding general knowledge question.
+Behaviour: Keep the answer strictly under 2 sentences and immediately pivot back to the codebase.
+Example: Correct: 'Docker isolates environments. Should we write a Dockerfile for this repo?' Incorrect: '[3 paragraphs on the history of containerization]'

@@ -7,6 +7,7 @@ describe("PromptBuilder", () => {
       zone1_critical_rules: ["Fact 1", "Fact 2"],
       zone2_context_files: ["Rule Pack A", "Tool Schemas"],
       zone3_active_cursor: ["Fact 1 Repeated", "Cursor at line 10"],
+      zone4_guidelines: ["Guideline 1"],
     };
 
     const result = PromptBuilder.build(payload);
@@ -17,7 +18,7 @@ describe("PromptBuilder", () => {
     expect(result).toContain("=== ZONE 2: BEHAVIORAL RULES & GENERAL CONTEXT ===");
     expect(result).toContain("Rule Pack A\n\nTool Schemas");
     
-    expect(result).toContain("=== ZONE 3: CRITICAL REITERATION & CURSOR ===");
+    expect(result).toContain("=== ZONE 3: PROJECT-SPECIFIC RULES & CURSOR CONTEXT ===");
     expect(result).toContain("Fact 1 Repeated\n\nCursor at line 10");
   });
 
@@ -26,6 +27,7 @@ describe("PromptBuilder", () => {
       zone1_critical_rules: ["Fact 1"],
       zone2_context_files: [],
       zone3_active_cursor: ["Cursor at line 10"],
+      zone4_guidelines: [],
     };
 
     const result = PromptBuilder.build(payload);
@@ -35,7 +37,7 @@ describe("PromptBuilder", () => {
     
     expect(result).not.toContain("=== ZONE 2: BEHAVIORAL RULES & GENERAL CONTEXT ===");
     
-    expect(result).toContain("=== ZONE 3: CRITICAL REITERATION & CURSOR ===");
+    expect(result).toContain("=== ZONE 3: PROJECT-SPECIFIC RULES & CURSOR CONTEXT ===");
     expect(result).toContain("Cursor at line 10");
   });
 
@@ -44,13 +46,14 @@ describe("PromptBuilder", () => {
       zone1_critical_rules: ["Fact 1", "", "Fact 2"],
       zone2_context_files: ["", "Rule Pack A"],
       zone3_active_cursor: [""],
+      zone4_guidelines: [],
     };
 
     const result = PromptBuilder.build(payload);
 
     expect(result).toContain("Fact 1\n\nFact 2");
     expect(result).toContain("Rule Pack A");
-    expect(result).not.toContain("=== ZONE 3: CRITICAL REITERATION & CURSOR ===");
+    expect(result).not.toContain("=== ZONE 3: PROJECT-SPECIFIC RULES & CURSOR CONTEXT ===");
   });
 
   it("should return an empty string if all zones are empty", () => {
@@ -58,6 +61,7 @@ describe("PromptBuilder", () => {
       zone1_critical_rules: [],
       zone2_context_files: [""],
       zone3_active_cursor: [],
+      zone4_guidelines: [],
     };
 
     const result = PromptBuilder.build(payload);

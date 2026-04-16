@@ -285,11 +285,13 @@ beforeAll(() => {
     async fetch(req) {
       const next = state.queue.shift()
       if (!next) {
+        console.error("UNEXPECTED REQUEST:", req.method, req.url)
         return new Response("unexpected request", { status: 500 })
       }
 
       const url = new URL(req.url)
       const body = (await req.json()) as Record<string, unknown>
+      console.log("MOCK SERVER RECEIVED:", req.method, url.pathname, "messages:", (body.messages as any[])?.length)
       next.resolve({ url, headers: req.headers, body })
 
       if (!url.pathname.endsWith(next.path)) {
@@ -1182,6 +1184,88 @@ describe("session.llm.stream", () => {
         expect(config?.temperature).toBe(0.3)
         expect(config?.topP).toBe(0.8)
         expect(config?.maxOutputTokens).toBe(ProviderTransform.maxOutputTokens(resolved))
+      },
+    })
+  })
+
+  test("injects Internal State Check block with 'model' role and dynamic agent name", async () => {
+    const providerID = "vivgrid"
+    const modelID = "gemini-3.1-pro-preview"
+    const fixture = await loadFixture(providerID, modelID)
+    const model = fixture.model
+
+    const request = new Promise<Capture>((resolve) => state.queue.push({ path: "/chat/completions", response: new Response(createChatStream("Hello"), { status: 200, headers: { "Content-Type": "text/event-stream" } }), resolve }))
+
+    await using tmp = await tmpdir({
+      init: async (dir) => {
+        await Bun.write(
+          path.join(dir, "epochcli.json"),
+          JSON.stringify({
+            enabled_providers: [providerID],
+            provider: {
+              [providerID]: {
+                options: {
+                  apiKey: "test-key",
+                  baseURL: `${state.server!.url.origin}/v1`,
+                },
+              },
+            },
+          }),
+        )
+      },
+    })
+
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const resolved = await Provider.getModel(ProviderID.make(providerID), ModelID.make(model.id))
+        const sessionID = SessionID.make("session-state-check")
+        const agent = {
+          name: "build",
+          mode: "primary",
+          options: {},
+          permission: [{ permission: "*", pattern: "*", action: "allow" }],
+        } satisfies Agent.Info
+
+        const user = {
+          id: MessageID.make("user-state-check"),
+          sessionID,
+          role: "user",
+          time: { created: Date.now() },
+          agent: agent.name,
+          model: { providerID: ProviderID.make(providerID), modelID: resolved.id },
+        } satisfies MessageV2.User
+
+        const stream = await LLM.stream({
+          user,
+          sessionID,
+          model: resolved,
+          agent,
+          system: { zone1: [], zone2: [] },
+          abort: new AbortController().signal,
+          messages: [{ role: "user", content: "Hello" }],
+          tools: {},
+        })
+
+        for await (const _ of stream.fullStream) {
+        }
+
+        const capture = await request
+        const messages = capture.body.messages as any[]
+        
+        // Find the system messages
+        const systemMessages = messages.filter(m => m.role === "system")
+        expect(systemMessages.length).toBeGreaterThanOrEqual(1)
+        
+        // Find the user message containing state check
+        const userMsg = messages.find(
+          (m) => m.role === "user" && m.content.includes("[INTERNAL STATE CHECK]"),
+        )
+
+        expect(userMsg).toBeDefined()
+        expect(userMsg.content).toContain("Hello")
+        expect(userMsg.content).toContain("Role: Assigned to [BUILD]")
+        expect(userMsg.content).toContain("<|channel>thought")
       },
     })
   })

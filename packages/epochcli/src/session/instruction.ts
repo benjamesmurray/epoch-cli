@@ -248,6 +248,10 @@ export namespace Instruction {
     return runPromise((svc) => svc.systemPaths())
   }
 
+  export function system() {
+    return runPromise((svc) => svc.system())
+  }
+
   export function loaded(messages: MessageV2.WithParts[]) {
     return extract(messages)
   }

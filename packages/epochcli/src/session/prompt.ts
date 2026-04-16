@@ -453,78 +453,82 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           const execute = item.execute
           if (!execute) continue
 
-          const schema = yield* Effect.promise(() => Promise.resolve(asSchema(item.inputSchema).jsonSchema))
+          const schema = yield* Effect.promise(() => Promise.resolve(asSchema(item.parameters).jsonSchema))
           const transformed = ProviderTransform.schema(input.model, schema)
-          item.inputSchema = jsonSchema(transformed)
-          item.execute = (args, opts) =>
-            Effect.runPromise(
-              Effect.gen(function* () {
-                const ctx = context(args, opts)
-                yield* plugin.trigger(
-                  "tool.execute.before",
-                  { tool: key, sessionID: ctx.sessionID, callID: opts.toolCallId },
-                  { args },
-                )
-                yield* Effect.promise(() => ctx.ask({ permission: key, metadata: {}, patterns: ["*"], always: ["*"] }))
-                const result: Awaited<ReturnType<NonNullable<typeof execute>>> = yield* Effect.promise(() =>
-                  execute(args, opts),
-                )
-                yield* plugin.trigger(
-                  "tool.execute.after",
-                  { tool: key, sessionID: ctx.sessionID, callID: opts.toolCallId, args },
-                  result,
-                )
+          const aiTool: AITool = {
+            description: item.description,
+            inputSchema: jsonSchema(transformed),
+            execute: (args, opts) =>
+              Effect.runPromise(
+                Effect.gen(function* () {
+                  const ctx = context(args, { ...opts, toolCallId: opts.toolCallId ?? "" } as any)
+                  yield* plugin.trigger(
+                    "tool.execute.before",
+                    { tool: key, sessionID: ctx.sessionID, callID: opts.toolCallId },
+                    { args },
+                  )
+                  yield* Effect.promise(() => ctx.ask({ permission: key, metadata: {}, patterns: ["*"], always: ["*"] }))
+                  const result: any = yield* Effect.promise(() =>
+                    execute(args, { ...ctx, callID: opts.toolCallId }),
+                  )
+                  yield* plugin.trigger(
+                    "tool.execute.after",
+                    { tool: key, sessionID: ctx.sessionID, callID: opts.toolCallId, args },
+                    result,
+                  )
 
-                const textParts: string[] = []
-                const attachments: Omit<MessageV2.FilePart, "id" | "sessionID" | "messageID">[] = []
-                for (const contentItem of result.content) {
-                  if (contentItem.type === "text") textParts.push(contentItem.text)
-                  else if (contentItem.type === "image") {
-                    attachments.push({
-                      type: "file",
-                      mime: contentItem.mimeType,
-                      url: `data:${contentItem.mimeType};base64,${contentItem.data}`,
-                    })
-                  } else if (contentItem.type === "resource") {
-                    const { resource } = contentItem
-                    if (resource.text) textParts.push(resource.text)
-                    if (resource.blob) {
+                  const textParts: string[] = []
+                  const attachments: Omit<MessageV2.FilePart, "id" | "sessionID" | "messageID">[] = []
+                  const content = result.content || (result.metadata?.content as any[]) || []
+                  for (const contentItem of content) {
+                    if (contentItem.type === "text") textParts.push(contentItem.text)
+                    else if (contentItem.type === "image") {
                       attachments.push({
                         type: "file",
-                        mime: resource.mimeType ?? "application/octet-stream",
-                        url: `data:${resource.mimeType ?? "application/octet-stream"};base64,${resource.blob}`,
-                        filename: resource.uri,
+                        mime: contentItem.mimeType,
+                        url: `data:${contentItem.mimeType};base64,${contentItem.data}`,
                       })
+                    } else if (contentItem.type === "resource") {
+                      const { resource } = contentItem
+                      if (resource.text) textParts.push(resource.text)
+                      if (resource.blob) {
+                        attachments.push({
+                          type: "file",
+                          mime: resource.mimeType ?? "application/octet-stream",
+                          url: `data:${resource.mimeType ?? "application/octet-stream"};base64,${resource.blob}`,
+                          filename: resource.uri,
+                        })
+                      }
                     }
                   }
-                }
 
-                const truncated = yield* truncate.output(textParts.join("\n\n"), {}, input.agent)
-                const metadata = {
-                  ...(result.metadata ?? {}),
-                  truncated: truncated.truncated,
-                  ...(truncated.truncated && { outputPath: truncated.outputPath }),
-                }
+                  const truncated = yield* truncate.output(textParts.join("\n\n") || result.output, {}, input.agent)
+                  const metadata = {
+                    ...(result.metadata ?? {}),
+                    truncated: truncated.truncated,
+                    ...(truncated.truncated && { outputPath: truncated.outputPath }),
+                  }
 
-                return {
-                  title: "",
-                  metadata,
-                  output: truncated.content,
-                  attachments: attachments.map((attachment) => ({
-                    ...attachment,
-                    id: PartID.ascending(),
-                    sessionID: ctx.sessionID,
-                    messageID: input.processor.message.id,
-                  })),
-                  content: result.content,
-                }
-              }),
-            )
+                  return {
+                    title: "",
+                    metadata,
+                    output: truncated.content,
+                    attachments: attachments.map((attachment) => ({
+                      ...attachment,
+                      id: PartID.ascending(),
+                      sessionID: ctx.sessionID,
+                      messageID: input.processor.message.id,
+                    })),
+                    content: content,
+                  }
+                }),
+              ),
+          }
 
           // Filter MCP tools based on agent permissions
           const perm = Permission.evaluate(key, "", mergedPermission)
           if (perm.action === "allow") {
-            tools[key] = item
+            tools[key] = aiTool
           }
         }
 

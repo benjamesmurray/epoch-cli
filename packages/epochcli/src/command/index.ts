@@ -7,6 +7,8 @@ import z from "zod"
 import { Config } from "../config/config"
 import { MCP } from "../mcp"
 import { Skill } from "../skill"
+import { Truncate } from "../tool/truncate"
+import * as CrossSpawnSpawner from "@/effect/cross-spawn-spawner"
 import { Log } from "../util/log"
 import PROMPT_INITIALIZE from "./template/initialize.txt"
 import PROMPT_REVIEW from "./template/review.txt"
@@ -181,7 +183,7 @@ export namespace Command {
     }),
   )
 
-  export const defaultLayer = layer.pipe(
+  export const defaultLayer: Layer.Layer<Service> = layer.pipe(
     Layer.provide(Config.defaultLayer),
     Layer.provide(MCP.defaultLayer),
     Layer.provide(Skill.defaultLayer),

@@ -157,6 +157,7 @@ describe("ProviderTransform.options - google thinkingConfig gating", () => {
     })
     expect(result.thinkingConfig).toEqual({
       includeThoughts: true,
+      thinkingLevel: "low",
     })
   })
 
