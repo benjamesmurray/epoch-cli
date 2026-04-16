@@ -38,9 +38,8 @@ description: ${description}
         directory: tmp.path,
         fn: async () => {
           const build = await Agent.get("build")
-          const model: any = { api: { id: "gpt-4" } }
-          const first = await SystemPrompt.skills(build!, model)
-          const second = await SystemPrompt.skills(build!, model)
+          const first = await SystemPrompt.skills(build!)
+          const second = await SystemPrompt.skills(build!)
 
           expect(first).toBe(second)
 
