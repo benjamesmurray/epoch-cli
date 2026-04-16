@@ -10,7 +10,8 @@ import { ProviderTransform } from "@/provider/transform"
 import { Config } from "@/config/config"
 import { Instance } from "@/project/instance"
 import type { Agent } from "@/agent/agent"
-import type { MessageV2 } from "./message-v2"
+import { MessageV2 } from "./message-v2"
+import { SanitizerMiddleware } from "./sanitizer"
 import { Plugin } from "@/plugin"
 import { SystemPrompt } from "./system"
 import { PromptBuilder, type ZoneStructuredPayload } from "./prompt/builder"
@@ -33,6 +34,8 @@ export namespace LLM {
     agent: Agent.Info
     permission?: Permission.Ruleset
     system: { zone1: string[]; zone2: string[] }
+    operationalFacts?: string[]
+    instructions?: string[]
     messages: ModelMessage[]
     small?: boolean
     tools: Record<string, Tool>
@@ -173,13 +176,25 @@ export namespace LLM {
 
     const payload: ZoneStructuredPayload = {
       zone1_critical_rules: [
-        `Current Phase: [${input.agent.name.toUpperCase()}]. You are restricted to using only the tools currently defined in your schema.`
+        `Current Phase: [${input.agent.name.toUpperCase()}]. You are restricted to using only the tools currently defined in your schema.`,
+        ...input.system.zone1
       ],
-      zone2_context_files: [],
+      zone2_context_files: [...input.system.zone2],
       zone3_active_cursor: [],
+      zone4_guidelines: [],
+    }
+
+    if (input.operationalFacts && input.operationalFacts.length > 0) {
+      payload.zone1_critical_rules.push(...input.operationalFacts)
+      payload.zone3_active_cursor.push(...input.operationalFacts)
+    }
+
+    if (input.instructions && input.instructions.length > 0) {
+      payload.zone4_guidelines.push(...input.instructions)
     }
 
     let activeRulePacks: string[] = ["core_interaction_pack"];
+    let thinkingEffort: "high" | "low" = "low";
 
     // Phase 1: Intent Classification (Clerk / local-side) - Task 1.1
     // The Clerk detects user intent and shifts the active epochcli Agent.
@@ -282,8 +297,8 @@ export namespace LLM {
                 }
             }
 
-            // Concurrently identify agent and rule packs
-            const [identifiedAgentResult, identifiedPacks] = await Promise.all([
+            // Concurrently identify agent, rule packs, and thinking effort
+            const [identifiedAgentResult, identifiedPacks, identifiedEffort] = await Promise.all([
                 (async () => {
                     if (objectionCount >= 2 && requestedAgent) {
                         l.debug("clerk", { message: `Arbitration threshold reached (${objectionCount} objections). Overruling Supervisor with: ${requestedAgent}` });
@@ -295,14 +310,17 @@ export namespace LLM {
                         return RuleRouter.identifyAgent(conversationTail, sideLanguage, groundTruths);
                     }
                 })(),
-                RuleRouter.identifyRulePacks(conversationTail, sideLanguage)
+                RuleRouter.identifyRulePacks(conversationTail, sideLanguage),
+                RuleRouter.identifyThinkingEffort(conversationTail, sideLanguage)
             ]);
 
             identifiedAgent = identifiedAgentResult;
             activeRulePacks = identifiedPacks;
+            thinkingEffort = identifiedEffort;
 
             l.debug("clerk", { message: `Identified agent: ${identifiedAgent}` });
             l.debug("clerk", { message: `Identified rule packs: ${activeRulePacks.join(", ")}` });
+            l.debug("clerk", { message: `Identified thinking effort: ${thinkingEffort}` });
             
             if (identifiedAgent !== input.agent.name) {
                 log.debug("Clerk identified agent shift", { from: input.agent.name, to: identifiedAgent });
@@ -442,6 +460,10 @@ export namespace LLM {
       system.push(header, rest.join("\n"))
     }
 
+    const isWorkflow = language instanceof GitLabWorkflowLanguageModel
+    const isGemma4 = input.model.api?.id?.includes("gemma-4") || input.model.id?.includes("big-pickle")
+    const isReasoningModel = input.model.capabilities.reasoning || isGemma4
+
     const variant =
       !input.small && input.model.variants && input.user.model.variant
         ? input.model.variants[input.user.model.variant]
@@ -452,6 +474,7 @@ export namespace LLM {
           model: input.model,
           sessionID: input.sessionID,
           providerOptions: provider.options,
+          thinkingEffort: isReasoningModel ? thinkingEffort : undefined,
         })
     const options: Record<string, any> = pipe(
       base,
@@ -463,20 +486,36 @@ export namespace LLM {
       options.instructions = system.join("\n")
     }
 
-    const isWorkflow = language instanceof GitLabWorkflowLanguageModel
+    // Positional Prompt Architecture: Assemble Zone-based messages
+    const initialMessages = PromptBuilder.buildMessages(payload, {
+      isGemma4,
+      thinkingEffort: isReasoningModel ? thinkingEffort : undefined
+    })
+    const systemContent = initialMessages
+      .filter((m) => m.role === "system")
+      .map((m) => m.content)
+      .join("\n\n")
+    const otherInitial = initialMessages.filter((m) => m.role !== "system")
+
+    const internalStateCheck = `
+<|channel>thought
+[INTERNAL STATE CHECK]
+- Mode: ${thinkingEffort.toUpperCase()} thinking / Adaptive efficiency active.
+- Role: Assigned to [${input.agent.name.toUpperCase()}].
+- Strategy: mcpx pm_query/pm_plan first. All arguments must be wrapped in <|\\\">.
+- Constraint: 32K token budget. Concise CoT.
+Ready to process user request strictly under these parameters.
+`.trim()
+
     const messages = isOpenaiOauth
       ? input.messages
       : isWorkflow
         ? input.messages
-        : [
-            ...system.map(
-              (x): ModelMessage => ({
-                role: "system",
-                content: x,
-              }),
-            ),
+        : mergeMessages([
+            ...otherInitial,
             ...input.messages,
-          ]
+            { role: "user" as const, content: internalStateCheck },
+          ])
 
     const params = await Plugin.trigger(
       "chat.params",
@@ -589,6 +628,7 @@ export namespace LLM {
     }
 
     return streamText({
+      system: systemContent,
       onFinish(event) {
           // Trigger Phase 3 background worker without awaiting it to allow the stream to finish immediately
           if (provider.id === "local-main") {
@@ -705,8 +745,10 @@ export namespace LLM {
             specificationVersion: "v3" as const,
             async transformParams(args) {
               if (args.type === "stream") {
-                // @ts-expect-error
-                args.params.prompt = ProviderTransform.message(args.params.prompt, input.model, options)
+                const targetMessages = ProviderTransform.message(args.params.prompt as ModelMessage[], input.model, options)
+                const targetKey = ProviderTransform.sdkKey(input.model.api.npm) ?? input.model.providerID
+                const isAzure = input.model.api.npm === "@ai-sdk/azure"
+                args.params.prompt = SanitizerMiddleware.stripProviderOptions(targetMessages, targetKey, isAzure)
               }
               return args.params
             },
@@ -728,7 +770,8 @@ export namespace LLM {
                 phase,
                 activeAgent: input.agent.name,
                 toolCount: Object.keys(tools).length,
-                payload: truncatedPayload
+                payload: truncatedPayload,
+                tools
               }
               l.debug("model execution start", startEvent)
 
@@ -779,7 +822,8 @@ export namespace LLM {
                 phase,
                 activeAgent: input.agent.name,
                 toolCount: Object.keys(tools).length,
-                payload: truncatedPayload
+                payload: truncatedPayload,
+                tools
               }
               l.debug("model execution start", startEvent)
 
@@ -912,6 +956,25 @@ export namespace LLM {
       Permission.merge(input.agent.permission, input.permission ?? []),
     )
     return Record.filter(input.tools, (_, k) => input.user.tools?.[k] !== false && !disabled.has(k))
+  }
+
+  function mergeMessages(messages: ModelMessage[]): ModelMessage[] {
+    const result: ModelMessage[] = []
+    for (const msg of messages) {
+      const last = result[result.length - 1]
+      if (last && last.role === msg.role) {
+        if (typeof last.content === "string" && typeof msg.content === "string") {
+          last.content += "\n\n" + msg.content
+          continue
+        }
+        if (Array.isArray(last.content) && Array.isArray(msg.content)) {
+          last.content.push(...msg.content)
+          continue
+        }
+      }
+      result.push(msg)
+    }
+    return result
   }
 
   // Check if messages contain any tool-call content

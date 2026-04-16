@@ -34,13 +34,14 @@ Projects/
 # Test and Tool Artifacts
 e2e_testing/*_test/
 e2e_testing/harness/test_config_single.json
+e2e_testing/harness/*_config.json
+e2e_testing/results/
 .epochcli/tool/*/
 .project-map/docs/repo_summary/
 .assistant_rules.toon
-projects/active/eventbus*
-projects/completed/eventbus*
-projects/active/transactional-event-bus*
-projects/completed/transactional-event-bus*
-projects/active/conversational-clerk-supervisor*
-projects/completed/conversational-clerk-supervisor*
+projects/
 .agent_logs/
+last_model_payload.json
+zone1_size.txt
+zone3_size.txt
+packages/epochcli/test-regex.js

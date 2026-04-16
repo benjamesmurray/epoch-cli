@@ -21,7 +21,7 @@ export namespace ProviderTransform {
   export const OUTPUT_TOKEN_MAX = Flag.EPOCHCLI_EXPERIMENTAL_OUTPUT_TOKEN_MAX || 32_000
 
   // Maps npm package to the key the AI SDK expects for providerOptions
-  function sdkKey(npm: string): string | undefined {
+  export function sdkKey(npm: string): string | undefined {
     switch (npm) {
       case "@ai-sdk/github-copilot":
         return "copilot"
@@ -142,7 +142,7 @@ export namespace ProviderTransform {
             content: [
               {
                 type: "text",
-                text: "Done.",
+                text: "Thank you for the tool output. Processing...",
               },
             ],
           })
@@ -281,8 +281,14 @@ export namespace ProviderTransform {
     if (
       (model.providerID === "anthropic" ||
         model.providerID === "google-vertex-anthropic" ||
+        model.providerID === "google" ||
+        model.providerID === "local-main" ||
+        model.providerID === "local-side" ||
+        model.api.npm === "@ai-sdk/google" ||
+        model.api.npm === "@ai-sdk/google-vertex" ||
         model.api.id.includes("anthropic") ||
         model.api.id.includes("claude") ||
+        model.api.id.includes("gemini") ||
         model.id.includes("anthropic") ||
         model.id.includes("claude") ||
         model.api.npm === "@ai-sdk/anthropic") &&
@@ -318,7 +324,16 @@ export namespace ProviderTransform {
       })
     }
 
-    return msgs
+    const supportsModelRole =
+      model.api.npm === "@ai-sdk/google" ||
+      model.api.npm === "@ai-sdk/google-vertex"
+
+    return msgs.map((m) => {
+      if (m.role === "assistant" && supportsModelRole) {
+        return { ...m, role: "model" as any }
+      }
+      return m
+    })
   }
 
   export function temperature(model: Provider.Model) {
@@ -745,8 +760,11 @@ export namespace ProviderTransform {
     model: Provider.Model
     sessionID: string
     providerOptions?: Record<string, any>
+    thinkingEffort?: "high" | "low"
   }): Record<string, any> {
     const result: Record<string, any> = {}
+
+    const effort = input.thinkingEffort ?? "low"
 
     // openai and providers using openai package should set store to false by default.
     if (
@@ -762,7 +780,7 @@ export namespace ProviderTransform {
         include: true,
       }
       if (input.model.api.id.includes("gemini-3")) {
-        result["reasoning"] = { effort: "high" }
+        result["reasoning"] = { effort }
       }
     }
 
@@ -788,9 +806,7 @@ export namespace ProviderTransform {
       if (input.model.capabilities.reasoning) {
         result["thinkingConfig"] = {
           includeThoughts: true,
-        }
-        if (input.model.api.id.includes("gemini-3")) {
-          result["thinkingConfig"]["thinkingLevel"] = "high"
+          thinkingLevel: effort
         }
       }
     }

@@ -42,6 +42,43 @@ export class SanitizerMiddleware {
     }
   }
 
+  static stripProviderOptions(messages: any[], targetKey: string, isAzure: boolean = false): any[] {
+    for (const msg of messages) {
+      if (msg.providerOptions) {
+        const newOptions: Record<string, any> = {}
+        if (msg.providerOptions[targetKey]) newOptions[targetKey] = msg.providerOptions[targetKey]
+        if (isAzure) {
+          if (msg.providerOptions["openai"]) newOptions["openai"] = msg.providerOptions["openai"]
+          if (msg.providerOptions["azure"]) newOptions["azure"] = msg.providerOptions["azure"]
+        }
+        if (Object.keys(newOptions).length > 0) {
+          msg.providerOptions = newOptions
+        } else {
+          delete msg.providerOptions
+        }
+      }
+      
+      if (Array.isArray(msg.content)) {
+        for (const part of msg.content) {
+          if (part.providerOptions) {
+            const newPartOptions: Record<string, any> = {}
+            if (part.providerOptions[targetKey]) newPartOptions[targetKey] = part.providerOptions[targetKey]
+            if (isAzure) {
+              if (part.providerOptions["openai"]) newPartOptions["openai"] = part.providerOptions["openai"]
+              if (part.providerOptions["azure"]) newPartOptions["azure"] = part.providerOptions["azure"]
+            }
+            if (Object.keys(newPartOptions).length > 0) {
+              part.providerOptions = newPartOptions
+            } else {
+              delete part.providerOptions
+            }
+          }
+        }
+      }
+    }
+    return messages
+  }
+
   static transform(): <R, E>(stream: Stream.Stream<LLM.Event, E, R>) => Stream.Stream<LLM.Event, E, R> {
     return <R, E>(stream: Stream.Stream<LLM.Event, E, R>) => {
       let buffer = ""

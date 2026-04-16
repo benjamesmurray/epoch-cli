@@ -1522,8 +1522,8 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                 if (format.type === "json_schema") zone1.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
 
                 const system = {
-                  zone1: [zone1.join("\\n\\n")].filter(Boolean),
-                  zone2: [instructions.join("\\n\\n")].filter(Boolean),
+                  zone1: zone1.filter(Boolean),
+                  zone2: instructions.filter(Boolean),
                 }
 
                 const result = yield* handle.process({
