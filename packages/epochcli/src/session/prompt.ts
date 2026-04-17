@@ -1368,7 +1368,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
               const isOneShot = msgs.some(m => m.info.role === "user" && m.parts.some(p => p.type === "text" && p.text.includes("ONE-SHOT mode")));
               if (isOneShot) {
                 log.info("One-Shot mode active. Auto-continuing after text response.", { sessionID })
-                const newMsgId = MessageID.make()
+                const newMsgId = MessageID.ascending()
                 yield* sessions.updateMessage({
                     id: newMsgId,
                     sessionID,

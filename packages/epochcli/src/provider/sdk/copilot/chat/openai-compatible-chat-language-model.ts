@@ -491,7 +491,6 @@ export class OpenAICompatibleChatLanguageModel implements LanguageModelV3 {
               controller.enqueue({
                 type: "reasoning-delta",
                 id: "reasoning-0",
-                textDelta: reasoningContent,
                 delta: reasoningContent,
               })
               }
@@ -519,7 +518,7 @@ export class OpenAICompatibleChatLanguageModel implements LanguageModelV3 {
 
               controller.enqueue({
                 type: "text-delta",
-                textDelta: delta.content,
+                id: "txt-0",
                 delta: delta.content,
               })
               }
@@ -617,7 +616,6 @@ export class OpenAICompatibleChatLanguageModel implements LanguageModelV3 {
                 controller.enqueue({
                   type: "tool-input-delta",
                   id: toolCall.id,
-                  inputTextDelta: toolCallDelta.function.arguments ?? "",
                   delta: toolCallDelta.function.arguments ?? "",
                 })
 
