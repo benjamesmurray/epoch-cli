@@ -50,6 +50,8 @@ export class AgentRunner {
             "-e", "GITHUB_TOKEN=mock-token-for-docker",
             "-e", "GITHUB_MODELS_TOKEN=mock-token-for-docker",
             "-e", "XDG_DATA_HOME=/workspace/.local/share",
+            "-e", "XDG_CONFIG_HOME=/workspace/.config",
+            "-e", "PATH=/workspace/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
             "-e", "EPOCHCLI_LIBC=glibc"
         ];
         if (docker.memoryLimit) {

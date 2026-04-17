@@ -86,7 +86,10 @@ export class SanitizerMiddleware {
 
       return Stream.flatMap(stream, (event) => {
         if (event.type === "text-delta") {
-          const delta = (event as any).textDelta || (event as any).text
+          const delta = (event as any).textDelta || (event as any).text || (event as any).delta
+          if (typeof delta !== "string") {
+            return Stream.succeed(event)
+          }
           buffer += delta
 
           if (!inToolCall && SanitizerMiddleware.TOOL_CALL_START_REGEX.test(buffer)) {
@@ -100,7 +103,7 @@ export class SanitizerMiddleware {
               return Stream.succeed({
                 type: "text-delta",
                 textDelta: repaired,
-                  text: repaired
+                delta: repaired
               } as unknown as LLM.Event)
             } else {
               // Buffer

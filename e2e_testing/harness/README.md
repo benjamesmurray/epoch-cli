@@ -31,6 +31,28 @@ The harness generates a comprehensive audit trail for every run in `e2e_testing/
 - **`prompts.json`**: The full conversation history (all turns) with exact prompt content.
 - **`variance_report.md`**: A summary report aggregating metrics (TPS, TTFT, Duration, Status) across all iterations for statistical analysis.
 
+## Log Analysis & Diagnostics
+
+For deep-dive analysis of a specific run (e.g., diagnosing thinking loops or function calling failures), two diagnostic tools are available:
+
+### 1. Epoch Log Analyzer (Recommended)
+A robust, turn-aware diagnostic tool that audits intervention efficacy and composition failures.
+- **Location**: `epoch-log-analyzer/`
+- **Features**: Detects Streaming Loop abortions, Phase Stagnation nudges, and MCPX Composition failures (invalid params, unknown arguments).
+- **Usage**:
+  ```bash
+  cd epoch-log-analyzer
+  bun run src/index.ts <path_to_run.log>
+  ```
+
+### 2. Quick Summary Utility
+A lightweight script for a fast, turn-by-turn overview of the execution flow.
+- **Location**: `e2e_testing/harness/summarize_log.cjs`
+- **Usage**:
+  ```bash
+  node summarize_log.cjs <path_to_run.log>
+  ```
+
 ## Container Specifications
 
 The tests run inside ephemeral Docker containers (`epochcli-eval-env`) built via `build-image.sh`. The container environment simulates a clean, isolated local developer machine with the following specs:

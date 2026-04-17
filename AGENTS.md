@@ -28,37 +28,37 @@
 
 ## MCPX Tooling & Execution Guide
 
-You have access to a terminal environment via the `mcpx` tool. You must not look for raw JSON-RPC schemas; instead, you will interface with all external capabilities using standard shell commands.
+You have access to a terminal environment with pre-installed command shims for MCP capabilities. You must interface with all external capabilities using standard shell commands.
 
-**Universal Syntax:** You must always route your commands through the `mcpx` CLI using the following exact structure:
-`mcpx <server_name> <tool_name> [--flag=value]`
+**Universal Syntax:**
+`<shim_name> <tool_name> [--flag=value]`
 
 **Self-Discovery (CRITICAL):**
-If you do not know the exact arguments for a specific tool, **do not guess**. Run the help command first to pull the schema-aware documentation:
-`mcpx <server_name> <tool_name> --help`
+If you do not know the exact arguments for a specific tool, **do not guess**. Run the help command first:
+`<shim_name> <tool_name> --help`
 
-### 1. Project Constitution & Rules (`ground-truth-cli`)
-Use this server to read the rigid behavioral constraints and technical context of the current repository. *If starting a new session, run the scan to orient yourself.*
-* **Check Orientation:** `mcpx ground-truth-cli gt_status`
-* **Scan Repo & Build Rules:** `mcpx ground-truth-cli gt_exec --action="scan" --path="."`
-* **Force Rule Refresh:** `mcpx ground-truth-cli gt_refresh`
+### 1. Project Constitution & Rules (`ground`)
+Use this to read behavioral constraints. *Always run the scan to orient yourself in a new session.*
+* **Check Orientation:** `ground gt_status`
+* **Scan Repo & Build Rules:** `ground gt_exec --action="scan" --path="."`
+* **Force Rule Refresh:** `ground gt_refresh`
 
-### 2. Workflow State Machine (`mcp-spec-cli`)
-Use this server to manage your workflow state (Requirements → Design → Tasks). Do not manage this state in your own memory; rely on the CLI.
-* **Start a New Feature:** `mcpx mcp-spec-cli sc_init --name="<feature_name>"`
-* **Pull Phase Instructions:** `mcpx mcp-spec-cli sc_guidance` (Run this if you are ever confused about what to do next).
-* **Progress the Workflow:** `mcpx mcp-spec-cli sc_plan --instruction="<optional_context>"`
-* **Approve Drafted Phase:** `mcpx mcp-spec-cli sc_approve`
-* **Manage Tasks:** `mcpx mcp-spec-cli sc_todo_list` / `mcpx mcp-spec-cli sc_todo_start --id="<task_id>"` / `mcpx mcp-spec-cli sc_todo_complete --id="<task_id>"`
+### 2. Workflow State Machine (`spec`)
+Use this to manage your workflow state (Requirements → Design → Tasks).
+* **Start a New Feature:** `spec sc_init --name="<feature_name>"`
+* **Pull Phase Instructions:** `spec sc_guidance`
+* **Progress the Workflow:** `spec sc_plan --instruction="<optional_context>"`
+* **Approve Drafted Phase:** `spec sc_approve`
+* **Manage Tasks:** `spec sc_todo_list` / `spec sc_todo_start --id="<task_id>"` / `spec sc_todo_complete --id="<task_id>"`
 
-### 3. Codebase Navigation (`project-map-cli`)
-Use this server to read and understand the repository architecture without reading raw, token-heavy files. It responds in dense TOON (Token-Oriented Object Notation).
-* **Initialize/Refresh Map:** `mcpx project-map-cli pm_init --profile=light`
-* **Check Map Status:** `mcpx project-map-cli pm_status`
-* **Search for Symbols/Context:** `mcpx project-map-cli pm_query --query="<search_string>"` or `--path="<file_path>"`
-* **Analyze Blast Radius:** `mcpx project-map-cli pm_plan --fqn="<fully_qualified_name>"`
+### 3. Codebase Navigation (`map`)
+Use this to understand repository architecture via dense TOON (Token-Oriented Object Notation).
+* **Initialize/Refresh Map:** `map pm_init --profile=light`
+* **Check Map Status:** `map pm_status`
+* **Search for Symbols/Context:** `map pm_query --query="<search_string>"` or `--path="<file_path>"`
+* **Analyze Blast Radius:** `map pm_plan --fqn="<fully_qualified_name>"`
 
-**Execution Rule:** When invoking these via your `mcpx` JSON tool, map the server name to the `server` parameter, the tool name to the `tool` parameter, and supply the flags accurately in the `flags` or `args` payload.
+**Execution Rule:** When invoking these via your `mcpx` JSON tool, map the shim name (e.g., `spec`) to the `server` parameter, the tool name (e.g., `sc_init`) to the `tool` parameter, and supply flags in the `flags` payload.
 
 ## Behavioral Constraints
 Trigger: Generating code in response to a user prompt.

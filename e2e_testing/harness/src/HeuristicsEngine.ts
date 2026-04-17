@@ -43,7 +43,12 @@ export class HeuristicsEngine {
                 payload: parsedPayload,
                 tools: toolsMatch ? JSON.parse(toolsMatch[1]) : []
             });
-            console.log(`    [${this.runId}] ✅ Captured initial payload (${payloadMatch[1].length} bytes)`);
+            console.log(`    [${this.runId}] ✅ Captured turn payload (${this.fullPrompts.length} turns so far, ${payloadMatch[1].length} bytes)`);
+            
+            // Doom Loop Escape Hatch: If we reach an unreasonable number of turns, kill the process to save resources
+            if (this.fullPrompts.length > 30) {
+              throw new LoopException(`Agent exceeded maximum turn threshold (30 turns). Aborting to prevent doom loop.`);
+            }
           } catch (parseErr: any) {
             console.log(`    [${this.runId}] ❌ Failed to parse payload JSON: ${parseErr.message}`);
           }

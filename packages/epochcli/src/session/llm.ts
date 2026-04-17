@@ -21,10 +21,20 @@ import { Auth } from "@/auth"
 import { Installation } from "@/installation"
 import { ToonEncoder } from "@/util/toon"
 import { MCP } from "@/mcp/index"
+import { StreamingMonitor } from "./llm/monitor"
+import { SchemaContextLoader } from "@/mcp/schema-loader"
 
 export namespace LLM {
   const log = Log.create({ service: "llm" })
   export const OUTPUT_TOKEN_MAX = ProviderTransform.OUTPUT_TOKEN_MAX
+
+  interface SessionMetadata {
+    phaseTurnCount: number
+    lastPhase: string
+    consecutiveFailures: Map<string, number>
+  }
+
+  const sessionMetadata = new Map<string, SessionMetadata>()
 
   export type StreamInput = {
     user: MessageV2.User
@@ -165,6 +175,20 @@ export namespace LLM {
       modelID: input.model.id,
       providerID: input.model.providerID,
     })
+
+    // Update Session Metadata for Turn Tracking & Stagnation Detection
+    let meta = sessionMetadata.get(input.sessionID)
+    if (!meta) {
+      meta = { phaseTurnCount: 0, lastPhase: input.agent.name, consecutiveFailures: new Map() }
+      sessionMetadata.set(input.sessionID, meta)
+    }
+
+    if (meta.lastPhase !== input.agent.name) {
+      meta.phaseTurnCount = 0
+      meta.lastPhase = input.agent.name
+    }
+    meta.phaseTurnCount++
+
     const [language, cfg, provider, auth] = await Promise.all([
       Provider.getLanguage(input.model),
       Config.get(),
@@ -176,7 +200,7 @@ export namespace LLM {
 
     const payload: ZoneStructuredPayload = {
       zone1_critical_rules: [
-        `Current Phase: [${input.agent.name.toUpperCase()}]. You are restricted to using only the tools currently defined in your schema.`,
+        `Current Phase: [${input.agent.name.toUpperCase()}]. The Supervisor (Clerk) has restricted you to this phase. If you are ready to write source code, you MUST use the object_to_supervisor tool to request a shift to the [BUILD] phase.`,
       ],
       zone2_context_files: [...input.system.zone2],
       zone3_active_cursor: [],
@@ -194,6 +218,13 @@ export namespace LLM {
 
     if (input.instructions && input.instructions.length > 0) {
       payload.zone4_guidelines.push(...input.instructions)
+    }
+
+    // Phase Stagnation Detection (Task 3.2)
+    if (input.agent.name === "plan" && meta.phaseTurnCount >= 8) {
+      const nudge = `Supervisor Note: You have been in the [PLAN] phase for ${meta.phaseTurnCount} turns. If the implementation plan is complete and tasks are defined, you should run 'sc_approve' to transition to the [BUILD] phase.`
+      payload.zone1_critical_rules.push(nudge)
+      l.info("stagnation nudge", { turnCount: meta.phaseTurnCount })
     }
 
     let activeRulePacks: string[] = ["core_interaction_pack"];
@@ -332,7 +363,7 @@ export namespace LLM {
                     l.debug("clerk", { message: `SHIFTING agent to: ${identifiedAgent}` });
                     input.agent = newAgent;
                     // Update the directive in Zone 1
-                    payload.zone1_critical_rules[0] = `Current Phase: [${input.agent.name.toUpperCase()}]. You are restricted to using only the tools currently defined in your schema.`;
+                    payload.zone1_critical_rules[0] = `Current Phase: [${input.agent.name.toUpperCase()}]. The Supervisor (Clerk) has restricted you to this phase. If you are ready to write source code, you MUST use the object_to_supervisor tool to request a shift to the [BUILD] phase.`;
                 }
             }
         }
@@ -509,6 +540,23 @@ export namespace LLM {
 Ready to process user request strictly under these parameters.
 `.trim()
 
+    // Truncate older proactive validation errors to prevent streaming loops and context bloat
+    let validationErrorCount = 0;
+    for (let i = input.messages.length - 1; i >= 0; i--) {
+      const msg = input.messages[i];
+      if (msg.role === 'tool' && Array.isArray(msg.content)) {
+        for (let j = 0; j < msg.content.length; j++) {
+          const part: any = msg.content[j];
+          if (part.type === 'tool-result' && part.isError && typeof part.result === 'string' && part.result.includes('INVALID ARGUMENTS:')) {
+            validationErrorCount++;
+            if (validationErrorCount > 2) {
+              part.result = 'INVALID ARGUMENTS: [TRUNCATED - Refer to most recent validation error]';
+            }
+          }
+        }
+      }
+    }
+
     const messages = isOpenaiOauth
       ? input.messages
       : isWorkflow
@@ -567,7 +615,84 @@ Ready to process user request strictly under these parameters.
             cfg,
           })
           if (interception) return interception
-          return originalExecute(args, options)
+          
+          let result;
+          let isError = false;
+          try {
+            result = await originalExecute(args, options)
+          } catch (e: any) {
+            result = e;
+            isError = true;
+          }
+
+          const resultStr = typeof result === 'string' ? result : (result instanceof Error ? String(result.message || result) : JSON.stringify(result))
+          
+          // Task 1.1: Auto-Fallback for sc_guidance prerequisite
+          if (resultStr.includes("You must run `spec sc_guidance`") || resultStr.includes("You must run \\`spec sc_guidance\\`")) {
+            log.info("Auto-fallback triggered for missing prerequisite sc_guidance")
+            let guidanceOutput = ""
+            try {
+              const allTools = resolveTools(input)
+              const guidanceToolKey = Object.keys(allTools).find(k => k.includes("sc_guidance"))
+              if (guidanceToolKey && allTools[guidanceToolKey] && allTools[guidanceToolKey].execute) {
+                const guidanceResult = await allTools[guidanceToolKey].execute!({}, options)
+                guidanceOutput = typeof guidanceResult === 'string' ? guidanceResult : JSON.stringify(guidanceResult)
+              } else if (allTools["mcpx"] && allTools["mcpx"].execute) {
+                const guidanceResult = await allTools["mcpx"].execute!({ server: "mcp-spec-cli", tool: "sc_guidance", flags: {} }, options)
+                guidanceOutput = typeof guidanceResult === 'string' ? guidanceResult : JSON.stringify(guidanceResult)
+              }
+            } catch (fallbackError) {
+              guidanceOutput = "Failed to auto-execute sc_guidance: " + String(fallbackError)
+            }
+            
+            const hybridResponse = "System overriding sc_approve. Prerequisite missing. Auto-executing sc_guidance. Here is the guidance you must review... Read this, then you may call sc_approve.\n\n" + guidanceOutput;
+            if (isError) {
+                return hybridResponse;
+            } else {
+                return hybridResponse;
+            }
+          }
+
+          // Task 2.1 & 2.2: Clerk Interceptor (Middleware) for generic prerequisite errors
+          if (isError && (resultStr.includes("You must run") || resultStr.includes("prerequisite"))) {
+             if (provider.id === "local-main") {
+                 try {
+                     log.info("Triggering Clerk Interceptor for prerequisite error")
+                     const sideModel = await Provider.getModel("local-side" as any, "nemotron-3-nano-4b" as any)
+                     const sideLanguage = await Provider.getLanguage(sideModel)
+                     
+                     // Build history string
+                     const tailCount = 5;
+                     const recentMessages = (options.messages ?? input.messages).slice(-tailCount);
+                     const historyStr = recentMessages.map((m: any) => `${m.role}: ${typeof m.content === 'string' ? m.content : JSON.stringify(m.content).slice(0, 200)}`).join("\n")
+                     
+                     const systemPrompt = "Look at the last tool error and the chat history. Write a concise, commanding one-sentence instruction telling the main agent exactly which tool to use next to resolve the prerequisite."
+                     const prompt = `History:\n${historyStr}\n\nTool Error:\n${resultStr}\n\nDirective:`
+                     
+                     const { generateText } = await import("ai")
+                     const res = await generateText({
+                       model: sideLanguage,
+                       system: systemPrompt,
+                       prompt: prompt,
+                       abortSignal: AbortSignal.timeout(10000),
+                       maxRetries: 0,
+                     })
+                     
+                     const clerkText = res.text.trim()
+                     if (clerkText) {
+                         log.info("Clerk interceptor generated directive", { directive: clerkText })
+                         throw new Error(`CRITICAL SYSTEM DIRECTIVE: ${clerkText}\n\nOriginal Error:\n${resultStr}`)
+                     }
+                 } catch (clerkErr) {
+                     log.warn("Clerk interceptor failed", { error: String(clerkErr) })
+                 }
+             }
+          }
+
+          if (isError) {
+             throw result;
+          }
+          return result
         },
       }
     })
@@ -833,15 +958,37 @@ Ready to process user request strictly under these parameters.
                 const { stream, ...rest } = await doStream()
                 let firstTokenTime: number | undefined
                 let tokenCount = 0
+                const monitor = new StreamingMonitor()
 
                 const iterator = (async function* () {
                    for await (const chunk of (stream as any)) {
-                      if (!firstTokenTime && chunk.type === "text-delta") {
+                      const textDelta = chunk.textDelta ?? chunk.delta
+                      if (!firstTokenTime && chunk.type === "text-delta" && textDelta) {
                          firstTokenTime = Date.now()
                       }
                       if (chunk.type === "text-delta" || chunk.type === "tool-call-delta") {
                          tokenCount++
                       }
+
+                      if (chunk.type === "text-delta" && typeof textDelta === "string") {
+                        if (monitor.push(textDelta)) {
+                           const offendingText = monitor.getOffendingText()
+                           l.warn("Streaming loop detected, aborting...", { offendingText })
+
+                           // Signal abortion to the provider if possible (though we only have the signal)
+                           try {
+                             (input.abort as any).dispatchEvent?.(new Event("abort"))
+                           } catch (e) {}
+
+                           yield {
+                             type: "text-delta",
+                             textDelta: `\n\n[SYSTEM INTERVENTION: Thinking loop detected. Offending sequence: "${offendingText}". Generation aborted.]`,
+                             delta: `\n\n[SYSTEM INTERVENTION: Thinking loop detected. Offending sequence: "${offendingText}". Generation aborted.]`
+                           } as any
+                           return
+                        }
+                      }
+
                       yield chunk
                    }
                 })();
@@ -862,7 +1009,8 @@ Ready to process user request strictly under these parameters.
                           toolCount: Object.keys(tools).length,
                           metrics: {
                             ttftMs: firstTokenTime ? firstTokenTime - startTime : undefined,
-                            tps: (tokenCount && firstTokenTime) ? (tokenCount / ((endTime - firstTokenTime) / 1000)) : undefined
+                            tps: (tokenCount && firstTokenTime) ? (tokenCount / ((endTime - firstTokenTime) / 1000)) : undefined,
+                            loop_detected: monitor.getOffendingText() !== undefined
                           }
                         }
                         l.debug("model execution end", endEvent)
@@ -917,8 +1065,13 @@ Ready to process user request strictly under these parameters.
 
                    const iterator = (async function* () {
                       for await (const chunk of (stream as any)) {
-                         if (chunk.type === "text-delta" && typeof chunk.textDelta === "string") {
-                            chunk.textDelta = chunk.textDelta.replace(/<\|">/g, "```")
+                         if (chunk.type === "text-delta") {
+                            if (typeof chunk.textDelta === "string") {
+                               chunk.textDelta = chunk.textDelta.replace(/<\|">/g, "```")
+                            }
+                            if (typeof chunk.delta === "string") {
+                               chunk.delta = chunk.delta.replace(/<\|">/g, "```")
+                            }
                          }
                          yield chunk
                       }
@@ -991,6 +1144,79 @@ Ready to process user request strictly under these parameters.
     return false
   }
 
+  /**
+   * Normalizes mcpx tool arguments (pos/flags) into a single object for validation.
+   */
+  function normalizeMcpxArguments(args: any): Record<string, any> {
+    const normalized: Record<string, any> = {};
+    
+    // Extract from flags
+    if (args.flags && typeof args.flags === 'object') {
+      Object.assign(normalized, args.flags);
+    }
+    
+    // Extract from args (heuristic for common patterns)
+    if (Array.isArray(args.args)) {
+      for (let i = 0; i < args.args.length; i++) {
+        const arg = args.args[i];
+        if (typeof arg === 'string' && arg.startsWith('--')) {
+          const parts = arg.slice(2).split('=');
+          const key = parts[0];
+          const val = parts.length > 1 ? parts[1] : args.args[i+1];
+          if (key) {
+            normalized[key] = val;
+            if (parts.length === 1) i++; // skip next since it was used as value
+          }
+        }
+      }
+    }
+    
+    return normalized;
+  }
+
+  /**
+   * Performs a proactive validation turn with the Clerk.
+   */
+  async function validateArgumentsProactively(input: {
+    toolName: string,
+    args: any,
+    schema: any,
+    provider: any,
+    cfg: Config.Info,
+    isMcpx?: boolean,
+    mcpxServer?: string,
+    l: any
+  }): Promise<string | null> {
+    try {
+      const sideLanguage = await Provider.getLanguage(
+        await Provider.getModel("local-side" as any, "nemotron-3-nano-4b" as any)
+      );
+
+      const systemPrompt = input.isMcpx
+        ? `You are a tool argument validator. The user is attempting to call a sub-tool via the 'mcpx' tool wrapper. Compare the proposed SUB-TOOL arguments with the provided JSON schema. If they are valid, output 'VALID'. If they are invalid, output 'INVALID: <concise_reason> EXAMPLE: <strict_valid_json_example>'. You MUST explicitly explain what was missing or incorrect. CRITICAL: Your JSON example MUST be formatted for the 'mcpx' wrapper tool, which expects \`{ "server": "${input.mcpxServer}", "tool": "${input.toolName}", "flags": <valid_sub_tool_args_as_key_value_pairs> }\`. Do not just provide the sub-tool args, wrap them in the mcpx tool structure!`
+        : `You are a tool argument validator. Compare the proposed arguments with the provided JSON schema. If they are valid, output 'VALID'. If they are invalid, output 'INVALID: <concise_reason> EXAMPLE: <strict_valid_json_example>'. You MUST explicitly explain what was missing or incorrect, and provide a strict, concrete JSON example of what the valid arguments should look like according to the schema.`;
+
+      const prompt = `Tool: ${input.toolName}\nProposed Args: ${JSON.stringify(input.args)}\nSchema: ${JSON.stringify(input.schema)}`;
+
+      const res = await generateText({
+        model: sideLanguage,
+        system: systemPrompt,
+        prompt: `${prompt}\n\nValidation Result:`,
+        abortSignal: AbortSignal.timeout(10000),
+        maxRetries: 0,
+      });
+
+      const result = res.text.trim();
+      if (result.startsWith('INVALID')) {
+        return result.replace(/^INVALID:\s*/, '');
+      }
+      return null;
+    } catch (e) {
+      input.l.warn("Proactive validation failed", { error: String(e) });
+      return null; // Graceful fall-through
+    }
+  }
+
   export async function interceptToolLoop(input: {
     toolName: string
     args: any
@@ -998,6 +1224,62 @@ Ready to process user request strictly under these parameters.
     provider: any
     cfg: Config.Info
   }) {
+    const l = log.clone();
+
+    // Task: Proactive Validation (Clerk / local-side)
+    if (input.provider.id === "local-main") {
+      try {
+        let schemaToolName = input.toolName;
+        let validationArgs = input.args;
+
+        let schema: any = undefined;
+
+        let isMcpx = false;
+        let mcpxServer = "";
+
+        // Specialized handling for mcpx sub-tools
+        if (input.toolName === "mcpx" && input.args.server && input.args.tool) {
+           isMcpx = true;
+           mcpxServer = input.args.server;
+           schemaToolName = input.args.tool;
+           validationArgs = normalizeMcpxArguments(input.args);
+           schema = await SchemaContextLoader.getMcpxToolSchema(
+             input.args.server, 
+             input.args.tool, 
+             input.cfg.mcpx?.binaryPath
+           );
+        } else {
+           schema = await SchemaContextLoader.getToolSchema(schemaToolName);
+        }
+
+        if (schema) {
+          log.info("Performing proactive validation", { tool: schemaToolName });
+          const hint = await validateArgumentsProactively({
+            toolName: schemaToolName,
+            args: validationArgs,
+            schema,
+            provider: input.provider,
+            cfg: input.cfg,
+            isMcpx,
+            mcpxServer,
+            l
+          });
+
+          if (hint) {
+            log.info("Proactive validation caught error", { tool: schemaToolName, hint });
+            return {
+              error: `INVALID ARGUMENTS: ${hint}`,
+              output: "",
+              title: "Argument Validation",
+              metadata: { schema_validated: true, proactive: true },
+            };
+          }
+        }
+      } catch (e) {
+        l.warn("Proactive validation turn failed", { error: String(e) });
+      }
+    }
+
     // Task 4.2: Arbitration Mechanism
     if (input.toolName === "object_to_supervisor") {
         return {
@@ -1063,6 +1345,41 @@ Ready to process user request strictly under these parameters.
 
     const isIdenticalLoop = identicalCount >= 3
     const isFailureLoop = sequentialFailureCount >= 3
+
+    // Schema-Aware Error Recovery (Task 2.2)
+    if (sequentialFailureCount >= 2 && !isIdenticalLoop && !isFailureLoop) {
+      try {
+        const schema = await SchemaContextLoader.getToolSchema(input.toolName)
+        if (schema && input.provider.id === "local-main") {
+          log.debug("Generating schema-aware correction hint with local-side Clerk")
+          const sideLanguage = await Provider.getLanguage(
+            await Provider.getModel("local-side" as any, "nemotron-3-nano-4b" as any),
+          )
+
+          const systemPrompt =
+            "You are a tool argument validator. Compare the failed arguments with the provided JSON schema. Identify the mistake and provide a concise, helpful correction hint. Do not be verbose. Example: 'You are using --path, but sc_guidance accepts no arguments. Try calling it without flags.'"
+
+          const prompt = `Tool: ${input.toolName}\nFailed Args: ${JSON.stringify(input.args)}\nSchema: ${JSON.stringify(schema)}`
+
+          const hint = await generateText({
+            model: sideLanguage,
+            system: systemPrompt,
+            prompt: `${prompt}\n\nCorrection Hint:`,
+            abortSignal: AbortSignal.timeout(10000),
+            maxRetries: 0,
+          })
+
+          return {
+            error: `INVALID ARGUMENTS: ${hint.text}`,
+            output: "",
+            title: "Argument Validation",
+            metadata: { schema_validated: true },
+          }
+        }
+      } catch (e) {
+        log.warn("Failed to generate schema-aware hint", { error: String(e) })
+      }
+    }
 
     if (isIdenticalLoop || isFailureLoop) {
       const loopType = isIdenticalLoop ? "IDENTICAL_ARGS" : "SEQUENTIAL_FAILURES"

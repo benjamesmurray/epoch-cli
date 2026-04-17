@@ -43,21 +43,7 @@ export class WorkspaceBuilder {
         }
       },
       "model": "local-main/gemma-4-26b-q4-xl",
-      "mcp": {
-        ...config.epochcli?.mcp,
-        "mcp-spec-cli": {
-          "type": "local",
-          "command": ["mcp-spec-cli"]
-        },
-        "project-map-cli": {
-          "type": "local",
-          "command": ["/opt/project-map-cli-env/bin/python", "-m", "project_map_cli.mcp.server"]
-        },
-        "ground-truth-cli": {
-          "type": "local",
-          "command": ["ground-truth-cli"]
-        }
-      },
+      "mcp": {},
       "experimental": {
         "mcp_timeout": 120000
       },
@@ -79,14 +65,24 @@ export class WorkspaceBuilder {
     await fs.mkdir(mcpxConfigDir, { recursive: true });
     const mcpxConfig = `
 [servers.mcp-spec-cli]
-command = "mcp-spec-cli"
+command = "/usr/local/bin/mcp-spec-cli"
+
+[servers.spec]
+command = "/usr/local/bin/mcp-spec-cli"
 
 [servers.project-map-cli]
 command = "/opt/project-map-cli-env/bin/python"
 args = ["-m", "project_map_cli.mcp.server"]
 
+[servers.map]
+command = "/opt/project-map-cli-env/bin/python"
+args = ["-m", "project_map_cli.mcp.server"]
+
 [servers.ground-truth-cli]
-command = "ground-truth-cli"
+command = "/usr/local/bin/ground-truth-cli"
+
+[servers.ground]
+command = "/usr/local/bin/ground-truth-cli"
 `;
     await fs.writeFile(
       path.join(mcpxConfigDir, "config.toml"),
@@ -98,10 +94,35 @@ command = "ground-truth-cli"
     const { exec } = await import("child_process");
     const { promisify } = await import("util");
     const execAsync = promisify(exec);
+    
     try {
         await execAsync("git init", { cwd: hostRunDir });
     } catch (e) {
-        // Ignore if git is not available on host, though it should be
+        // Ignore if git is not available on host
+    }
+
+    // Install shims for the servers
+    try {
+        const shimDir = path.join(hostRunDir, ".local", "bin");
+        await fs.mkdir(shimDir, { recursive: true });
+        
+        const writeShim = async (name: string, server: string) => {
+            const content = `#!/bin/sh\n# mcpx-shim:server=${server}\nexec mcpx '${server}' "$@"\n`;
+            await fs.writeFile(path.join(shimDir, name), content, { mode: 0o755 });
+        };
+        
+        // Full name shims
+        await writeShim("mcp-spec-cli", "mcp-spec-cli");
+        await writeShim("project-map-cli", "project-map-cli");
+        await writeShim("ground-truth-cli", "ground-truth-cli");
+
+        // Short aliases (for AGENTS.md instructions)
+        await writeShim("spec", "mcp-spec-cli");
+        await writeShim("map", "project-map-cli");
+        await writeShim("ground", "ground-truth-cli");
+
+    } catch (e) {
+        console.error("Failed to install shims manually:", e);
     }
 
     // Mock an auth.json to bypass the "no providers found" crash gracefully

@@ -36,7 +36,17 @@ Epoch CLI utilizes a refined **Positional Prompt Architecture** to exploit the t
 Includes a robust E2E variance testing harness that monitors:
 - **Performance Metrics**: Real-time tracking of Tokens Per Second (TPS) and Time-To-First-Token (TTFT).
 - **Architectural Validation**: Detailed logging of `activeAgent` transitions, `toolCount` reduction, and full `tools` definition payloads.
-- **Stability Monitoring**: Automated tracking of JSON repair rates and loop detection interventions.
+- **Stability Monitoring**: Automated tracking of JSON repair rates, loop detection interventions, and "Doom Loop" test aborts.
+
+#### 1. Epoch Log Analyzer (Recommended)
+A robust, turn-aware diagnostic tool that audits intervention efficacy and composition failures from the test harness.
+- **Location**: `epoch-log-analyzer/`
+- **Features**: Detects Streaming Loop abortions, Phase Stagnation nudges, and MCPX Composition failures (invalid params, unknown arguments).
+- **Usage**:
+  ```bash
+  cd epoch-log-analyzer
+  bun run src/index.ts <path_to_run.log>
+  ```
 
 ## Getting Started
 

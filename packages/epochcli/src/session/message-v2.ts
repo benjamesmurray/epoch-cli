@@ -604,6 +604,10 @@ export namespace MessageV2 {
 
     const toModelOutput = (options: { toolCallId: string; input: unknown; output: unknown }) => {
       const output = options.output
+      if (output === null || output === undefined) {
+        return { type: "text", value: "" }
+      }
+
       if (typeof output === "string") {
         return { type: "text", value: output }
       }

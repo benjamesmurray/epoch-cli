@@ -727,6 +727,7 @@ export namespace MCP {
             return {
               output: content,
               title: `mcpx ${input.server} ${input.tool}`,
+              isError: res.code !== 0,
               metadata: { exit: res.code, truncated, outputPath, command: commandLine },
             }
           },

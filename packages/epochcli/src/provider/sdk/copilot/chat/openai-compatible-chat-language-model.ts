@@ -491,11 +491,12 @@ export class OpenAICompatibleChatLanguageModel implements LanguageModelV3 {
               controller.enqueue({
                 type: "reasoning-delta",
                 id: "reasoning-0",
+                textDelta: reasoningContent,
                 delta: reasoningContent,
               })
-            }
+              }
 
-            if (delta.content) {
+              if (delta.content) {
               // If reasoning was active and we're starting text, end reasoning first
               // This handles the case where reasoning_opaque and content come in the same chunk
               if (isActiveReasoning && !isActiveText) {
@@ -518,11 +519,10 @@ export class OpenAICompatibleChatLanguageModel implements LanguageModelV3 {
 
               controller.enqueue({
                 type: "text-delta",
-                id: "txt-0",
+                textDelta: delta.content,
                 delta: delta.content,
               })
-            }
-
+              }
             if (delta.tool_calls != null) {
               // If reasoning was active and we're starting tool calls, end reasoning first
               // This handles the case where reasoning goes directly to tool calls with no content
@@ -617,6 +617,7 @@ export class OpenAICompatibleChatLanguageModel implements LanguageModelV3 {
                 controller.enqueue({
                   type: "tool-input-delta",
                   id: toolCall.id,
+                  inputTextDelta: toolCallDelta.function.arguments ?? "",
                   delta: toolCallDelta.function.arguments ?? "",
                 })
 

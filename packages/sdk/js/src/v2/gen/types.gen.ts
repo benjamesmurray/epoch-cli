@@ -1407,6 +1407,20 @@ export type McpRemoteConfig = {
 }
 
 /**
+ * mcpx CLI utility configuration
+ */
+export type McpxConfig = {
+  /**
+   * Path to the mcpx binary
+   */
+  binaryPath?: string
+  /**
+   * Enable mcpx-based tool discovery and execution
+   */
+  enabled?: boolean
+}
+
+/**
  * @deprecated Always uses stretch layout.
  */
 export type LayoutConfig = "auto" | "stretch"
@@ -1525,6 +1539,7 @@ export type Config = {
           enabled: boolean
         }
   }
+  mcpx?: McpxConfig
   formatter?:
     | false
     | {

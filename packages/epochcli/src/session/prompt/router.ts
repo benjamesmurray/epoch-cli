@@ -88,10 +88,6 @@ export class RuleRouter {
    * Uses the Clerk model (4B) to identify the appropriate agent persona based on user intent.
    */
   static async identifyAgent(input: string, clerkModel: any, groundTruths?: string): Promise<"build" | "plan" | "explore"> {
-    if (input.includes("ONE-SHOT")) {
-      return "plan";
-    }
-
     const { text } = await generateText({
       model: clerkModel,
       system: `You are the Conversational Supervisor for Gemini CLI. 

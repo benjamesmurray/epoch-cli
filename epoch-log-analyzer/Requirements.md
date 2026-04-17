@@ -1,6 +1,6 @@
-# epoch-test - Requirements Document
+# epoch-log-analyzer - Requirements Document
 
-Initial requirements
+Implement the epoch-log-analyzer tool to parse run.log files and detect interventions and MCPX failures.
 
 ## Core Features
 

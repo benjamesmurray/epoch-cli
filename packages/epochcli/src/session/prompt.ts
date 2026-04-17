@@ -1365,6 +1365,27 @@ NOTE: At any point in time through this workflow you should feel free to ask the
               !hasToolCalls &&
               lastUser.id < lastAssistant.id
             ) {
+              const isOneShot = msgs.some(m => m.info.role === "user" && m.parts.some(p => p.type === "text" && p.text.includes("ONE-SHOT mode")));
+              if (isOneShot) {
+                log.info("One-Shot mode active. Auto-continuing after text response.", { sessionID })
+                const newMsgId = MessageID.make()
+                yield* sessions.updateMessage({
+                    id: newMsgId,
+                    sessionID,
+                    role: "user",
+                    time: { created: Date.now() },
+                    model: lastUser.model,
+                    agent: lastUser.agent,
+                })
+                yield* sessions.updatePart({
+                    id: PartID.ascending(),
+                    sessionID,
+                    messageID: newMsgId,
+                    type: "text",
+                    text: "Please continue executing the plan autonomously.",
+                })
+                continue
+              }
               log.info("exiting loop", { sessionID })
               break
             }
