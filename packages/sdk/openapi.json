@@ -2213,6 +2213,9 @@
                   "workspaceID": {
                     "type": "string",
                     "pattern": "^wrk.*"
+                  },
+                  "yolo": {
+                    "type": "boolean"
                   }
                 }
               }
@@ -2491,6 +2494,9 @@
                 "properties": {
                   "title": {
                     "type": "string"
+                  },
+                  "yolo": {
+                    "type": "boolean"
                   },
                   "time": {
                     "type": "object",
@@ -3380,6 +3386,9 @@
                   "noReply": {
                     "type": "boolean"
                   },
+                  "yolo": {
+                    "type": "boolean"
+                  },
                   "tools": {
                     "description": "@deprecated tools and permissions have been merged, you can set permissions on the session itself now",
                     "type": "object",
@@ -3862,6 +3871,9 @@
                     "type": "string"
                   },
                   "noReply": {
+                    "type": "boolean"
+                  },
+                  "yolo": {
                     "type": "boolean"
                   },
                   "tools": {
@@ -9863,6 +9875,9 @@
           "version": {
             "type": "string"
           },
+          "yolo": {
+            "type": "boolean"
+          },
           "time": {
             "type": "object",
             "properties": {
@@ -12142,6 +12157,9 @@
           },
           "version": {
             "type": "string"
+          },
+          "yolo": {
+            "type": "boolean"
           },
           "time": {
             "type": "object",

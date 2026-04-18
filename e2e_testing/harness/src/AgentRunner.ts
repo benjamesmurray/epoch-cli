@@ -24,11 +24,13 @@ export class AgentRunner {
   private runId: string;
   private isAborting: boolean = false;
   private docker?: DockerConfig;
+  private yolo: boolean;
 
-  constructor(command: string[], cwd: string, timeoutMs: number, docker?: DockerConfig, runId: string = "run", abortOnGenerate: boolean = false) {
+  constructor(command: string[], cwd: string, timeoutMs: number, docker?: DockerConfig, runId: string = "run", abortOnGenerate: boolean = false, yolo: boolean = false) {
     this.runId = runId;
     this.abortOnGenerate = abortOnGenerate;
     this.docker = docker;
+    this.yolo = yolo;
     if (docker) {
         // Extract the prompt assuming the format is `["epochcli", "run", "prompt"]`
         const promptString = command.slice(2).join(" ");
@@ -37,8 +39,9 @@ export class AgentRunner {
         // Pass the model defined in the test_config.json via the `--model` flag, defaulting if not found
         // Note: the test config model is typically embedded in the epochcli.jsonc but the CLI prioritizes the flag
         const modelArg = docker.model ? `--model ${docker.model}` : "";
+        const yoloArg = yolo ? "--yolo" : "";
         
-        const internalCommand = `cp -a /etc/epochcli/. /workspace/ 2>/dev/null || true; git config --global --add safe.directory /workspace; HOME=/workspace LOG_LEVEL=DEBUG EPOCHCLI_DEBUG_FULL_PROMPT=true bun /cli/packages/epochcli/src/index.ts run --thinking --print-logs --log-level=DEBUG ${modelArg} "${cleanArgs}"`;
+        const internalCommand = `cp -a /etc/epochcli/. /workspace/ 2>/dev/null || true; git config --global --add safe.directory /workspace; HOME=/workspace LOG_LEVEL=DEBUG EPOCHCLI_DEBUG_FULL_PROMPT=true bun /cli/packages/epochcli/src/index.ts run --thinking --print-logs --log-level=DEBUG ${modelArg} ${yoloArg} "${cleanArgs}"`;
         
         this.command = [
             "docker", "run", "--rm", 

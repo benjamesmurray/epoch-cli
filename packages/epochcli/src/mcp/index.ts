@@ -676,7 +676,7 @@ export namespace MCP {
           description:
             "Execute an MCP tool via the mcpx CLI. This tool bypasses standard JSON-RPC bloat and allows for shell-like composition of MCP operations. Discover capabilities by running 'mcpx <server> --help'.",
           parameters: z.object({
-            server: z.string().describe("The name of the MCP server (e.g. 'mcp-spec-cli', 'project-map-cli')"),
+            server: z.string().describe("The name of the MCP server (e.g. 'spec', 'map')"),
             tool: z.string().describe("The name of the tool to invoke (e.g. 'sc_init', 'pm_query')"),
             args: z
               .array(z.string())

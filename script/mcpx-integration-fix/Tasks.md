@@ -23,8 +23,8 @@ Detailed tasks for a new session to implement the exclusive MCPX integration and
 ## Phase 2: Project Guidance Updates
 
 - [ ] 2.1 **Spec CLI Guidance**:
-    - Files: `mcp-spec-cli/src/features/shared/SpecManager.ts`
-    - Logic: Update the `nextSteps` generator to prefix all commands with `mcpx mcp-spec-cli`.
+    - Files: `spec/src/features/shared/SpecManager.ts`
+    - Logic: Update the `nextSteps` generator to prefix all commands with `mcpx spec`.
     - Requirement Reference: Narrative & Guidance Updates.
 
 - [ ] 2.2 **Project Map Guidance**:
@@ -41,7 +41,7 @@ Detailed tasks for a new session to implement the exclusive MCPX integration and
 
 - [ ] 3.1 **Docker Image Build Verification**:
     - Action: Run `./build-image.sh` in `e2e_testing/harness`.
-    - Verification: Ensure `mcpx-go`, `mcp-spec-cli`, and `ground-truth-cli` (with fixed `bin` field) are available in the image.
+    - Verification: Ensure `mcpx-go`, `spec`, and `ground-truth-cli` (with fixed `bin` field) are available in the image.
     - Requirement Reference: Docker E2E Stability.
 
 - [ ] 3.2 **Workspace Builder Completion**:
@@ -58,5 +58,5 @@ Detailed tasks for a new session to implement the exclusive MCPX integration and
 
 - [ ] 4.2 **Run Iterations**:
     - Action: `bun src/index.ts --config test_config_single.json --iterations 2`.
-    - Verification: Review `run.log` to confirm the agent is successfully composing commands like `mcpx mcp-spec-cli sc_init ...`.
+    - Verification: Review `run.log` to confirm the agent is successfully composing commands like `mcpx spec sc_init ...`.
     - Requirement Reference: CLI Composition Support.

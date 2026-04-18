@@ -34,13 +34,13 @@ describe("HeuristicsEngine", () => {
 
   it("should detect pretty-printed tool invocations", () => {
     const engine = new HeuristicsEngine("test-run");
-    engine.processLine('⚙ mcp-spec-cli_sc_init {"mode":"one-shot","name":"eventbus"}');
-    expect(engine.getUsedTools()).toContain("mcp-spec-cli_sc_init");
+    engine.processLine('⚙ spec_sc_init {"mode":"one-shot","name":"eventbus"}');
+    expect(engine.getUsedTools()).toContain("spec_sc_init");
   });
 
   it("should detect infinite tool loops with pretty-printed lines", () => {
     const engine = new HeuristicsEngine("test-run", 2);
-    const line = '⚙ mcp-spec-cli_sc_init {"mode":"one-shot"}';
+    const line = '⚙ spec_sc_init {"mode":"one-shot"}';
     engine.processLine(line);
     expect(() => engine.processLine(line)).toThrow(LoopException);
   });

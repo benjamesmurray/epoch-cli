@@ -928,6 +928,7 @@ export type Session = {
     compacting?: number
     archived?: number
   }
+  yolo?: boolean
   permission?: PermissionRuleset
   revert?: {
     messageID: string
@@ -1086,6 +1087,7 @@ export type SyncEventSessionUpdated = {
         compacting: number | null
         archived: number | null
       }
+      yolo: boolean | null
       permission: PermissionRuleset | null
       revert: {
         messageID: string
@@ -1823,6 +1825,7 @@ export type GlobalSession = {
     compacting?: number
     archived?: number
   }
+  yolo?: boolean
   permission?: PermissionRuleset
   revert?: {
     messageID: string
@@ -3098,6 +3101,7 @@ export type SessionCreateData = {
     title?: string
     permission?: PermissionRuleset
     workspaceID?: string
+    yolo?: boolean
   }
   path?: never
   query?: {
@@ -3226,6 +3230,7 @@ export type SessionGetResponse = SessionGetResponses[keyof SessionGetResponses]
 export type SessionUpdateData = {
   body?: {
     title?: string
+    yolo?: boolean
     time?: {
       archived?: number
     }
@@ -3546,6 +3551,7 @@ export type SessionPromptData = {
     format?: OutputFormat
     system?: string
     variant?: string
+    yolo?: boolean
     parts: Array<TextPartInput | FilePartInput | AgentPartInput | SubtaskPartInput>
   }
   path: {
@@ -3747,6 +3753,7 @@ export type SessionPromptAsyncData = {
     format?: OutputFormat
     system?: string
     variant?: string
+    yolo?: boolean
     parts: Array<TextPartInput | FilePartInput | AgentPartInput | SubtaskPartInput>
   }
   path: {
@@ -3789,6 +3796,7 @@ export type SessionCommandData = {
     arguments: string
     command: string
     variant?: string
+    yolo?: boolean
     parts?: Array<{
       id?: string
       type: "file"

@@ -64,25 +64,25 @@ export class WorkspaceBuilder {
     const mcpxConfigDir = path.join(hostRunDir, ".config", "mcpx");
     await fs.mkdir(mcpxConfigDir, { recursive: true });
     const mcpxConfig = `
-[servers.mcp-spec-cli]
-command = "/usr/local/bin/mcp-spec-cli"
-
 [servers.spec]
-command = "/usr/local/bin/mcp-spec-cli"
-
-[servers.project-map-cli]
-command = "/opt/project-map-cli-env/bin/python"
-args = ["-m", "project_map_cli.mcp.server"]
+command = "node"
+args = ["/usr/local/lib/node_modules/@epoch-ai/deliver-cli/dist/index.js"]
 
 [servers.map]
 command = "/opt/project-map-cli-env/bin/python"
 args = ["-m", "project_map_cli.mcp.server"]
 
-[servers.ground-truth-cli]
-command = "/usr/local/bin/ground-truth-cli"
+[servers.project-map-cli]
+command = "/opt/project-map-cli-env/bin/python"
+args = ["-m", "project_map_cli.mcp.server"]
 
 [servers.ground]
-command = "/usr/local/bin/ground-truth-cli"
+command = "node"
+args = ["/usr/local/lib/node_modules/ground-truth-cli/dist/index.js"]
+
+[servers.ground-truth-cli]
+command = "node"
+args = ["/usr/local/lib/node_modules/ground-truth-cli/dist/index.js"]
 `;
     await fs.writeFile(
       path.join(mcpxConfigDir, "config.toml"),
@@ -111,15 +111,14 @@ command = "/usr/local/bin/ground-truth-cli"
             await fs.writeFile(path.join(shimDir, name), content, { mode: 0o755 });
         };
         
-        // Full name shims
-        await writeShim("mcp-spec-cli", "mcp-spec-cli");
+        // Canonical shims
+        await writeShim("spec", "spec");
+        await writeShim("map", "map");
+        await writeShim("ground", "ground");
+
+        // Legacy compatibility shims
         await writeShim("project-map-cli", "project-map-cli");
         await writeShim("ground-truth-cli", "ground-truth-cli");
-
-        // Short aliases (for AGENTS.md instructions)
-        await writeShim("spec", "mcp-spec-cli");
-        await writeShim("map", "project-map-cli");
-        await writeShim("ground", "ground-truth-cli");
 
     } catch (e) {
         console.error("Failed to install shims manually:", e);

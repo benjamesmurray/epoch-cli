@@ -59,7 +59,7 @@ The tests run inside ephemeral Docker containers (`epochcli-eval-env`) built via
 
 - **Base OS**: Debian Bookworm (`node:22-bookworm`)
 - **Runtime Dependencies**: Node.js v22, Bun (latest), Python 3 + pip, Git.
-- **Offline MCP Servers**: `ground-truth-cli`, `mcp-spec-cli`, and `project-map-cli` are pre-installed.
+- **Offline MCP Servers**: `ground-truth-cli`, `spec`, and `project-map-cli` are pre-installed.
 - **Baseline Context Files**: Baked-in `.assistant_rules.toon`, `AGENTS.md`, and `.editorconfig`.
 - **Memory Limits**: Bounded by the `memoryLimit` specified in `test_config.json` (e.g., `4g`).
 - **Host Codebase**: The entire CLI codebase is mounted read-only (`:ro`) into the container at `/cli`. This allows the agent to run the absolute latest code without needing to rebuild the Docker image.
@@ -94,6 +94,9 @@ bun run src/index.ts
 
 # Run a specific config with iteration override
 bun run src/index.ts --config thinking_config.json --iterations 3
+
+# Run in YOLO mode (autonomously continues until task_complete)
+bun run src/index.ts --yolo
 
 # Capture initial payloads quickly by aborting as soon as the model is invoked
 bun run src/index.ts --abort-on-generate

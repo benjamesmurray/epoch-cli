@@ -21,7 +21,7 @@ To reclaim context budget and prevent agentic drift, Epoch CLI utilizes the **mc
 
 ### 🏛️ Three Pillar MCP Architecture (via mcpx)
 The CLI achieves "functional consciousness" and architectural awareness entirely through its integration with core MCP servers routed via `mcpx`:
-- **`mcp-spec-cli`**: Drives rigorous, specification-based workflows (Requirements -> Design -> Tasks -> Implementation -> Testing).
+- **`spec`**: Drives rigorous, specification-based workflows (Requirements -> Design -> Tasks -> Implementation -> Testing).
 - **`project-map-cli`**: Provides structural awareness. The agent can query symbols and explore relationships without reading massive files directly.
 - **`ground-truth-cli`**: Scans the project to enforce codebase-specific rules and conventions via TOON (Token-Oriented Object Notation).
 
@@ -30,7 +30,7 @@ Epoch CLI utilizes a refined **Positional Prompt Architecture** to exploit the t
 - **Zone 1 (Head - System Prompt)**: Anchors high-priority **Operational Facts** (context limits, mcpx syntax, environment) at the absolute beginning of the request.
 - **Zone 2 (Middle - History Offloading)**: Static behavioral rules, style guides, and engineering tasks are offloaded to a **one-time `assistant` initialization message** in the conversation history. This saves ~1,000 tokens per turn.
 - **Zone 3 (Tail - Reinforcement)**: Operational facts are reinforced in a dedicated `operationalFacts` field at the **absolute end of the JSON payload** (after the message history), ensuring critical rules are always in the model's immediate context.
-- **Managed Cold Starts**: Maintains an `.epoch-context.md` file via the `mcpx mcp-spec-cli` bridge to allow the system to wipe conversation history (Purge) without losing task continuity.
+- **Managed Cold Starts**: Maintains an `.epoch-context.md` file via the `mcpx spec` bridge to allow the system to wipe conversation history (Purge) without losing task continuity.
 
 ### 📊 Advanced Telemetry & E2E Testing
 Includes a robust E2E variance testing harness that monitors:

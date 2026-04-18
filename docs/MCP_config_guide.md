@@ -34,8 +34,8 @@ mcpx add https://docs.mcp.cloudflare.com/mcp
 You can add entries directly to `~/.config/mcpx/config.toml`:
 
 ```toml
-[servers.project-map-cli]
-command = "/home/benmurray/Projects/cli/project-map-cli/venv/bin/python"
+[servers.map]
+command = "/home/benmurray/Projects/cli/map/venv/bin/python"
 args = ["-m", "project_map_cli.mcp.server"]
 
 [servers.github]
@@ -83,13 +83,13 @@ mcpx github search-repositories --query=mcp | jq -r '.items[0].full_name'
 You can install local passthrough shims so that `<server>` works as a standalone command in your terminal:
 
 ```bash
-mcpx shim install project-map-cli
-project-map-cli pm_status
+mcpx shim install map
+map pm_status
 ```
 
 ## 6. Project Servers
 
 The following project-specific servers are pre-configured in `mcpx`:
-- `mcp-spec-cli`: Management of specification-driven development.
-- `project-map-cli`: Architectural mapping and symbol analysis.
-- `ground-truth-cli`: Synthesis of behavioral rules and operational facts.
+- `spec`: Management of specification-driven development.
+- `map`: Architectural mapping and symbol analysis.
+- `ground`: Synthesis of behavioral rules and operational facts.

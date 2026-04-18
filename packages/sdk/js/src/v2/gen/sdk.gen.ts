@@ -1555,6 +1555,7 @@ export class Session2 extends HeyApiClient {
       title?: string
       permission?: PermissionRuleset
       workspaceID?: string
+      yolo?: boolean
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -1569,6 +1570,7 @@ export class Session2 extends HeyApiClient {
             { in: "body", key: "title" },
             { in: "body", key: "permission" },
             { in: "body", key: "workspaceID" },
+            { in: "body", key: "yolo" },
           ],
         },
       ],
@@ -1690,6 +1692,7 @@ export class Session2 extends HeyApiClient {
       directory?: string
       workspace?: string
       title?: string
+      yolo?: boolean
       time?: {
         archived?: number
       }
@@ -1705,6 +1708,7 @@ export class Session2 extends HeyApiClient {
             { in: "query", key: "directory" },
             { in: "query", key: "workspace" },
             { in: "body", key: "title" },
+            { in: "body", key: "yolo" },
             { in: "body", key: "time" },
           ],
         },
@@ -2037,6 +2041,7 @@ export class Session2 extends HeyApiClient {
       format?: OutputFormat
       system?: string
       variant?: string
+      yolo?: boolean
       parts?: Array<TextPartInput | FilePartInput | AgentPartInput | SubtaskPartInput>
     },
     options?: Options<never, ThrowOnError>,
@@ -2058,6 +2063,7 @@ export class Session2 extends HeyApiClient {
             { in: "body", key: "format" },
             { in: "body", key: "system" },
             { in: "body", key: "variant" },
+            { in: "body", key: "yolo" },
             { in: "body", key: "parts" },
           ],
         },
@@ -2171,6 +2177,7 @@ export class Session2 extends HeyApiClient {
       format?: OutputFormat
       system?: string
       variant?: string
+      yolo?: boolean
       parts?: Array<TextPartInput | FilePartInput | AgentPartInput | SubtaskPartInput>
     },
     options?: Options<never, ThrowOnError>,
@@ -2192,6 +2199,7 @@ export class Session2 extends HeyApiClient {
             { in: "body", key: "format" },
             { in: "body", key: "system" },
             { in: "body", key: "variant" },
+            { in: "body", key: "yolo" },
             { in: "body", key: "parts" },
           ],
         },
@@ -2225,6 +2233,7 @@ export class Session2 extends HeyApiClient {
       arguments?: string
       command?: string
       variant?: string
+      yolo?: boolean
       parts?: Array<{
         id?: string
         type: "file"
@@ -2250,6 +2259,7 @@ export class Session2 extends HeyApiClient {
             { in: "body", key: "arguments" },
             { in: "body", key: "command" },
             { in: "body", key: "variant" },
+            { in: "body", key: "yolo" },
             { in: "body", key: "parts" },
           ],
         },

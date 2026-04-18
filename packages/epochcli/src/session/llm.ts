@@ -48,6 +48,7 @@ export namespace LLM {
     instructions?: string[]
     messages: ModelMessage[]
     small?: boolean
+    yolo?: boolean
     tools: Record<string, Tool>
     retries?: number
     toolChoice?: "auto" | "required" | "none"
@@ -216,6 +217,14 @@ export namespace LLM {
       payload.zone1_critical_rules.push(...input.system.zone1)
     }
 
+    if (input.yolo) {
+      payload.zone1_critical_rules.push(
+        "CRITICAL: YOLO mode is active. You MUST execute tasks autonomously until the work is completely finished. " +
+        "You are NOT allowed to stop and ask for user input. " +
+        "When AND ONLY WHEN the entire job is done, you MUST call the 'task_complete' tool to terminate the session."
+      )
+    }
+
     if (input.instructions && input.instructions.length > 0) {
       payload.zone4_guidelines.push(...input.instructions)
     }
@@ -318,15 +327,23 @@ export namespace LLM {
             // Check for recent objections to the supervisor
             let objectionCount = 0;
             let requestedAgent: string | undefined;
-            for (let i = input.messages.length - 1; i >= 0; i--) {
+            let recentScApprove = false;
+            let consecutiveObjectionBroken = false;
+            
+            for (let i = input.messages.length - 1; i >= Math.max(0, input.messages.length - 8); i--) {
                 const msg = input.messages[i];
                 if (msg.role === "assistant" && Array.isArray(msg.content)) {
-                    const call = msg.content.find(c => c.type === "tool-call" && c.toolName === "object_to_supervisor");
-                    if (call) {
+                    const objCall = msg.content.find(c => c.type === "tool-call" && c.toolName === "object_to_supervisor");
+                    if (objCall && !consecutiveObjectionBroken) {
                         objectionCount++;
-                        requestedAgent = (call as any).args.requestedAgent;
-                    } else {
-                        break;
+                        if (!requestedAgent) requestedAgent = (objCall as any).args.requestedAgent;
+                    } else if (msg.content.some(c => c.type === "tool-call" && c.toolName !== "object_to_supervisor")) {
+                        consecutiveObjectionBroken = true;
+                    }
+                    
+                    const mcpxCall = msg.content.find(c => c.type === "tool-call" && c.toolName === "mcpx");
+                    if (mcpxCall && (mcpxCall as any).args?.tool === "sc_approve") {
+                        recentScApprove = true;
                     }
                 }
             }
@@ -334,8 +351,9 @@ export namespace LLM {
             // Concurrently identify agent, rule packs, and thinking effort
             const [identifiedAgentResult, identifiedPacks, identifiedEffort] = await Promise.all([
                 (async () => {
-                    if (objectionCount >= 2 && requestedAgent) {
-                        l.debug("clerk", { message: `Arbitration threshold reached (${objectionCount} objections). Overruling Supervisor with: ${requestedAgent}` });
+                    const threshold = recentScApprove ? 1 : 2;
+                    if (objectionCount >= threshold && requestedAgent) {
+                        l.debug("clerk", { message: `Arbitration threshold reached (${objectionCount} objections, recentApprove: ${recentScApprove}). Overruling Supervisor with: ${requestedAgent}` });
                         return requestedAgent;
                     } else if (isOneShot && !planningFinished) {
                         l.debug("clerk", { message: "One-Shot planning in progress. Locking persona to: plan" });
@@ -373,61 +391,12 @@ export namespace LLM {
       }
     }
 
-    // Phase 1: Context Fetching (Clerk / local-side) - Task 1.4
-    // Attempt to fetch localized file trees and active path from MCP servers and compress them
-    if (provider.id === "local-main") {
-      try {
-        let mcpContext = ""
-        const mcpClientsRecord = await MCP.clients()
-        const mcpClients = Object.values(mcpClientsRecord) as any[]
-        const specCli = mcpClients.find((c: any) => c.id === "mcp-spec-cli")
-        const projectMapCli = mcpClients.find((c: any) => c.id === "project-map-cli")
-        
-        let activePath = "."
-        
-        if (specCli) {
-          try {
-             log.debug("Fetching current state from mcp-spec-cli")
-             const statusRes = await specCli.client.callTool({ name: "sc_status", arguments: {} })
-             if (statusRes.content && statusRes.content.length > 0 && statusRes.content[0].type === "text") {
-                const text = statusRes.content[0].text
-                const featureMatch = text.match(/Feature: projects\/active\/(.+)/)
-                if (featureMatch) {
-                    activePath = `projects/active/${featureMatch[1]}`
-                    mcpContext += `Spec CLI Context:\n${ToonEncoder.encode({ active_feature: activePath, status: text })}\n`
-                }
-             }
-          } catch (e) {
-             log.debug("Failed to fetch mcp-spec-cli status", { error: String(e) })
-          }
-        }
-        
-        if (projectMapCli) {
-           try {
-             log.debug("Fetching localized map from project-map-cli for path", { activePath })
-             const mapRes = await projectMapCli.client.callTool({ name: "pm_query", arguments: { path: activePath } })
-             if (mapRes.content && mapRes.content.length > 0 && mapRes.content[0].type === "text") {
-                 mcpContext += `Project Map Context:\n${ToonEncoder.encode({ localized_map: mapRes.content[0].text })}\n`
-             }
-           } catch (e) {
-             log.debug("Failed to fetch project-map-cli localized map", { error: String(e) })
-           }
-        }
-        
-        if (mcpContext) {
-            payload.zone1_critical_rules.push(mcpContext)
-        }
-      } catch (e) {
-        log.warn("Phase 1 Pre-Generation MCP Context fetch failed", { error: String(e) })
-      }
-    }
-
     if (provider.id === "local-main") {
       try {
         let rulesContext = ""
         const mcpClientsRecord = await MCP.clients()
         const mcpClients = Object.values(mcpClientsRecord) as any[]
-        const gtCli = mcpClients.find((c: any) => c.id === "ground-truth-cli")
+        const gtCli = mcpClients.find((c: any) => c.id === "ground")
         if (gtCli) {
             log.debug("Fetching ground truth rules")
             const gtRes = await gtCli.client.callTool({ name: "gt_status", arguments: {} })
@@ -517,6 +486,50 @@ export namespace LLM {
     }
     if (isOpenaiOauth) {
       options.instructions = system.join("\n")
+    }
+
+    // Phase 1: Context Fetching (Clerk / local-side) - Task 1.4
+    // Attempt to fetch localized file trees and active path from MCP servers and compress them
+    if (provider.id === "local-main") {
+      try {
+        let mcpContext = ""
+        const mcpxTool = input.tools["mcpx"]
+        
+        let activePath = "."
+        
+        if (mcpxTool) {
+          try {
+             log.debug("Fetching current state from spec via mcpx")
+             const statusRes = await mcpxTool.execute!({ server: "spec", tool: "sc_status", flags: {} }, options as any)
+             if (statusRes.content && statusRes.content.length > 0 && statusRes.content[0].type === "text") {
+                const text = statusRes.content[0].text
+                const featureMatch = text.match(/Feature: (.+)/)
+                if (featureMatch) {
+                    activePath = featureMatch[1].trim()
+                }
+                mcpContext += `Spec CLI Context:\n${ToonEncoder.encode({ active_feature: activePath, status: text })}\n`
+             }
+          } catch (e) {
+             log.debug("Failed to fetch spec status via mcpx", { error: String(e) })
+          }
+
+          try {
+             log.debug("Fetching localized map from map for path via mcpx", { activePath })
+             const mapRes = await mcpxTool.execute!({ server: "map", tool: "pm_query", flags: { path: activePath } }, options as any)
+             if (mapRes.content && mapRes.content.length > 0 && mapRes.content[0].type === "text") {
+                 mcpContext += `Project Map Context:\n${ToonEncoder.encode({ localized_map: mapRes.content[0].text })}\n`
+             }
+          } catch (e) {
+             log.debug("Failed to fetch map localized map via mcpx", { error: String(e) })
+          }
+        }
+        
+        if (mcpContext) {
+            payload.zone1_critical_rules.push(mcpContext)
+        }
+      } catch (e) {
+        log.warn("Phase 1 Pre-Generation MCP Context fetch failed", { error: String(e) })
+      }
     }
 
     // Positional Prompt Architecture: Assemble Zone-based messages
@@ -638,7 +651,7 @@ Ready to process user request strictly under these parameters.
                 const guidanceResult = await allTools[guidanceToolKey].execute!({}, options)
                 guidanceOutput = typeof guidanceResult === 'string' ? guidanceResult : JSON.stringify(guidanceResult)
               } else if (allTools["mcpx"] && allTools["mcpx"].execute) {
-                const guidanceResult = await allTools["mcpx"].execute!({ server: "mcp-spec-cli", tool: "sc_guidance", flags: {} }, options)
+                const guidanceResult = await allTools["mcpx"].execute!({ server: "spec", tool: "sc_guidance", flags: {} }, options)
                 guidanceOutput = typeof guidanceResult === 'string' ? guidanceResult : JSON.stringify(guidanceResult)
               }
             } catch (fallbackError) {

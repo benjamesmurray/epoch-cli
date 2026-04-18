@@ -63,10 +63,10 @@ export namespace PostGenerationWorker {
             // Autonomous Spec CLI update
             const mcpClientsRecord = yield* Effect.promise(() => MCP.clients())
             const mcpClients = Object.values(mcpClientsRecord) as any[]
-            const specCli = mcpClients.find(c => c.id === "mcp-spec-cli")
+            const specCli = mcpClients.find(c => c.id === "spec")
             
             if (specCli && !input.abortSignal.aborted) {
-                 log.debug("Advancing task state via mcp-spec-cli")
+                 log.debug("Advancing task state via spec")
                  // Ideally we'd determine the EXACT task ID completed, but for now we'll fetch the active one
                  // or summarize the completion. In a full implementation, we might call sc_todo_complete.
                  // This fulfills the autonomous call requirement.

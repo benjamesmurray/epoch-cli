@@ -2204,6 +2204,7 @@ export type SessionGetResponse = SessionGetResponses[keyof SessionGetResponses]
 export type SessionUpdateData = {
   body?: {
     title?: string
+    yolo?: boolean
   }
   path: {
     id: string
@@ -2591,6 +2592,7 @@ export type SessionPromptData = {
     }
     agent?: string
     noReply?: boolean
+    yolo?: boolean
     system?: string
     tools?: {
       [key: string]: boolean
@@ -2686,6 +2688,7 @@ export type SessionPromptAsyncData = {
     }
     agent?: string
     noReply?: boolean
+    yolo?: boolean
     system?: string
     tools?: {
       [key: string]: boolean

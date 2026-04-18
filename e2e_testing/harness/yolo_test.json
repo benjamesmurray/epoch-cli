@@ -1,0 +1,19 @@
+[
+  {
+    "id": "yolo-mini-feature",
+    "iterations": 1,
+    "timeoutMs": 300000,
+    "prompt": "Create a new project called 'mini-math' using Spec CLI. Design and implement a simple math utility that can add and multiply numbers. Ensure you follow the full spec workflow: init, plan, approve, implement (todo), and verify. Use task_complete when the entire job is done.",
+    "expectedTools": ["sc_init", "sc_plan", "sc_approve", "task_complete"],
+    "runTargetDir": ".epochcli/tool/$RUN_ID",
+    "epochcli": {
+      "mcpx": { "enabled": true }
+    },
+    "docker": {
+      "imageName": "epochcli-eval-env:latest",
+      "network": "host",
+      "memoryLimit": "4g",
+      "model": "local-main/gemma-4-26b-q4-xl"
+    }
+  }
+]

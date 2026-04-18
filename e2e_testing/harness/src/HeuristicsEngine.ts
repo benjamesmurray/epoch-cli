@@ -38,12 +38,12 @@ export class HeuristicsEngine {
         
         if (payloadMatch) {
           try {
-            const parsedPayload = JSON.parse(payloadMatch[1]);
+            const parsedPayload = JSON.parse(payloadMatch[1]!);
             this.fullPrompts.push({
                 payload: parsedPayload,
-                tools: toolsMatch ? JSON.parse(toolsMatch[1]) : []
+                tools: toolsMatch ? JSON.parse(toolsMatch[1]!) : []
             });
-            console.log(`    [${this.runId}] ✅ Captured turn payload (${this.fullPrompts.length} turns so far, ${payloadMatch[1].length} bytes)`);
+            console.log(`    [${this.runId}] ✅ Captured turn payload (${this.fullPrompts.length} turns so far, ${payloadMatch[1]!.length} bytes)`);
             
             // Doom Loop Escape Hatch: If we reach an unreasonable number of turns, kill the process to save resources
             if (this.fullPrompts.length > 30) {
@@ -64,7 +64,7 @@ export class HeuristicsEngine {
         try {
             const metricsMatch = line.match(/metrics=({.*?})(?:\s|$)/);
             if (metricsMatch) {
-                const metrics = JSON.parse(metricsMatch[1]);
+                const metrics = JSON.parse(metricsMatch[1]!);
                 if (metrics.tps) this.tpsHistory.push(metrics.tps);
                 if (metrics.ttftMs) this.ttftHistory.push(metrics.ttftMs);
                 if (metrics.promptTokens) this.totalTokens += metrics.promptTokens;

@@ -1308,7 +1308,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           }
 
           if (input.noReply === true) return message
-          return yield* loop({ sessionID: input.sessionID })
+          return yield* loop({ sessionID: input.sessionID, yolo: input.yolo })
         },
       )
 
@@ -1323,11 +1323,12 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           throw new Error("Impossible")
         })
 
-      const runLoop: (sessionID: SessionID) => Effect.Effect<MessageV2.WithParts> = Effect.fn("SessionPrompt.run")(
-        function* (sessionID: SessionID) {
+      const runLoop: (sessionID: SessionID, yolo?: boolean) => Effect.Effect<MessageV2.WithParts> = Effect.fn("SessionPrompt.run")(
+        function* (sessionID: SessionID, yolo?: boolean) {
           const ctx = yield* InstanceState.context
           let structured: unknown | undefined
           let step = 0
+          const toolHistory: { tool: string; input: any }[] = []
           const session = yield* sessions.get(sessionID)
 
           while (true) {
@@ -1357,7 +1358,27 @@ NOTE: At any point in time through this workflow you should feel free to ask the
             )
             // Some providers return "stop" even when the assistant message contains tool calls.
             // Keep the loop running so tool results can be sent back to the model.
-            const hasToolCalls = lastAssistantMsg?.parts.some((part) => part.type === "tool") ?? false
+            const toolParts = lastAssistantMsg?.parts.filter((part): part is MessageV2.ToolPart => part.type === "tool") ?? []
+            const hasToolCalls = toolParts.length > 0
+
+            // Stagnation detection
+            for (const part of toolParts) {
+              if (part.state.status !== "pending") {
+                toolHistory.push({ tool: part.tool, input: part.state.input })
+                if (toolHistory.length > 6) toolHistory.shift()
+              }
+            }
+
+            if (toolHistory.length >= 6) {
+              const lastThree = toolHistory.slice(-3)
+              const previousThree = toolHistory.slice(-6, -3)
+              if (JSON.stringify(lastThree) === JSON.stringify(previousThree)) {
+                log.error("Stagnation detected - loop aborted", { sessionID, toolHistory })
+                const error = new NamedError.Unknown({ message: "Agent paused: Detected repetitive tool usage without progress." })
+                yield* bus.publish(Session.Event.Error, { sessionID, error: error.toObject() })
+                break
+              }
+            }
 
             if (
               lastAssistant?.finish &&
@@ -1365,9 +1386,22 @@ NOTE: At any point in time through this workflow you should feel free to ask the
               !hasToolCalls &&
               lastUser.id < lastAssistant.id
             ) {
-              const isOneShot = msgs.some(m => m.info.role === "user" && m.parts.some(p => p.type === "text" && p.text.includes("ONE-SHOT mode")));
-              if (isOneShot) {
-                log.info("One-Shot mode active. Auto-continuing after text response.", { sessionID })
+              const isYolo = session.yolo || yolo || msgs.some(m => m.info.role === "user" && m.parts.some(p => p.type === "text" && p.text.includes("[System: YOLO mode enabled")));
+              const hasTaskComplete = msgs.some(m => m.info.role === "assistant" && m.parts.some(p => p.type === "tool" && p.tool === "task_complete"));
+
+              if (isYolo && !hasTaskComplete) {
+                log.info("YOLO mode active. Auto-continuing after text response.", { sessionID })
+                
+                // Semantic Auto-Complete hint
+                let nudgeText = "[SYSTEM: You have indicated you are finished, but you have not formally closed the session. You must now invoke the task_complete tool to terminate the run. Do not perform any further validations.]"
+                
+                const lastToolResult = msgs.findLast(m => m.parts.some(p => p.type === "tool" && p.state.status === "completed"))
+                const lastResultPart = lastToolResult?.parts.find((p): p is MessageV2.ToolPart => p.type === "tool" && p.state.status === "completed")
+                
+                if (lastResultPart?.tool === "sc_status" && typeof (lastResultPart.state as any).output === "string" && (lastResultPart.state as any).output.includes("All tasks completed")) {
+                    nudgeText = "[SYSTEM: All tasks in your todo list are marked complete. If you are finished, you MUST call task_complete now. Do not perform any further redundant checks.]"
+                }
+
                 const newMsgId = MessageID.ascending()
                 yield* sessions.updateMessage({
                     id: newMsgId,
@@ -1382,7 +1416,8 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                     sessionID,
                     messageID: newMsgId,
                     type: "text",
-                    text: "Please continue executing the plan autonomously.",
+                    synthetic: true,
+                    text: nudgeText,
                 })
                 continue
               }
@@ -1558,6 +1593,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
                   sessionID,
                   parentSessionID: session.parentID,
                   system,
+                  yolo: yolo || msgs.some(m => m.info.role === "user" && m.parts.some(p => p.type === "text" && p.text.includes("[System: YOLO mode enabled"))),
                   messages: [...modelMsgs, ...(isLastStep ? [{ role: "assistant" as const, content: MAX_STEPS }] : [])],
                   tools,
                   model,
@@ -1614,7 +1650,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       )(function* (input: z.infer<typeof LoopInput>) {
         const s = yield* InstanceState.get(state)
         const runner = getRunner(s.runners, input.sessionID)
-        return yield* runner.ensureRunning(runLoop(input.sessionID))
+        return yield* runner.ensureRunning(runLoop(input.sessionID, input.yolo))
       })
 
       const shell: (input: ShellInput) => Effect.Effect<MessageV2.WithParts> = Effect.fn("SessionPrompt.shell")(
@@ -1731,6 +1767,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           agent: userAgent,
           parts,
           variant: input.variant,
+          yolo: input.yolo,
         })
         yield* bus.publish(Command.Event.Executed, {
           name: input.command,
@@ -1804,6 +1841,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
     format: MessageV2.Format.optional(),
     system: z.string().optional(),
     variant: z.string().optional(),
+    yolo: z.boolean().optional(),
     parts: z.array(
       z.discriminatedUnion("type", [
         MessageV2.TextPart.omit({
@@ -1865,6 +1903,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
 
   export const LoopInput = z.object({
     sessionID: SessionID.zod,
+    yolo: z.boolean().optional(),
   })
 
   export async function loop(input: z.infer<typeof LoopInput>) {
@@ -1897,6 +1936,7 @@ NOTE: At any point in time through this workflow you should feel free to ask the
     arguments: z.string(),
     command: z.string(),
     variant: z.string().optional(),
+    yolo: z.boolean().optional(),
     parts: z
       .array(
         z.discriminatedUnion("type", [

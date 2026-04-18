@@ -14,21 +14,19 @@
         "GITHUB_PERSONAL_ACCESS_TOKEN": "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"
       }
     },
-    "project-map-cli": {
+    "map": {
       "command": "/home/benmurray/Projects/cli/project-map-cli/venv/bin/python",
       "args": [
         "-m",
         "project_map_cli.mcp.server"
       ]
     },
-    "mcp-spec-cli": {
-      "command": "node",
-      "args": [
-        "/home/benmurray/Projects/cli/mcp-spec-cli/dist/index.js"
-      ],
+    "spec": {
+      "command": "/home/benmurray/.npm-global/bin/deliver-cli",
+      "args": [],
       "trust": true
     },
-    "ground-truth-cli": {
+    "ground": {
       "command": "npx",
       "args": [
         "-y",

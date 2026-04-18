@@ -157,7 +157,7 @@ Persistence: The correction is written to a persistent local file. When doing th
 9. Persistent Functional State via mcpx
 Rather than treating every prompt as a blank slate, the assistant will maintain a "functional consciousness"—a persistent state that tracks continuity of concerns and intentions across process restarts.
 The Spec CLI Bridge: The Spec CLI (accessed via `mcpx`) acts as the source of truth for the workspace focus, tracking the primary and secondary concerns of the active sprint.
-Idle Thinking Cycles: When the local inference engine is idle, the system can trigger an autonomous thinking cycle to update the project map TOON data via `mcpx project-map-cli` or self-critique recent code generations.
+Idle Thinking Cycles: When the local inference engine is idle, the system can trigger an autonomous thinking cycle to update the project map TOON data via `mcpx map` or self-critique recent code generations.
 
 10. Scaling Ground Truth Engineering
 The Context Communication Rule (Code Snippets)
@@ -174,7 +174,7 @@ Emergent Self-Correction: As observed in the ATLAS paper, when models are given 
 The Clerk as the "Rule Router"
 In your Pre-Generation phase, the 4B Clerk can run a lightning-fast classification on the user's prompt. 
 If the user asks "Can you refactor this class?", the Clerk injects the *Reasoning Discipline* rules and sets the System Instruction to `Thinking Effort = HIGH`. The Clerk also uses `mcpx <server> --help` to dynamically discover tool schemas when needed.
-The ground-truth-cli (via `mcpx`) helps to populate the .assistant_rules.toon file that the side model will use to place the operational facts in zone 1 and 3 and while placing behavioural rule packs in zone 2.
+The ground (via `mcpx`) helps to populate the .assistant_rules.toon file that the side model will use to place the operational facts in zone 1 and 3 and while placing behavioural rule packs in zone 2.
 
 The Arbitration Protocol (Escalation)
 Trigger: When the Main Model is blocked by missing tools or believes its assigned persona is incorrect.

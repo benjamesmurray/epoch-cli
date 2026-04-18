@@ -143,6 +143,7 @@ export namespace Session {
         compacting: z.number().optional(),
         archived: z.number().optional(),
       }),
+      yolo: z.boolean().optional(),
       permission: Permission.Ruleset.optional(),
       revert: z
         .object({
@@ -309,11 +310,13 @@ export namespace Session {
       title?: string
       permission?: Permission.Ruleset
       workspaceID?: WorkspaceID
+      yolo?: boolean
     }) => Effect.Effect<Info>
     readonly fork: (input: { sessionID: SessionID; messageID?: MessageID }) => Effect.Effect<Info>
     readonly touch: (sessionID: SessionID) => Effect.Effect<void>
     readonly get: (id: SessionID) => Effect.Effect<Info>
     readonly setTitle: (input: { sessionID: SessionID; title: string }) => Effect.Effect<void>
+    readonly setYolo: (input: { sessionID: SessionID; yolo: boolean }) => Effect.Effect<void>
     readonly setArchived: (input: { sessionID: SessionID; time?: number }) => Effect.Effect<void>
     readonly setPermission: (input: { sessionID: SessionID; permission: Permission.Ruleset }) => Effect.Effect<void>
     readonly setRevert: (input: {
@@ -371,6 +374,7 @@ export namespace Session {
         workspaceID?: WorkspaceID
         directory: string
         permission?: Permission.Ruleset
+        yolo?: boolean
       }) {
         const ctx = yield* InstanceState.context
         const result: Info = {
@@ -383,6 +387,7 @@ export namespace Session {
           parentID: input.parentID,
           title: input.title ?? createDefaultTitle(!!input.parentID),
           permission: input.permission,
+          yolo: input.yolo,
           time: {
             created: Date.now(),
             updated: Date.now(),
@@ -461,6 +466,7 @@ export namespace Session {
         title?: string
         permission?: Permission.Ruleset
         workspaceID?: WorkspaceID
+        yolo?: boolean
       }) {
         const directory = yield* InstanceState.directory
         return yield* createNext({
@@ -469,6 +475,7 @@ export namespace Session {
           title: input?.title,
           permission: input?.permission,
           workspaceID: input?.workspaceID,
+          yolo: input?.yolo,
         })
       })
 
@@ -518,6 +525,10 @@ export namespace Session {
 
       const setTitle = Effect.fn("Session.setTitle")(function* (input: { sessionID: SessionID; title: string }) {
         yield* patch(input.sessionID, { title: input.title })
+      })
+
+      const setYolo = Effect.fn("Session.setYolo")(function* (input: { sessionID: SessionID; yolo: boolean }) {
+        yield* patch(input.sessionID, { yolo: input.yolo })
       })
 
       const setArchived = Effect.fn("Session.setArchived")(function* (input: { sessionID: SessionID; time?: number }) {
@@ -624,6 +635,7 @@ export namespace Session {
         touch,
         get,
         setTitle,
+        setYolo,
         setArchived,
         setPermission,
         setRevert,
@@ -654,6 +666,7 @@ export namespace Session {
         title: z.string().optional(),
         permission: Info.shape.permission,
         workspaceID: WorkspaceID.zod.optional(),
+        yolo: z.boolean().optional(),
       })
       .optional(),
     (input) => runPromise((svc) => svc.create(input)),
@@ -668,6 +681,10 @@ export namespace Session {
 
   export const setTitle = fn(z.object({ sessionID: SessionID.zod, title: z.string() }), (input) =>
     runPromise((svc) => svc.setTitle(input)),
+  )
+
+  export const setYolo = fn(z.object({ sessionID: SessionID.zod, yolo: z.boolean() }), (input) =>
+    runPromise((svc) => svc.setYolo(input)),
   )
 
   export const setArchived = fn(z.object({ sessionID: SessionID.zod, time: z.number().optional() }), (input) =>

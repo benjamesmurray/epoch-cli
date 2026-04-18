@@ -233,6 +233,10 @@ export const RunCommand = cmd({
         describe: "the command to run, use message for args",
         type: "string",
       })
+      .option("yolo", {
+        type: "boolean",
+        describe: "run autonomously until task is complete",
+      })
       .option("continue", {
         alias: ["c"],
         describe: "continue the last session",
@@ -349,6 +353,10 @@ export const RunCommand = cmd({
 
     if (!process.stdin.isTTY) message += "\n" + (await Bun.stdin.text())
 
+    if (args.yolo) {
+      message += "\n\n[System: YOLO mode enabled. You MUST use the task_complete tool when you are completely finished.]"
+    }
+
     if (message.trim().length === 0 && !args.command) {
       UI.error("You must provide a message or a command")
       process.exit(1)
@@ -394,7 +402,7 @@ export const RunCommand = cmd({
       if (baseID) return baseID
 
       const name = title()
-      const result = await sdk.session.create({ title: name, permission: rules })
+      const result = await sdk.session.create({ title: name, permission: rules, yolo: args.yolo })
       return result.data?.id
     }
 
@@ -635,6 +643,7 @@ export const RunCommand = cmd({
           command: args.command,
           arguments: message,
           variant: args.variant,
+          yolo: args.yolo,
         })
       } else {
         const model = args.model ? Provider.parseModel(args.model) : undefined
@@ -644,6 +653,7 @@ export const RunCommand = cmd({
           model,
           variant: args.variant,
           parts: [...files, { type: "text", text: message }],
+          yolo: args.yolo,
         })
       }
     }

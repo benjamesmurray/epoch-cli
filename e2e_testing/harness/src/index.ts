@@ -17,13 +17,15 @@ async function main() {
     options: {
       iterations: { type: "string" },
       config: { type: "string" },
-      "abort-on-generate": { type: "boolean" }
+      "abort-on-generate": { type: "boolean" },
+      yolo: { type: "boolean" }
     },
     allowPositionals: true
   });
 
   const configFile = values.config || positionals[0] || path.join(process.cwd(), "test_config.json");
   const overrideIterations = values.iterations ? parseInt(values.iterations, 10) : undefined;
+  const isYolo = !!values.yolo;
 
   console.log(`Loading configuration from ${configFile}...`);
   const configs = await ConfigLoader.load(configFile);
@@ -61,10 +63,10 @@ async function main() {
           // Local execution path (Fallback)
           targetWorkspace = path.join(suiteDir, runId);
           await fs.mkdir(targetWorkspace, { recursive: true });
-          cmd = [LOCAL_EPOCHCLI_CMD, "run", prompt];
+          cmd = [LOCAL_EPOCHCLI_CMD, "run", isYolo ? "--yolo" : "", prompt].filter(Boolean);
       }
 
-      const runner = new AgentRunner(cmd, targetWorkspace, config.timeoutMs, config.docker, runId, values["abort-on-generate"]);
+      const runner = new AgentRunner(cmd, targetWorkspace, config.timeoutMs, config.docker, runId, values["abort-on-generate"], isYolo);
       const res = await runner.run();
       console.log(`  > Agent Execution finished: ${res.status} (${(res.durationMs / 1000).toFixed(1)}s)`);
       const logPath = path.join(targetWorkspace, "run.log");
@@ -80,8 +82,8 @@ async function main() {
               const toolsMatch = startLine.match(/tools=([\[{].*?[\]}])(?=\s+\w+=|\s+[\w\s]+$|$)/);
               if (payloadMatch) {
                   const initialPayload = {
-                      payload: JSON.parse(payloadMatch[1]),
-                      tools: toolsMatch ? JSON.parse(toolsMatch[1]) : []
+                      payload: JSON.parse(payloadMatch[1]!),
+                      tools: toolsMatch ? JSON.parse(toolsMatch[1]!) : []
                   };
                   await fs.writeFile(path.join(targetWorkspace, "initial_payload.json"), JSON.stringify(initialPayload, null, 2), "utf-8");
                   console.log(`  > Initial payload saved to: ${path.join(targetWorkspace, "initial_payload.json")}`);

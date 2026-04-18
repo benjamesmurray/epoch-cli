@@ -61,7 +61,7 @@ The system utilizes a dual-model orchestration where a smaller "Clerk" model (lo
 
 ## 4. Ground Truth Integration
 
-The `ground-truth-cli` MCP server is the primary source of truth for project-specific rules (`.Model_rules.toon`).
+The `ground` MCP server is the primary source of truth for project-specific rules (`.Model_rules.toon`).
 
 ### **Dynamic Session Initiation**
 To ensure a "zero-config" experience, the system performs an automatic scan if rules are missing:
@@ -73,7 +73,7 @@ To ensure a "zero-config" experience, the system performs an automatic scan if r
 ### **Rule Extraction, Synthesis, & Deduplication**
 `LLM.stream` parses context and rules using a prioritized extraction strategy:
 *   **Zone 1 & 2:** Standard regex-based extraction from `.Model_rules.toon` into the internal prompt payload.
-*   **Zone 3 Synthesis & Deduplication:** The `ground-truth-cli` dynamically detects the project's framework/language (e.g., via `package.json`) and conditionally synthesizes a "Stack Conventions" rule. If multiple `ZONE 3` blocks are found in the TOON file (e.g., due to template merging or stale baseline files), the system **prioritizes the last block found**. This ensures that the most recent dynamically synthesized rules take precedence over static defaults.
+*   **Zone 3 Synthesis & Deduplication:** The `ground` dynamically detects the project's framework/language (e.g., via `package.json`) and conditionally synthesizes a "Stack Conventions" rule. If multiple `ZONE 3` blocks are found in the TOON file (e.g., due to template merging or stale baseline files), the system **prioritizes the last block found**. This ensures that the most recent dynamically synthesized rules take precedence over static defaults.
 *   **Zone 4 Extraction:** To guarantee guidelines are always present regardless of Ground Truth status, `AGENTS.md` and `.cursorrules` are explicitly fetched via the `Instruction` service and injected as a dedicated system message, bypassing the TOON rules entirely.
 
 ## 5. Benefits of this Architecture

@@ -9,7 +9,7 @@ Repair and verify the unified MCPX integration within epochcli, ensuring robust 
 - **Robust Argument Mapping**: Ensure LLM tool arguments and flags are correctly serialized into `mcpx` shell commands.
 - **Error Transparency**: Return `stderr` and exit codes from failed `mcpx` calls back to the LLM to enable self-correction.
 - **CLI Composition Support**: The agent should be guided to use shell composition (pipes, redirects) when calling `mcpx` (e.g., `mcpx github search-repositories | jq`).
-- **Narrative & Guidance Updates**: Update the internal help text and "Next Step" breadcrumbs in `mcp-spec-cli`, `project-map-cli`, and `ground-truth-cli` to use the `mcpx <server> <command>` syntax.
+- **Narrative & Guidance Updates**: Update the internal help text and "Next Step" breadcrumbs in `spec`, `project-map-cli`, and `ground-truth-cli` to use the `mcpx <server> <command>` syntax.
 - **Docker E2E Stability**: Ensure the `epochcli-eval-env` image and the test harness correctly configure `mcpx`.
 
 ## User Stories
@@ -24,7 +24,7 @@ Repair and verify the unified MCPX integration within epochcli, ensuring robust 
 - [ ] `packages/epochcli` no longer registers individual MCP tools when `mcpx` is enabled.
 - [ ] `packages/epochcli` no longer contains hardcoded paths to `/home/benmurray`.
 - [ ] `mcpx` tool returns exit code and `stderr` to the model when a command fails.
-- [ ] `mcp-spec-cli` "Next Step" output uses the `mcpx mcp-spec-cli ...` prefix.
+- [ ] `spec` "Next Step" output uses the `mcpx spec ...` prefix.
 - [ ] `project-map-cli` and `ground-truth-cli` help text uses `mcpx` examples.
 - [ ] `WorkspaceBuilder` correctly generates `.config/mcpx/config.toml` in the Docker workspace.
 - [ ] `eventbus-v2` E2E test passes with `mcpx` enabled in `test_config_single.json`.

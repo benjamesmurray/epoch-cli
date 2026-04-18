@@ -24,7 +24,7 @@
 ## Testing & Type Checking
 - Avoid mocks as much as possible. Test actual implementation, do not duplicate logic into tests.
 - Tests cannot run from repo root (guard: `do-not-run-tests-from-root`); run from package dirs like `packages/epochcli`.
-- Always run `bun typecheck` from package directories (e.g., `packages/epochcli`), never `tsc` directly.
+- Always run `bun typecheck` from package directories (e.g., `packages/epochcli`), never `tsc` directly. If creating a new package, define the script as `"typecheck": "tsc --noEmit"`.
 
 ## MCPX Tooling & Execution Guide
 
@@ -46,10 +46,16 @@ Use this to read behavioral constraints. *Always run the scan to orient yourself
 ### 2. Workflow State Machine (`spec`)
 Use this to manage your workflow state (Requirements → Design → Tasks).
 * **Start a New Feature:** `spec sc_init --name="<feature_name>"`
+* **Check Status:** `spec sc_status`
+* **Verify Project State:** `spec sc_verify`
 * **Pull Phase Instructions:** `spec sc_guidance`
 * **Progress the Workflow:** `spec sc_plan --instruction="<optional_context>"`
 * **Approve Drafted Phase:** `spec sc_approve`
 * **Manage Tasks:** `spec sc_todo_list` / `spec sc_todo_start --id="<task_id>"` / `spec sc_todo_complete --id="<task_id>"`
+* **Update Context:** `spec sc_epoch --focus="<focus>"`
+* **Provide Feedback:** `spec sc_feedback --feedback="<feedback>"`
+* **Toggle Mode:** `spec sc_mode --mode="one-shot"`
+* **Archive Feature:** `spec sc_archive`
 
 ### 3. Codebase Navigation (`map`)
 Use this to understand repository architecture via dense TOON (Token-Oriented Object Notation).
