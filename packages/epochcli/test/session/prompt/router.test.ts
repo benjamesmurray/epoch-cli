@@ -4,7 +4,17 @@ import { RuleRouter } from "../../../src/session/prompt/router"
 describe("RuleRouter", () => {
   describe("identifyAgent", () => {
     it("should fast-path to 'plan' for Spec CLI one-shot requests", async () => {
-      const mockModel = {} as any
+      const mockModel = {
+        specificationVersion: "v3",
+        provider: "mock",
+        modelId: "mock",
+        doGenerate: async () => ({
+           text: "plan",
+           finishReason: "stop",
+           usage: { promptTokens: 10, completionTokens: 10, inputTokens: { total: 10 }, outputTokens: { total: 10 } },
+           content: [{ type: "text", text: "plan" }]
+        })
+      } as any
       const result = await RuleRouter.identifyAgent(
         "Implement a new feature using the Spec CLI in ONE-SHOT mode.",
         mockModel

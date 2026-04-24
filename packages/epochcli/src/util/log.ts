@@ -5,6 +5,7 @@ import { Global } from "../global"
 import { Flag } from "../flag/flag"
 import z from "zod"
 import { Glob } from "./glob"
+import { SessionTelemetry } from "./session-telemetry"
 
 export namespace Log {
   export type ZoneStructuredPayload = any; // 
@@ -21,7 +22,7 @@ export namespace Log {
     phase: "Phase 1: Pre-Gen" | "Phase 2: Gen" | "Phase 3: Post-Gen" | string;
     activeAgent?: string;
     toolCount?: number;
-
+    contextLimit?: number;
     mainEpochId: string;
     clerkMicroEpochId?: string;
 
@@ -43,6 +44,7 @@ export namespace Log {
 
   export function truncatePayload(payload: ZoneStructuredPayload | any | undefined): ZoneStructuredPayload | undefined {
     if (!payload) return undefined;
+    if (Flag.EPOCHCLI_DEBUG_FULL_PROMPT) return payload;
     
     // Deep clone to avoid mutating the original payload
     const truncated = { ...payload };
@@ -96,6 +98,7 @@ export namespace Log {
     level?: Level
   }
 
+  let writeStream: ReturnType<typeof createWriteStream> | null = null
   let logpath = ""
   export function file() {
     return logpath
@@ -108,18 +111,35 @@ export namespace Log {
   export async function init(options: Options) {
     if (options.level) level = options.level
     cleanup(Global.Path.log)
+    await SessionTelemetry.init(options)
     if (options.print) return
     logpath = path.join(
       Global.Path.log,
       options.dev ? "dev.log" : new Date().toISOString().split(".")[0].replace(/:/g, "") + ".log",
     )
     await fs.truncate(logpath).catch(() => {})
-    const stream = createWriteStream(logpath, { flags: "a" })
+    writeStream = createWriteStream(logpath, { flags: "a" })
     write = async (msg: any) => {
       return new Promise((resolve, reject) => {
-        stream.write(msg, (err) => {
+        if (!writeStream) {
+          resolve(0)
+          return
+        }
+        writeStream.write(msg, (err) => {
           if (err) reject(err)
           else resolve(msg.length)
+        })
+      })
+    }
+  }
+
+  export async function dispose() {
+    await SessionTelemetry.dispose()
+    if (writeStream) {
+      return new Promise<void>((resolve) => {
+        writeStream!.end(() => {
+          writeStream = null
+          resolve()
         })
       })
     }

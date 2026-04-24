@@ -1,0 +1,16 @@
+[
+  {
+    "id": "shim-syntax-test",
+    "iterations": 1,
+    "timeoutMs": 300000,
+    "prompt": "Initialize a new project called 'shim-test' using the spec CLI (spec sc_init --name shim-test). Then run ground gt_status to check the project constitution, and map pm_query --path . to see the workspace map. Finally, use the write_file tool to create a file named dummy.test.ts containing: import { test, expect } from 'bun:test'; test('dummy', () => { expect(true).toBe(true); }); Once you have successfully run these three shim commands via bash and written the test file, you are done. Use task_complete.",
+    "expectedTools": ["bash", "task_complete", "sc_init", "gt_status", "pm_query"],
+    "runTargetDir": ".epochcli/tool/$RUN_ID",
+    "docker": {
+      "imageName": "epochcli-eval-env:latest",
+      "network": "host",
+      "memoryLimit": "4g",
+      "model": "local-main/gemma-4-26b-q4-xl"
+    }
+  }
+]

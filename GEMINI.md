@@ -8,7 +8,12 @@ t
 - **Purpose:** Allows direct interaction with GitHub repositories, issues, pull requests, and Actions.
 - **When to use:** Use this server's tools to read remote repository code, fetch issue details, create/update pull requests, or check CI/CD workflow status.
 
-## 2. Project Map CLI (`map`)
+## Tooling Integrity
+- **MCPX Composition:** All interactions with external MCP servers (spec, map, ground) MUST use the structured `mcpx` JSON tool. Do NOT attempt to pass raw shell strings or shim commands into tool parameters.
+- **Syntax Mapping:** Always decompose shim-style commands (e.g., `spec sc_status`) into their JSON components: `server="spec"`, `tool="sc_status"`. See `AGENTS.md` for mandatory mapping examples and discovery rules.
+
+## Project Map CLI (`map`)
+
 
 - **Purpose:** Provides a contextually efficient architectural map of the local project.
 - **When to use:** Invoke this tool when you need to understand the project structure, file dependencies, or system-wide layout without wasting context on exhaustive manual directory listings or file reads. Create new projects here: /home/benmurray/Projects/cli/Projects/Active

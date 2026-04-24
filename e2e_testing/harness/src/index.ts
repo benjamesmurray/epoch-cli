@@ -18,7 +18,8 @@ async function main() {
       iterations: { type: "string" },
       config: { type: "string" },
       "abort-on-generate": { type: "boolean" },
-      yolo: { type: "boolean" }
+      yolo: { type: "boolean" },
+      scenario: { type: "string" }
     },
     allowPositionals: true
   });
@@ -26,6 +27,7 @@ async function main() {
   const configFile = values.config || positionals[0] || path.join(process.cwd(), "test_config.json");
   const overrideIterations = values.iterations ? parseInt(values.iterations, 10) : undefined;
   const isYolo = !!values.yolo;
+  const targetScenario = values.scenario;
 
   console.log(`Loading configuration from ${configFile}...`);
   const configs = await ConfigLoader.load(configFile);
@@ -38,6 +40,7 @@ async function main() {
   console.log(`\nEvidence will be captured in: ${suiteDir}`);
 
   for (const config of configs) {
+    if (targetScenario && config.id !== targetScenario) continue;
     const iters = overrideIterations || config.iterations;
     console.log(`\n==================================================`);
     console.log(`Starting Scenario: ${config.id} (${iters} iterations)`);
@@ -72,27 +75,52 @@ async function main() {
       const logPath = path.join(targetWorkspace, "run.log");
       console.log(`  > Logs saved to: ${logPath}`);
 
-      // Extract initial payload directly from the log file for robustness
+      // Extract initial payload and tools from telemetry for robustness
       try {
-          const logContent = await fs.readFile(logPath, "utf-8");
-          const lines = logContent.split("\n");
-          const startLine = lines.find(l => l.includes("event=START_GENERATE"));
-          if (startLine) {
-              const payloadMatch = startLine.match(/payload=([\[{].*?[\]}])(?=\s+\w+=|\s+[\w\s]+$|$)/);
-              const toolsMatch = startLine.match(/tools=([\[{].*?[\]}])(?=\s+\w+=|\s+[\w\s]+$|$)/);
-              if (payloadMatch) {
-                  const initialPayload = {
-                      payload: JSON.parse(payloadMatch[1]!),
-                      tools: toolsMatch ? JSON.parse(toolsMatch[1]!) : []
-                  };
-                  await fs.writeFile(path.join(targetWorkspace, "initial_payload.json"), JSON.stringify(initialPayload, null, 2), "utf-8");
-                  console.log(`  > Initial payload saved to: ${path.join(targetWorkspace, "initial_payload.json")}`);
-              } else {
-                  console.log(`  > Could not extract payload from START_GENERATE line`);
+          const logDirs = [
+              path.join(targetWorkspace, ".local", "share", "epochcli", "log"),
+              path.join(targetWorkspace, ".config", "epochcli", "log"),
+              path.join(targetWorkspace, "log") // Fallback
+          ];
+          
+          let telemetryFile: string | null = null;
+          let foundDir: string | null = null;
+          
+          for (const dir of logDirs) {
+              const exists = await fs.stat(dir).then(() => true).catch(() => false);
+              if (exists) {
+                  const files = await fs.readdir(dir);
+                  const latest = files.filter(f => f.endsWith(".telemetry.jsonl")).sort().reverse()[0];
+                  if (latest) {
+                      telemetryFile = path.join(dir, latest);
+                      foundDir = dir;
+                      break;
+                  }
               }
           }
+          
+          if (telemetryFile) {
+              const content = await fs.readFile(telemetryFile, "utf-8");
+              const lines = content.split("\n").filter(Boolean);
+              for (const line of lines) {
+                  try {
+                      const json = JSON.parse(line);
+                      if (json.event === "START_GENERATE" && json.payload) {
+                          const initialPayload = {
+                              payload: json.payload,
+                              tools: json.tools
+                          };
+                          await fs.writeFile(path.join(targetWorkspace, "initial_payload.json"), JSON.stringify(initialPayload, null, 2), "utf-8");
+                          console.log(`  > Initial payload saved from telemetry to: ${path.join(targetWorkspace, "initial_payload.json")}`);
+                          break; 
+                      }
+                  } catch (e) {}
+              }
+          } else {
+              console.log(`  > Telemetry file not found in searched directories.`);
+          }
       } catch (e: any) {
-          console.log(`  > Failed to extract initial payload: ${e.message}`);
+          console.log(`  > Failed to extract initial payload from telemetry: ${e.message}`);
       }
 
       if (res.fullPrompts && res.fullPrompts.length > 0) {
@@ -131,6 +159,7 @@ async function main() {
         }
       }
 
+      const metrics = res.engine.getMetrics();
       allResults.push({
         runId,
         iteration: i,
@@ -140,9 +169,10 @@ async function main() {
         logPath: path.join(targetWorkspace, "run.log"),
         errorMessage,
         jsonRepairs: res.engine.jsonRepairs,
-        avgTps: res.avgTps,
-        avgTtftMs: res.avgTtftMs,
-        totalTokens: res.totalTokens
+        avgTps: metrics.avgTps,
+        avgTtftMs: metrics.avgTtftMs,
+        totalTokens: metrics.totalTokens,
+        totalEpochs: metrics.totalEpochs
       });
     }
   }

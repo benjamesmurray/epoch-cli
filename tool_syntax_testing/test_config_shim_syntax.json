@@ -1,0 +1,16 @@
+[
+  {
+    "id": "shim-syntax-test",
+    "iterations": 1,
+    "timeoutMs": 300000,
+    "prompt": "Initialize a new project called 'shim-test' using the spec CLI (spec sc_init --name shim-test). Run ground gt_status to check the project constitution, and map pm_query --path . to see the workspace map. Then use object_to_supervisor to request a phase switch to 'build' (reason: 'Need to write a dummy test file'). Once approved, use the write_file tool to create dummy.test.ts containing: import { test, expect } from 'bun:test'; test('dummy', () => { expect(true).toBe(true); }); Finally, call task_complete.",
+    "expectedTools": ["bash", "task_complete", "sc_init", "gt_status", "pm_query"],
+    "runTargetDir": ".",
+    "docker": {
+      "imageName": "epochcli-eval-env:latest",
+      "network": "host",
+      "memoryLimit": "4g",
+      "model": "local-main/gemma-4-26b-q4-xl"
+    }
+  }
+]

@@ -172,13 +172,7 @@ export namespace Agent {
             general: {
               name: "general",
               description: `General-purpose agent for researching complex questions and executing multi-step tasks. Use this agent to execute multiple units of work in parallel.`,
-              permission: Permission.merge(
-                defaults,
-                Permission.fromConfig({
-                  todowrite: "deny",
-                }),
-                user,
-              ),
+              permission: defaults,
               options: {},
               mode: "subagent",
               native: true,

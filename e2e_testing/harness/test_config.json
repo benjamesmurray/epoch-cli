@@ -2,14 +2,16 @@
   {
     "id": "eventbus-v2",
     "iterations": 1,
-    "timeoutMs": 300000,
-    "prompt": "Use the spec tool to initialize a new project called 'eventbus' in one-shot mode. Create a design for a strictly typed EventBus in TypeScript and then implement it with tests.",
+    "timeoutMs": 1200000,
+    "prompt": "Use the spec tool to initialize a new project called 'eventbus' in one-shot mode (spec sc_init --name eventbus). Create a design for a strictly typed EventBus in TypeScript and then implement it with tests.",
     "expectedTools": ["sc_init", "sc_plan", "sc_approve", "sc_todo_start", "sc_todo_complete"],
     "runTargetDir": ".",
     "docker": {
       "imageName": "epochcli-eval-env:latest",
       "network": "host",
-      "memoryLimit": "4g"
+      "memoryLimit": "4g",
+      "model": "local-main/google-gemma-26b",
+      "contextOverride": 16000
     }
   }
 ]

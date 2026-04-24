@@ -114,9 +114,9 @@ export namespace LSPClient {
           },
         },
       }),
-      45_000,
+      90_000,
     ).catch((err) => {
-      l.error("initialize error", { error: err })
+      l.error("initialize error", { error: String(err), cause: (err as any)?.cause })
       throw new InitializeError(
         { serverID: input.serverID },
         {

@@ -461,12 +461,7 @@ export const BashTool = Tool.define("bash", async () => {
           `The working directory to run the command in. Defaults to ${Instance.directory}. Use this instead of 'cd' commands.`,
         )
         .optional(),
-      description: z
-        .string()
-        .describe(
-          "Clear, concise description of what this command does in 5-10 words. Examples:\nInput: ls\nOutput: Lists files in current directory\n\nInput: git status\nOutput: Shows working tree status\n\nInput: npm install\nOutput: Installs package dependencies\n\nInput: mkdir foo\nOutput: Creates directory 'foo'",
-        ),
-    }),
+      description: z.string().describe("A concise 5-10 word description of the command's intent (e.g., 'Shows working tree status')."),    }),
     async execute(params, ctx) {
       const cwd = params.workdir ? await resolvePath(params.workdir, Instance.directory, shell) : Instance.directory
       if (params.timeout !== undefined && params.timeout < 0) {

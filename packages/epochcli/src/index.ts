@@ -66,6 +66,7 @@ function show(out: string) {
 
 const cli = yargs(args)
   .parserConfiguration({ "populate--": true })
+  .exitProcess(false)
   .scriptName("epochcli")
   .wrap(100)
   .help("help", "show help")
@@ -247,5 +248,6 @@ try {
   // Most notably, some docker-container-based MCP servers don't handle such signals unless
   // run using `docker run --init`.
   // Explicitly exit to avoid any hanging subprocesses.
+  await Log.dispose()
   process.exit()
 }

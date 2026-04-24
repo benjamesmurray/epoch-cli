@@ -25,7 +25,6 @@ import { WebSearchTool } from "../../tool/websearch"
 import { TaskTool } from "../../tool/task"
 import { SkillTool } from "../../tool/skill"
 import { BashTool } from "../../tool/bash"
-import { TodoWriteTool } from "../../tool/todo"
 import { Locale } from "../../util/locale"
 
 type ToolProps<T> = {
@@ -202,16 +201,6 @@ function bash(info: ToolProps<typeof BashTool>) {
   )
 }
 
-function todo(info: ToolProps<typeof TodoWriteTool>) {
-  block(
-    {
-      icon: "#",
-      title: "Todos",
-    },
-    info.input.todos.map((item) => `${item.status === "completed" ? "[x]" : "[ ]"} ${item.content}`).join("\n"),
-  )
-}
-
 function normalizePath(input?: string) {
   if (!input) return ""
   if (path.isAbsolute(input)) return path.relative(process.cwd(), input) || "."
@@ -324,8 +313,7 @@ export const RunCommand = cmd({
         process.chdir(args.dir)
         return process.cwd()
       } catch {
-        UI.error("Failed to change directory to " + args.dir)
-        process.exit(1)
+        throw new Error("Failed to change directory to " + args.dir)
       }
     })()
 
@@ -336,8 +324,7 @@ export const RunCommand = cmd({
       for (const filePath of list) {
         const resolvedPath = path.resolve(process.cwd(), filePath)
         if (!(await Filesystem.exists(resolvedPath))) {
-          UI.error(`File not found: ${filePath}`)
-          process.exit(1)
+          throw new Error(`File not found: ${filePath}`)
         }
 
         const mime = (await Filesystem.isDir(resolvedPath)) ? "application/x-directory" : "text/plain"
@@ -358,13 +345,11 @@ export const RunCommand = cmd({
     }
 
     if (message.trim().length === 0 && !args.command) {
-      UI.error("You must provide a message or a command")
-      process.exit(1)
+      throw new Error("You must provide a message or a command")
     }
 
     if (args.fork && !args.continue && !args.session) {
-      UI.error("--fork requires --continue or --session")
-      process.exit(1)
+      throw new Error("--fork requires --continue or --session")
     }
 
     const rules: Permission.Ruleset = [
@@ -420,7 +405,6 @@ export const RunCommand = cmd({
           if (part.tool === "codesearch") return codesearch(props<typeof CodeSearchTool>(part))
           if (part.tool === "websearch") return websearch(props<typeof WebSearchTool>(part))
           if (part.tool === "task") return task(props<typeof TaskTool>(part))
-          if (part.tool === "todowrite") return todo(props<typeof TodoWriteTool>(part))
           if (part.tool === "skill") return skill(props<typeof SkillTool>(part))
           return fallback(part)
         } catch {
@@ -627,12 +611,12 @@ export const RunCommand = cmd({
 
       const sessionID = await session(sdk)
       if (!sessionID) {
-        UI.error("Session not found")
-        process.exit(1)
+        throw new Error("Session not found")
       }
 
-      loop().catch((e) => {        console.error(e)
-        process.exit(1)
+      loop().catch((e) => {
+        console.error(e)
+        throw e
       })
 
       if (args.command) {

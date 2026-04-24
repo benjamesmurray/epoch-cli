@@ -1,5 +1,6 @@
 import { Provider } from "@/provider/provider"
 import { Log } from "@/util/log"
+import { SessionTelemetry } from "@/util/session-telemetry"
 import { Cause, Effect, Layer, Record, ServiceMap } from "effect"
 import * as Queue from "effect/Queue"
 import * as Stream from "effect/Stream"
@@ -49,6 +50,7 @@ export namespace LLM {
     messages: ModelMessage[]
     small?: boolean
     yolo?: boolean
+    isContinue?: boolean
     tools: Record<string, Tool>
     retries?: number
     toolChoice?: "auto" | "required" | "none"
@@ -94,7 +96,7 @@ export namespace LLM {
 
   export const defaultLayer = layer
 
-  export function parseGroundTruthRules(raw: string, activePacks: string[] = ["core_interaction_pack"]): { operationalFacts: string; behavioralRules: string; projectSpecific: string } {
+  export function parseGroundTruthRules(raw: string, activePacks: string[] = ["core_interaction_pack"], contextLimit?: number): { operationalFacts: string; behavioralRules: string; projectSpecific: string } {
     const zones = {
       operationalFacts: "",
       behavioralRules: "",
@@ -108,8 +110,20 @@ export namespace LLM {
       const extractedFacts: string[] = []
       let match
       while ((match = factsRegex.exec(factsStr)) !== null) {
-        extractedFacts.push(`- ${match[1]}`)
+        let fact = match[1]
+        // TASK: Dynamic Context Limit Injection
+        // If we have a dynamic limit, and this fact mentions the 32K limit, override it.
+        if (contextLimit && fact.includes("context limit is strictly 32K")) {
+           fact = `The environment context limit is strictly ${Math.round(contextLimit / 1000)}K tokens.`
+        }
+        extractedFacts.push(`- ${fact}`)
       }
+      
+      // If the fact was NOT in the TOON file but we have a limit, inject it at the top
+      if (contextLimit && !extractedFacts.some(f => f.includes("context limit is strictly"))) {
+          extractedFacts.unshift(`- The environment context limit is strictly ${Math.round(contextLimit / 1000)}K tokens.`)
+      }
+
       if (extractedFacts.length > 0) {
         zones.operationalFacts = `ZONE 1 & 3: OPERATIONAL FACTS\n${extractedFacts.join("\n")}`
       } else {
@@ -201,16 +215,16 @@ export namespace LLM {
 
     const payload: ZoneStructuredPayload = {
       zone1_critical_rules: [
-        `Current Phase: [${input.agent.name.toUpperCase()}]. The Supervisor (Clerk) has restricted you to this phase. If you are ready to write source code, you MUST use the object_to_supervisor tool to request a shift to the [BUILD] phase.`,
+        `Current Phase: [${input.agent.name.toUpperCase()}]. The Supervisor (Clerk) has restricted you to this phase.${input.agent.name !== "build" ? " If you are ready to write source code, you MUST use the object_to_supervisor tool to request a shift to the [BUILD] phase." : ""}`,
+        "CONTINUITY MANDATE: You are operating in a multi-epoch session. The file '.epoch-continuity.toon' contains the definitive ground truth of your PREVIOUS actions and project state. Treat it as your primary memory. If the continuity report indicates a tool (e.g. sc_plan) was successful, do not repeat it, even if a tool output suggests it is the 'Next' step. Use the 'State Verdict' and 'Residual Blockers' sections to guide your immediate next tool choice.",
       ],
-      zone2_context_files: [...input.system.zone2],
+      zone2_context_files: [],
       zone3_active_cursor: [],
       zone4_guidelines: [],
     }
 
     if (input.operationalFacts && input.operationalFacts.length > 0) {
       payload.zone1_critical_rules.push(...input.operationalFacts)
-      payload.zone3_active_cursor.push(...input.operationalFacts)
     }
 
     if (input.system?.zone1) {
@@ -243,13 +257,14 @@ export namespace LLM {
     // The Clerk detects user intent and shifts the active epochcli Agent.
     if (provider.id === "local-main") {
       try {
-        const sideModel = await Provider.getSideModel() as Provider.Model; // 4B Clerk
-        const sideLanguage = await Provider.getLanguage(sideModel);
-        
-        // Extract conversation tail for structural context (Task 1.1)
-        const tailCount = 10;
-        const recentMessages = input.messages.slice(-tailCount);
-        const conversationTail = recentMessages.map(m => {
+        const sideModel = await Provider.getSideModel()
+        if (sideModel) {
+          const sideLanguage = await Provider.getLanguage(sideModel)
+
+          // Extract conversation tail for structural context (Task 1.1)
+          const tailCount = 10
+          const recentMessages = input.messages.slice(-tailCount)
+          const conversationTail = recentMessages.map(m => {
             let content = "";
             if (typeof m.content === "string") {
                 content = m.content;
@@ -281,7 +296,7 @@ export namespace LLM {
               const fsNode = await import("fs/promises");
               const rulesContext = await fsNode.readFile(".assistant_rules.toon", "utf-8");
               // Use an empty array for packs here since we just want operational facts for the Clerk
-              const parsedRules = parseGroundTruthRules(rulesContext, []);
+              const parsedRules = parseGroundTruthRules(rulesContext, [], sideModel.limit.context);
               if (parsedRules.operationalFacts) groundTruths = parsedRules.operationalFacts;
             } catch (e) {}
 
@@ -381,9 +396,10 @@ export namespace LLM {
                     l.debug("clerk", { message: `SHIFTING agent to: ${identifiedAgent}` });
                     input.agent = newAgent;
                     // Update the directive in Zone 1
-                    payload.zone1_critical_rules[0] = `Current Phase: [${input.agent.name.toUpperCase()}]. The Supervisor (Clerk) has restricted you to this phase. If you are ready to write source code, you MUST use the object_to_supervisor tool to request a shift to the [BUILD] phase.`;
+                    payload.zone1_critical_rules[0] = `Current Phase: [${input.agent.name.toUpperCase()}]. The Supervisor (Clerk) has restricted you to this phase.${input.agent.name !== "build" ? " If you are ready to write source code, you MUST use the object_to_supervisor tool to request a shift to the [BUILD] phase." : ""}`;
                 }
             }
+          }
         }
       } catch (e) {
         l.error("clerk", { message: "Intent classification failed", error: String(e) });
@@ -414,10 +430,9 @@ export namespace LLM {
         }
         
         if (rulesContext) {
-           const parsedRules = parseGroundTruthRules(rulesContext, activeRulePacks)
+           const parsedRules = parseGroundTruthRules(rulesContext, activeRulePacks, input.model.limit.context);
            if (parsedRules.operationalFacts) {
                payload.zone1_critical_rules.push(parsedRules.operationalFacts)
-               payload.zone3_active_cursor.push(parsedRules.operationalFacts) // Repetition in zone 3
            }
            if (parsedRules.behavioralRules) payload.zone2_context_files.push(parsedRules.behavioralRules)
            if (parsedRules.projectSpecific) payload.zone3_active_cursor.push(parsedRules.projectSpecific)
@@ -430,7 +445,7 @@ export namespace LLM {
     payload.zone2_context_files.push(
       [
         // use agent prompt otherwise provider prompt
-        ...(input.agent.prompt ? [input.agent.prompt] : SystemPrompt.provider(input.model)),
+        ...(input.agent.prompt ? [input.agent.prompt] : SystemPrompt.provider(input.model, input.isContinue)),
         // any custom prompt passed into this call
         ...(input.system?.zone2 ?? []),
         // any custom prompt from last user message
@@ -460,7 +475,7 @@ export namespace LLM {
     }
 
     const isWorkflow = language instanceof GitLabWorkflowLanguageModel
-    const isGemma4 = input.model.api?.id?.includes("gemma-4") || input.model.id?.includes("big-pickle")
+    const isGemma4 = input.model.api?.id?.includes("gemma-4") || input.model.api?.id?.includes("google-gemma-26b") || input.model.id?.includes("big-pickle")
     const isReasoningModel = input.model.capabilities.reasoning || isGemma4
 
     const variant =
@@ -548,8 +563,7 @@ export namespace LLM {
 [INTERNAL STATE CHECK]
 - Mode: ${thinkingEffort.toUpperCase()} thinking / Adaptive efficiency active.
 - Role: Assigned to [${input.agent.name.toUpperCase()}].
-- Strategy: mcpx pm_query/pm_plan first. All arguments must be wrapped in <|\\\">.
-- Constraint: 32K token budget. Concise CoT.
+- Constraint: ${Math.round(input.model.limit.context / 1000)}K token budget. Concise CoT.
 Ready to process user request strictly under these parameters.
 `.trim()
 
@@ -671,30 +685,32 @@ Ready to process user request strictly under these parameters.
              if (provider.id === "local-main") {
                  try {
                      log.info("Triggering Clerk Interceptor for prerequisite error")
-                     const sideModel = await Provider.getModel("local-side" as any, "nemotron-3-nano-4b" as any)
-                     const sideLanguage = await Provider.getLanguage(sideModel)
-                     
-                     // Build history string
-                     const tailCount = 5;
-                     const recentMessages = (options.messages ?? input.messages).slice(-tailCount);
-                     const historyStr = recentMessages.map((m: any) => `${m.role}: ${typeof m.content === 'string' ? m.content : JSON.stringify(m.content).slice(0, 200)}`).join("\n")
-                     
-                     const systemPrompt = "Look at the last tool error and the chat history. Write a concise, commanding one-sentence instruction telling the main agent exactly which tool to use next to resolve the prerequisite."
-                     const prompt = `History:\n${historyStr}\n\nTool Error:\n${resultStr}\n\nDirective:`
-                     
-                     const { generateText } = await import("ai")
-                     const res = await generateText({
-                       model: sideLanguage,
-                       system: systemPrompt,
-                       prompt: prompt,
-                       abortSignal: AbortSignal.timeout(10000),
-                       maxRetries: 0,
-                     })
-                     
-                     const clerkText = res.text.trim()
-                     if (clerkText) {
-                         log.info("Clerk interceptor generated directive", { directive: clerkText })
-                         throw new Error(`CRITICAL SYSTEM DIRECTIVE: ${clerkText}\n\nOriginal Error:\n${resultStr}`)
+                     const sideModel = await Provider.getSideModel()
+                     if (sideModel) {
+                        const sideLanguage = await Provider.getLanguage(sideModel)
+                        
+                        // Build history string
+                        const tailCount = 5;
+                        const recentMessages = (options.messages ?? input.messages).slice(-tailCount);
+                        const historyStr = recentMessages.map((m: any) => `${m.role}: ${typeof m.content === 'string' ? m.content : JSON.stringify(m.content).slice(0, 200)}`).join("\n")
+                        
+                        const systemPrompt = "Look at the last tool error and the chat history. Write a concise, commanding one-sentence instruction telling the main agent exactly which tool to use next to resolve the prerequisite."
+                        const prompt = `History:\n${historyStr}\n\nTool Error:\n${resultStr}\n\nDirective:`
+                        
+                        const { generateText } = await import("ai")
+                        const res = await generateText({
+                          model: sideLanguage,
+                          system: systemPrompt,
+                          prompt: prompt,
+                          abortSignal: AbortSignal.timeout(10000),
+                          maxRetries: 0,
+                        })
+                        
+                        const clerkText = res.text.trim()
+                        if (clerkText) {
+                            log.info("Clerk interceptor generated directive", { directive: clerkText })
+                            throw new Error(`CRITICAL SYSTEM DIRECTIVE: ${clerkText}\n\nOriginal Error:\n${resultStr}`)
+                        }
                      }
                  } catch (clerkErr) {
                      log.warn("Clerk interceptor failed", { error: String(clerkErr) })
@@ -795,9 +811,9 @@ Ready to process user request strictly under these parameters.
                const sideProviderConfig = cfg.provider?.["local-side"]
                if (sideProviderConfig) {
                    log.debug("Attempting to repair broken JSON tool call with local-side Clerk")
-                   const sideLanguage = await Provider.getLanguage(
-                     await Provider.getModel("local-side" as any, "nemotron-3-nano-4b" as any) // or default local-side model
-                   )
+                   const sideModel = await Provider.getSideModel()
+                   if (!sideModel) return failed.toolCall
+                   const sideLanguage = await Provider.getLanguage(sideModel)
                    const repairResponse = await generateText({
                      model: sideLanguage,
                      system: "You are a JSON repair utility. The user will provide a broken JSON tool call. Your ONLY job is to output the repaired, valid JSON object that matches the intended schema. DO NOT output any markdown, explanations, or other text. ONLY the valid JSON object.",
@@ -909,14 +925,15 @@ Ready to process user request strictly under these parameters.
                 providerId: input.model.providerID,
                 phase,
                 activeAgent: input.agent.name,
+                contextLimit: input.model.limit.context,
                 toolCount: Object.keys(tools).length,
                 payload: truncatedPayload,
-                tools
+                tools: Flag.EPOCHCLI_DEBUG_FULL_PROMPT ? tools : undefined
               }
               l.debug("model execution start", startEvent)
+              SessionTelemetry.emitModelEvent(startEvent)
 
-              try {
-                const res = await doGenerate()
+              try {                const res = await doGenerate()
                 const endTime = Date.now()
                 
                 const endEvent: Log.EnhancedModelExecutionEvent = {
@@ -930,10 +947,13 @@ Ready to process user request strictly under these parameters.
                   metrics: {
                     ttftMs: endTime - startTime,
                     promptTokens: (res.usage as any)?.promptTokens,
+                    completionTokens: (res.usage as any)?.completionTokens,
                     tps: (res.usage as any)?.completionTokens ? ((res.usage as any).completionTokens / ((endTime - startTime) / 1000)) : undefined
                   }
-                }
-                l.debug("model execution end", endEvent)
+                  }
+                  SessionTelemetry.emitModelEvent(endEvent)
+
+                  l.debug("model execution end", endEvent)
                 return res
               } catch (e) {
                 const errorEvent: Log.EnhancedModelExecutionEvent = {
@@ -961,14 +981,15 @@ Ready to process user request strictly under these parameters.
                 providerId: input.model.providerID,
                 phase,
                 activeAgent: input.agent.name,
+                contextLimit: input.model.limit.context,
                 toolCount: Object.keys(tools).length,
                 payload: truncatedPayload,
-                tools
+                tools: Flag.EPOCHCLI_DEBUG_FULL_PROMPT ? tools : undefined
               }
               l.debug("model execution start", startEvent)
+              SessionTelemetry.emitModelEvent(startEvent)
 
-              try {
-                const { stream, ...rest } = await doStream()
+              try {                const { stream, ...rest } = await doStream()
                 let firstTokenTime: number | undefined
                 let tokenCount = 0
                 const monitor = new StreamingMonitor()
@@ -1023,6 +1044,8 @@ Ready to process user request strictly under these parameters.
                           metrics: {
                             ttftMs: firstTokenTime ? firstTokenTime - startTime : undefined,
                             tps: (tokenCount && firstTokenTime) ? (tokenCount / ((endTime - firstTokenTime) / 1000)) : undefined,
+                            promptTokens: (await (rest as any).usage)?.promptTokens,
+                            completionTokens: (await (rest as any).usage)?.completionTokens,
                             loop_detected: monitor.getOffendingText() !== undefined
                           }
                         }
@@ -1201,12 +1224,19 @@ Ready to process user request strictly under these parameters.
     l: any
   }): Promise<string | null> {
     try {
-      const sideLanguage = await Provider.getLanguage(
-        await Provider.getModel("local-side" as any, "nemotron-3-nano-4b" as any)
-      );
+      const sideModel = await Provider.getSideModel()
+      if (!sideModel) return null
+      const sideLanguage = await Provider.getLanguage(sideModel)
 
       const systemPrompt = input.isMcpx
-        ? `You are a tool argument validator. The user is attempting to call a sub-tool via the 'mcpx' tool wrapper. Compare the proposed SUB-TOOL arguments with the provided JSON schema. If they are valid, output 'VALID'. If they are invalid, output 'INVALID: <concise_reason> EXAMPLE: <strict_valid_json_example>'. You MUST explicitly explain what was missing or incorrect. CRITICAL: Your JSON example MUST be formatted for the 'mcpx' wrapper tool, which expects \`{ "server": "${input.mcpxServer}", "tool": "${input.toolName}", "flags": <valid_sub_tool_args_as_key_value_pairs> }\`. Do not just provide the sub-tool args, wrap them in the mcpx tool structure!`
+        ? `You are a tool argument validator. The user is attempting to call a sub-tool via the 'mcpx' tool wrapper. Compare the proposed SUB-TOOL arguments with the provided JSON schema. If they are valid, output 'VALID'. If they are invalid, output 'INVALID: <concise_reason> EXAMPLE: <strict_valid_json_example>'. You MUST explicitly explain what was missing or incorrect.
+        
+CRITICAL: Your JSON example MUST be formatted for the 'mcpx' wrapper tool. 
+- Servers like 'spec' and 'map' often use positional arguments.
+- Positional arguments (like 'sc_status', 'pm_query', or specific paths) MUST be passed in the 'args' array of strings.
+- Named flags (like --path) should be in the 'flags' record.
+- EXAMPLE for 'spec sc_status': \`{ "server": "spec", "tool": "sc_status", "args": [] }\` (or with specific sub-args in the array).
+- Your output MUST be a JSON object containing "server", "tool", and "args" (and/or "flags").`
         : `You are a tool argument validator. Compare the proposed arguments with the provided JSON schema. If they are valid, output 'VALID'. If they are invalid, output 'INVALID: <concise_reason> EXAMPLE: <strict_valid_json_example>'. You MUST explicitly explain what was missing or incorrect, and provide a strict, concrete JSON example of what the valid arguments should look like according to the schema.`;
 
       const prompt = `Tool: ${input.toolName}\nProposed Args: ${JSON.stringify(input.args)}\nSchema: ${JSON.stringify(input.schema)}`;
@@ -1238,6 +1268,7 @@ Ready to process user request strictly under these parameters.
     cfg: Config.Info
   }) {
     const l = log.clone();
+    l.error(`!!! DEBUG: interceptToolLoop called for ${input.toolName}. History length: ${input.messages.length}`)
 
     // Task: Proactive Validation (Clerk / local-side)
     if (input.provider.id === "local-main") {
@@ -1307,47 +1338,54 @@ Ready to process user request strictly under these parameters.
     let failureChainActive = true
     const attemptedArgs: any[] = []
 
+    console.error(`!!! DEBUG: backward scan starting. messages.length: ${input.messages.length}`)
     // Scan backwards through messages
     for (let i = input.messages.length - 1; i >= 0; i--) {
       if (!identicalChainActive && !failureChainActive) break
 
       const msg = input.messages[i]
+      console.error(`!!! DEBUG: turn ${i} role: ${msg.role} is_array: ${Array.isArray(msg.content)}`)
 
       if (msg.role === "assistant" && Array.isArray(msg.content)) {
-        const call = msg.content.find((c) => c.type === "tool-call" && c.toolName === input.toolName)
-        if (call) {
-          const callArgs = (call as any).args
-
-          // Identical arguments chain
-          if (identicalChainActive) {
-            if (JSON.stringify(callArgs) === JSON.stringify(input.args)) {
-              identicalCount++
-            } else {
-              identicalChainActive = false
+        console.error(`!!! DEBUG: turn ${i} is assistant array. length: ${msg.content.length}`)
+        for (const part of msg.content) {
+            console.error(`!!! DEBUG: part type: ${part.type}`)
+            if (part.type === "tool-call") {
+                const tName = (part as any).toolName || (part as any).name
+                const tArgs = (part as any).args
+                console.error(`!!! DEBUG: found tool-call part. name: ${tName}`)
+                if (tName === input.toolName) {
+                    const callArgs = tArgs
+                    l.error(`!!! DEBUG: tool name match!`)
+                    
+                    // Identical arguments chain
+                    if (identicalChainActive) {
+                        if (JSON.stringify(callArgs) === JSON.stringify(input.args)) {
+                            identicalCount++
+                            l.error(`!!! DEBUG: identical match! count: ${identicalCount}`)
+                        } else {
+                            identicalChainActive = false
+                            l.error(`!!! DEBUG: identical chain broken`)
+                        }
+                    }
+                    
+                    // Sequential failures chain
+                    if (failureChainActive) {
+                        attemptedArgs.push(callArgs)
+                        const nextMsg = input.messages[i + 1]
+                        if (nextMsg && nextMsg.role === "user" && Array.isArray(nextMsg.content)) {
+                            const result = (nextMsg.content as any[]).find(
+                                (c) => c.type === "tool-result" && (c.toolCallId === (part as any).toolCallId || c.toolCallId === (part as any).id),
+                            )
+                            if (result && (result as any).isError) {
+                                sequentialFailureCount++
+                            } else if (result) {
+                                failureChainActive = false
+                            }
+                        }
+                    }
+                }
             }
-          }
-
-          // Sequential failures chain
-          if (failureChainActive) {
-            attemptedArgs.push(callArgs)
-            // Check if this specific call resulted in an error in the subsequent message
-            const nextMsg = input.messages[i + 1]
-            if (nextMsg && nextMsg.role === "user" && Array.isArray(nextMsg.content)) {
-              const result = (nextMsg.content as any[]).find(
-                (c) => c.type === "tool-result" && c.toolCallId === (call as any).toolCallId,
-              )
-              if (result && (result as any).isError) {
-                sequentialFailureCount++
-              } else if (result) {
-                // Successful call to this tool, reset sequential failure count
-                failureChainActive = false
-              }
-            }
-          }
-        } else {
-          // Called a different tool, chain broken for both
-          identicalChainActive = false
-          failureChainActive = false
         }
       } else if (msg.role === "user" && typeof msg.content === "string") {
         // User interrupted or added new text
@@ -1356,7 +1394,7 @@ Ready to process user request strictly under these parameters.
       }
     }
 
-    const isIdenticalLoop = identicalCount >= 3
+    const isIdenticalLoop = identicalCount >= 1
     const isFailureLoop = sequentialFailureCount >= 3
 
     // Schema-Aware Error Recovery (Task 2.2)
@@ -1365,12 +1403,11 @@ Ready to process user request strictly under these parameters.
         const schema = await SchemaContextLoader.getToolSchema(input.toolName)
         if (schema && input.provider.id === "local-main") {
           log.debug("Generating schema-aware correction hint with local-side Clerk")
-          const sideLanguage = await Provider.getLanguage(
-            await Provider.getModel("local-side" as any, "nemotron-3-nano-4b" as any),
-          )
+          const sideModel = await Provider.getSideModel()
+          if (!sideModel) return null
+          const sideLanguage = await Provider.getLanguage(sideModel)
 
-          const systemPrompt =
-            "You are a tool argument validator. Compare the failed arguments with the provided JSON schema. Identify the mistake and provide a concise, helpful correction hint. Do not be verbose. Example: 'You are using --path, but sc_guidance accepts no arguments. Try calling it without flags.'"
+          const systemPrompt =            "You are a tool argument validator. Compare the failed arguments with the provided JSON schema. Identify the mistake and provide a concise, helpful correction hint. Do not be verbose. Example: 'You are using --path, but sc_guidance accepts no arguments. Try calling it without flags.'"
 
           const prompt = `Tool: ${input.toolName}\nFailed Args: ${JSON.stringify(input.args)}\nSchema: ${JSON.stringify(schema)}`
 
@@ -1404,19 +1441,27 @@ Ready to process user request strictly under these parameters.
           const sideProviderConfig = input.cfg.provider?.["local-side"]
           if (sideProviderConfig) {
             log.debug("Generating intervention directive with local-side Clerk")
-            const sideLanguage = await Provider.getLanguage(
-              await Provider.getModel("local-side" as any, "nemotron-3-nano-4b" as any),
-            )
+            const sideModel = await Provider.getSideModel()
+            if (!sideModel) return null
+            const sideLanguage = await Provider.getLanguage(sideModel)
+
+            let continuityContext = ""
+            const systemMessage = input.messages.find((m) => m.role === "system")
+            if (systemMessage && typeof systemMessage.content === "string") {              const match = systemMessage.content.match(/epoch_continuity:[\s\S]*?(?=\n\n|$)/)
+              if (match) {
+                continuityContext = `\n\nContext (Epoch Continuity Report):\n${match[0]}\n`
+              }
+            }
 
             const systemPrompt =
-              "You are an AI supervisor monitoring a main agent. The main agent is stuck in a loop. Provide a concise, stern directive telling the agent to STOP calling this tool, explain why its current approach is failing (e.g. repeating same args, or repeatedly failing with varied args like capitalization errors), and instruct it to stop and rethink or try a completely different strategy. Do not output anything other than the directive."
+              "You are an AI supervisor monitoring a main agent. The main agent is stuck in a doom loop or has stagnated. Analyze the recent failed attempts and the provided Context (if any). Provide a concise, stern directive telling the agent to STOP calling this tool or repeating this behavior. Explain why its current approach is failing, and suggest a specific actionable alternative strategy based on the Context. Do not output anything other than the directive."
 
             const prompt = isIdenticalLoop
-              ? `Tool: ${input.toolName}\nArgs: ${JSON.stringify(input.args)}\nStatus: Stuck in an infinite loop with identical arguments.`
+              ? `Tool: ${input.toolName}\nArgs: ${JSON.stringify(input.args)}\nStatus: Stuck in an infinite loop with identical arguments.${continuityContext}`
               : `Tool: ${input.toolName}\nRecent Failed Attempts:\n${attemptedArgs
                   .reverse()
                   .map((a, idx) => `${idx + 1}. ${JSON.stringify(a)}`)
-                  .join("\n")}\nStatus: Stuck in a trial-and-error loop where all recent attempts have failed.`
+                  .join("\n")}\nStatus: Stuck in a trial-and-error loop where all recent attempts have failed.${continuityContext}`
 
             const intervention = await generateText({
               model: sideLanguage,

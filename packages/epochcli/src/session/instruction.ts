@@ -18,8 +18,7 @@ const log = Log.create({ service: "instruction" })
 
 const FILES = [
   "AGENTS.md",
-  ...(Flag.EPOCHCLI_DISABLE_CLAUDE_CODE_PROMPT ? [] : ["CLAUDE.md"]),
-  "CONTEXT.md", // deprecated
+  ".epoch-continuity.toon",
 ]
 
 function globalFiles() {
@@ -28,9 +27,6 @@ function globalFiles() {
     files.push(path.join(Flag.EPOCHCLI_CONFIG_DIR, "AGENTS.md"))
   }
   files.push(path.join(Global.Path.config, "AGENTS.md"))
-  if (!Flag.EPOCHCLI_DISABLE_CLAUDE_CODE_PROMPT) {
-    files.push(path.join(os.homedir(), ".claude", "CLAUDE.md"))
-  }
   return files
 }
 
@@ -125,11 +121,17 @@ export namespace Instruction {
 
           // The first project-level match wins so we don't stack AGENTS.md/CLAUDE.md from every ancestor.
           if (!Flag.EPOCHCLI_DISABLE_PROJECT_CONFIG) {
+            const seenFiles = new Set<string>()
             for (const file of FILES) {
               const matches = yield* fs.findUp(file, Instance.directory, Instance.worktree)
               if (matches.length > 0) {
-                matches.forEach((item) => paths.add(path.resolve(item)))
-                break
+                // We take the first match (the closest one) for each file type
+                const resolvedPath = path.resolve(matches[0])
+                const fileName = path.basename(resolvedPath)
+                if (!seenFiles.has(fileName)) {
+                  paths.add(resolvedPath)
+                  seenFiles.add(fileName)
+                }
               }
             }
           }

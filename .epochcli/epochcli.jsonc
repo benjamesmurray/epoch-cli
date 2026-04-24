@@ -1,50 +1,49 @@
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "./config.json",
+  "model": "local-main/google-gemma-26b",
+  "side_model": "local-side/nemotron-3-nano",
   "provider": {
-    "opencode": {
-      "options": {},
-    },
     "local-main": {
       "npm": "@ai-sdk/openai-compatible",
-      "name": "Local Gemma (RTX 4090)",
+      "name": "Local Main (Gemma)",
       "options": {
         "baseURL": "http://localhost:8085/v1",
         "apiKey": "2250"
       },
       "models": {
-        "gemma-4-26b-q4-xl": { "name": "Gemma 4 26B" },
-        "gemma-4-q5": { "name": "Gemma 4 26B Q5" },
-        "qwen-3.5": { "name": "Qwen 3.5" }
+        "google-gemma-26b": {
+          "name": "Gemma 4 26B",
+          "limit": {
+            "context": 32000,
+            "output": 4096
+          }
+        }
       }
     },
     "local-side": {
       "npm": "@ai-sdk/openai-compatible",
-      "name": "Local Nemotron (RTX 4090)",
+      "name": "Local Side (Nemotron Clerk)",
       "options": {
-        "baseURL": "http://localhost:8086/v1",
+        "baseURL": "http://localhost:8085/v1",
         "apiKey": "2250"
       },
       "models": {
-        "nemotron-3-nano-4b": { "name": "Nemotron 3 Nano" }
+        "nemotron-3-nano": {
+          "name": "Nemotron 3 Nano",
+          "limit": {
+            "context": 32000,
+            "output": 4096
+          }
+        }
       }
     }
   },
-  "model": "local-main/gemma-4-26b-q4-xl",
   "permission": {
     "edit": {
-      "packages/opencode/migration/*": "deny",
-    },
+      "packages/opencode/migration/*": "deny"
+    }
   },
-  "mcp": {},
   "mcpx": {
-    "enabled": true,
-    "binaryPath": "/home/benmurray/.npm-global/lib/node_modules/mcpx-go/vendor/mcpx"
-  },
-  "experimental": {
-    "mcp_timeout": 120000
-  },
-  "tools": {
-    "github-triage": false,
-    "github-pr-search": false,
-  },
+    "enabled": true
+  }
 }

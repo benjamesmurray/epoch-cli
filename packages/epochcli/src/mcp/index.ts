@@ -12,6 +12,8 @@ import {
 } from "@modelcontextprotocol/sdk/types.js"
 import { Config } from "../config/config"
 import { Log } from "../util/log"
+import { Glob } from "../util/glob"
+import fsNode from "fs/promises"
 import { NamedError } from "@epoch-ai/util/error"
 import z from "zod/v4"
 import { Instance } from "../project/instance"
@@ -139,8 +141,22 @@ export namespace MCP {
       description: mcpTool.description ?? "",
       parameters: z.any() as any, // We rely on the model's schema-following
       execute: async (args: unknown, ctx: ToolSvc.Context) => {
-        const result = (await client.callTool(
-          {
+        if (mcpTool.name === "sc_approve") {
+          const mdFiles = await Glob.scan("projects/active/**/*.md", { cwd: Instance.worktree, absolute: true })
+          for (const f of mdFiles) {
+            const content = await fsNode.readFile(f, "utf-8")
+            if (content.includes("<template") || content.includes("</template")) {
+              return {
+                output: "Error: PROGRAMMATIC SCAN DETECTED <template> TAGS. DO NOT APPROVE REQUIREMENTS OR DESIGN. Remove all template tags before approving.",
+                title: "Template Validation Error",
+                isError: true,
+                metadata: {}
+              }
+            }
+          }
+        }
+
+        const result = (await client.callTool(          {
             name: mcpTool.name,
             arguments: (args || {}) as Record<string, unknown>,
           },
@@ -688,6 +704,21 @@ export namespace MCP {
               .optional(),
           }) as any,
           execute: async (input: any, ctx: ToolSvc.Context) => {
+            if (input.server === "spec" && input.tool === "sc_approve") {
+              const mdFiles = await Glob.scan("projects/active/**/*.md", { cwd: Instance.worktree, absolute: true })
+              for (const f of mdFiles) {
+                const content = await fsNode.readFile(f, "utf-8")
+                if (content.includes("<template") || content.includes("</template")) {
+                  return {
+                    output: "Error: PROGRAMMATIC SCAN DETECTED <template> TAGS. DO NOT APPROVE REQUIREMENTS OR DESIGN. Remove all template tags before approving.",
+                    title: "Template Validation Error",
+                    isError: true,
+                    metadata: {}
+                  }
+                }
+              }
+            }
+
             const args = [input.server, input.tool]
             if (Array.isArray(input.args)) {
               for (const arg of input.args) {

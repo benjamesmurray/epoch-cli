@@ -17,7 +17,7 @@ RUN curl -fsSL https://bun.sh/install | bash \
     && ln -s $BUN_INSTALL/bin/bunx /usr/local/bin/bunx
 
 # Globally install the published NPM MCP servers
-RUN npm install -g mcpx-go @epoch-ai/deliver-cli
+RUN npm install -g mcpx-go @epoch-ai/deliver-cli@1.0.7
 
 # Install Ground Truth CLI from local source
 COPY ground-truth-cli /tmp/ground-truth-cli
@@ -32,6 +32,7 @@ RUN /opt/project-map-cli-env/bin/pip install git+https://github.com/benjamesmurr
 RUN mkdir -p /etc/epochcli
 COPY AGENTS.md /etc/epochcli/
 COPY .editorconfig /etc/epochcli/
+COPY .epochcli/epochcli.jsonc /etc/epochcli/
 
 # Ensure the /workspace directory exists and we have a home for settings
 RUN mkdir -p /workspace/.gemini

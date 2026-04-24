@@ -801,6 +801,13 @@ export namespace Config {
         .record(
           z.string(),
           ModelsDev.Model.partial().extend({
+            limit: z
+              .object({
+                context: z.number().optional(),
+                input: z.number().optional(),
+                output: z.number().optional(),
+              })
+              .optional(),
             variants: z
               .record(
                 z.string(),

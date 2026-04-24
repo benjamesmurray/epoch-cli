@@ -1,0 +1,17 @@
+[
+  {
+    "id": "yolo-16k-refactor",
+    "iterations": 1,
+    "timeoutMs": 600000,
+    "prompt": "Use the spec tool to initialize a new project called 'telemetry-refactor' in one-shot mode. Create a new utility 'BufferManager' in TypeScript that handles generic byte buffers with safe-slicing and implement it with comprehensive tests.",
+    "expectedTools": ["sc_init", "sc_plan", "sc_approve", "sc_todo_start", "sc_todo_complete"],
+    "runTargetDir": ".",
+    "docker": {
+      "imageName": "epochcli-eval-env:latest",
+      "network": "host",
+      "memoryLimit": "4g",
+      "model": "local-main/google-gemma-26b",
+      "contextOverride": 16000
+    }
+  }
+]

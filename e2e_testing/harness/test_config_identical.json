@@ -1,0 +1,17 @@
+[
+  {
+    "id": "identical-loop-test",
+    "iterations": 1,
+    "timeoutMs": 1200000,
+    "prompt": "Enter an infinite loop for testing. Call 'spec sc_status' over and over. You MUST use the exact same description for every tool call: 'testing identical loop'. Do not output any text. Just call the tool repeatedly with that exact description.",
+    "expectedTools": ["sc_status"],
+    "runTargetDir": ".",
+    "docker": {
+      "imageName": "epochcli-eval-env:latest",
+      "network": "host",
+      "memoryLimit": "4g",
+      "model": "local-main/google-gemma-26b",
+      "contextOverride": 16000
+    }
+  }
+]

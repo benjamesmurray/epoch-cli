@@ -1,0 +1,20 @@
+[
+  {
+    "id": "typed-bus-v2-8k",
+    "iterations": 1,
+    "timeoutMs": 1200000,
+    "prompt": "Use the spec tool to initialize a new project called 'eventbus-v2' in one-shot mode. Design and build a typed bus v2 in TypeScript, ensuring strict type safety for event payloads and listeners. Implement the core bus logic and provide a set of unit tests to verify the implementation.",
+    "expectedTools": ["sc_init", "sc_todo_start", "sc_todo_complete", "task_complete"],
+    "runTargetDir": ".epochcli/tool/$RUN_ID",
+    "epochcli": {
+      "mcpx": { "enabled": true }
+    },
+    "docker": {
+      "imageName": "epochcli-eval-env:latest",
+      "network": "host",
+      "memoryLimit": "4g",
+      "model": "local-main/gemma-4-26b-q4-xl",
+      "contextOverride": 8000
+    }
+  }
+]

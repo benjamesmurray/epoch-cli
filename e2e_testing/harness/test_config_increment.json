@@ -1,0 +1,17 @@
+[
+  {
+    "id": "increment-loop",
+    "iterations": 1,
+    "timeoutMs": 1200000,
+    "prompt": "Initialize 'telemetry-refactor' with spec sc_init. Then, create a file 'counter.txt' and write '1' to it. Read it, then rewrite it as '2'. Continue this loop, incrementing the number each time, until you have reached 20. Do not skip any steps. You must reach 20.",
+    "expectedTools": ["sc_init", "write", "read"],
+    "runTargetDir": ".",
+    "docker": {
+      "imageName": "epochcli-eval-env:latest",
+      "network": "host",
+      "memoryLimit": "4g",
+      "model": "local-main/google-gemma-26b",
+      "contextOverride": 16000
+    }
+  }
+]

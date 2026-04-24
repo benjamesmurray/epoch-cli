@@ -1,0 +1,44 @@
+[
+  {
+    "id": "syntax-mcpx-init-raw",
+    "iterations": 1,
+    "timeoutMs": 300000,
+    "prompt": "Initialize a new project called 'raw-mcpx-test' using the mcpx tool directly. You must use the tool name 'sc_init' and provide the project name correctly via the 'args' array (as per the schema). Do NOT use the bash shim.",
+    "expectedTools": ["sc_init"],
+    "runTargetDir": ".",
+    "docker": {
+      "imageName": "epochcli-eval-env:latest",
+      "network": "none",
+      "memoryLimit": "4g",
+      "model": "local-main/google-gemma-26b"
+    }
+  },
+  {
+    "id": "syntax-sc-plan-minimal",
+    "iterations": 1,
+    "timeoutMs": 300000,
+    "prompt": "Assume the project 'raw-mcpx-test' is already initialized. Use the spec CLI to transition to the design phase. CRITICAL: Do NOT pass any arguments or flags to the sc_plan tool. It is stateful and takes zero arguments.",
+    "expectedTools": ["sc_plan"],
+    "runTargetDir": ".",
+    "docker": {
+      "imageName": "epochcli-eval-env:latest",
+      "network": "none",
+      "memoryLimit": "4g",
+      "model": "local-main/google-gemma-26b"
+    }
+  },
+  {
+    "id": "syntax-sc-approve-minimal",
+    "iterations": 1,
+    "timeoutMs": 300000,
+    "prompt": "Assume the project 'raw-mcpx-test' has a completed design. Use the spec CLI to approve the design. CRITICAL: Do NOT pass any arguments or flags to the sc_approve tool. It is stateful and takes zero arguments.",
+    "expectedTools": ["sc_approve"],
+    "runTargetDir": ".",
+    "docker": {
+      "imageName": "epochcli-eval-env:latest",
+      "network": "none",
+      "memoryLimit": "4g",
+      "model": "local-main/google-gemma-26b"
+    }
+  }
+]

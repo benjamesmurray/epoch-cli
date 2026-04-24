@@ -16,6 +16,7 @@ import { Env } from "../env"
 import { Instance } from "../project/instance"
 import { Flag } from "../flag/flag"
 import { iife } from "@/util/iife"
+import { isContainer } from "@/util/network"
 import { Global } from "../global"
 import path from "path"
 import { Filesystem } from "../util/filesystem"
@@ -1365,6 +1366,7 @@ export namespace Provider {
               const val = Env.get(String(key))
               return val ?? item
             })
+
             return url
           })
 
@@ -1430,7 +1432,7 @@ export namespace Provider {
             return wrapSSE(res, chunkTimeout, chunkAbortCtl)
           }
 
-          const bundledFn = BUNDLED_PROVIDERS[model.api.npm]
+          const bundledFn = model.api.npm ? BUNDLED_PROVIDERS[model.api.npm] : undefined
           if (bundledFn) {
             log.info("using bundled provider", {
               providerID: model.providerID,
@@ -1442,6 +1444,10 @@ export namespace Provider {
             })
             s.sdk.set(key, loaded)
             return loaded as SDK
+          }
+
+          if (!model.api.npm) {
+             throw new Error(`Provider ${model.providerID} has no npm package specified`)
           }
 
           let installedPath: string
@@ -1464,6 +1470,7 @@ export namespace Provider {
           s.sdk.set(key, loaded)
           return loaded as SDK
         } catch (e) {
+          log.error("Provider initialization failed", { providerID: model.providerID, error: String(e), cause: (e as any)?.cause });
           throw new InitError({ providerID: model.providerID }, { cause: e })
         }
       }

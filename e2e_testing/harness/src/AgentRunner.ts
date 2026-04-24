@@ -23,6 +23,7 @@ export class AgentRunner {
   private abortOnGenerate: boolean;
   private runId: string;
   private isAborting: boolean = false;
+  private pendingEpochSnapshot: number | null = null;
   private docker?: DockerConfig;
   private yolo: boolean;
 
@@ -41,7 +42,7 @@ export class AgentRunner {
         const modelArg = docker.model ? `--model ${docker.model}` : "";
         const yoloArg = yolo ? "--yolo" : "";
         
-        const internalCommand = `cp -a /etc/epochcli/. /workspace/ 2>/dev/null || true; git config --global --add safe.directory /workspace; HOME=/workspace LOG_LEVEL=DEBUG EPOCHCLI_DEBUG_FULL_PROMPT=true bun /cli/packages/epochcli/src/index.ts run --thinking --print-logs --log-level=DEBUG ${modelArg} ${yoloArg} "${cleanArgs}"`;
+        const internalCommand = `mkdir -p /workspace/.epochcli; cp -an /etc/epochcli/. /workspace/.epochcli/ 2>/dev/null || true; git config --global --add safe.directory /workspace; HOME=/workspace LOG_LEVEL=DEBUG EPOCHCLI_DEBUG_FULL_PROMPT=true bun /cli/packages/epochcli/src/index.ts run --thinking --print-logs --log-level=DEBUG ${modelArg} ${yoloArg} "${cleanArgs}"`;
         
         this.command = [
             "docker", "run", "--rm", 
@@ -54,8 +55,11 @@ export class AgentRunner {
             "-e", "GITHUB_MODELS_TOKEN=mock-token-for-docker",
             "-e", "XDG_DATA_HOME=/workspace/.local/share",
             "-e", "XDG_CONFIG_HOME=/workspace/.config",
+            "-e", "EPOCHCLI_TEST_MANAGED_CONFIG_DIR=/workspace/.managed-config-empty",
             "-e", "PATH=/workspace/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-            "-e", "EPOCHCLI_LIBC=glibc"
+            "-e", "EPOCHCLI_LIBC=glibc",
+            "-e", "EPOCHCLI_DEBUG_FULL_PROMPT=true",
+            "-e", "LOG_LEVEL=DEBUG"
         ];
         if (docker.memoryLimit) {
             this.command.push("--memory", docker.memoryLimit);
@@ -114,7 +118,7 @@ export class AgentRunner {
         signal: controller.signal,
         env: {
             ...process.env,
-            LOG_LEVEL: "INFO",
+            LOG_LEVEL: "DEBUG",
             EPOCHCLI_DEBUG_FULL_PROMPT: "true"
         }
       });
@@ -141,7 +145,53 @@ export class AgentRunner {
 
             for (const line of lines) {
               try {
+                const prevEpochs = this.engine.totalEpochs;
+                const prevWrites = this.engine.lastContinuityWrite;
                 this.engine.processLine(line);
+                
+                // If transition detected, mark for numbered snapshot
+                if (this.engine.totalEpochs > prevEpochs) {
+                    this.pendingEpochSnapshot = this.engine.totalEpochs;
+                }
+
+                if (this.engine.lastContinuityWrite > prevWrites) {
+                    const continuityFile = path.join(this.cwd, ".epoch-continuity.md");
+                    const latestPath = path.join(this.cwd, `continuity_latest.md`);
+                    
+                    // Always update the latest summary
+                    fs.copyFile(continuityFile, latestPath).catch(() => {});
+
+                    if (this.pendingEpochSnapshot !== null) {
+                        const epochNum = this.pendingEpochSnapshot;
+                        this.pendingEpochSnapshot = null; // Clear it
+
+                        // Transition detected, snapshot the file with retry
+                        const snapshotPath = path.join(this.cwd, `continuity_epoch_${epochNum}.md`);
+                        
+                        let attempts = 0;
+                        const maxAttempts = 5;
+                        const delay = 500;
+                        
+                        const trySnapshot = async () => {
+                            try {
+                                const content = await fs.readFile(continuityFile, "utf-8");
+                                await fs.writeFile(snapshotPath, content);
+                                console.log(`    [${this.runId}] 💾 Snapshotted Epoch ${epochNum} report to ${snapshotPath}`);
+                                return true;
+                            } catch (err) {
+                                attempts++;
+                                if (attempts < maxAttempts) {
+                                    await new Promise(resolve => setTimeout(resolve, delay));
+                                    return trySnapshot();
+                                }
+                                console.log(`    [${this.runId}] ⚠️ Could not snapshot continuity report after ${maxAttempts} attempts: ${err}`);
+                                return false;
+                            }
+                        };
+                        trySnapshot();
+                    }
+                }
+
                 if (this.abortOnGenerate && this.engine.hasFullPayload() && !this.isAborting) {
                   this.isAborting = true;
                   console.log(`    [${this.runId}] 🛑 Aborting execution as requested (--abort-on-generate)`);
@@ -179,6 +229,44 @@ export class AgentRunner {
 
       const stdoutPromise = processStream(proc.stdout);
       const stderrPromise = processStream(proc.stderr);
+
+      // Telemetry Polling (JSONL stream)
+      const telemetryPromise = (async () => {
+          let lastSize = 0;
+          let telemetryFile: string | null = null;
+          
+          while (!proc.killed && proc.exitCode === null) {
+              if (!telemetryFile) {
+                  // Try to find the telemetry file
+                  const logDir = path.join(this.cwd, ".local", "share", "epochcli", "log");
+                  try {
+                      const files = await fs.readdir(logDir);
+                      const latest = files.filter(f => f.endsWith(".telemetry.jsonl")).sort().reverse()[0];
+                      if (latest) telemetryFile = path.join(logDir, latest);
+                  } catch (e) {}
+              }
+
+              if (telemetryFile) {
+                  try {
+                      const stats = await fs.stat(telemetryFile);
+                      if (stats.size > lastSize) {
+                          const file = await fs.open(telemetryFile, "r");
+                          const buffer = Buffer.alloc(stats.size - lastSize);
+                          await file.read(buffer, 0, stats.size - lastSize, lastSize);
+                          await file.close();
+                          
+                          const content = buffer.toString("utf-8");
+                          const lines = content.split("\n").filter(Boolean);
+                          for (const line of lines) {
+                              this.engine.processLine(line);
+                          }
+                          lastSize = stats.size;
+                      }
+                  } catch (e) {}
+              }
+              await new Promise(r => setTimeout(r, 1000));
+          }
+      })();
 
       try {
         await proc.exited;

@@ -35,8 +35,12 @@ You can add entries directly to `~/.config/mcpx/config.toml`:
 
 ```toml
 [servers.map]
-command = "/home/benmurray/Projects/cli/map/venv/bin/python"
+command = "/home/benmurray/Projects/cli/project-map-cli/venv/bin/python"
 args = ["-m", "project_map_cli.mcp.server"]
+
+[servers.spec]
+command = "npx"
+args = ["-y", "@epoch-ai/deliver-cli", "serve"]
 
 [servers.github]
 command = "npx"
@@ -80,16 +84,30 @@ mcpx github search-repositories --query=mcp | jq -r '.items[0].full_name'
 
 ## 5. Command Shims (Optional)
 
-You can install local passthrough shims so that `<server>` works as a standalone command in your terminal:
+You can install local passthrough shims so that `<server>` works as a standalone command in your terminal. This is the preferred way for agents to interact with project tools.
 
 ```bash
+# Install shims
 mcpx shim install map
-map pm_status
+mcpx shim install spec
+mcpx shim install ground
+
+# Direct usage
+spec sc_status
+map pm_query --query "stallScore"
+ground gt_status
 ```
 
 ## 6. Project Servers
 
-The following project-specific servers are pre-configured in `mcpx`:
-- `spec`: Management of specification-driven development.
-- `map`: Architectural mapping and symbol analysis.
-- `ground`: Synthesis of behavioral rules and operational facts.
+The following project-specific servers are pre-configured in `mcpx`. Agents should use their respective shims for all operations:
+
+- **`spec`**: Management of specification-driven development.
+    - `spec sc_status`: View project health and next steps.
+    - `spec sc_todo_start`: Mark a task as active.
+- **`map`**: Architectural mapping and symbol analysis.
+    - `map pm_query`: Search for symbols or get file context.
+    - `map pm_plan`: Analyze the architectural impact of a change.
+- **`ground`**: Synthesis of behavioral rules and operational facts.
+    - `ground gt_status`: Check current project rules.
+    - `ground gt_refresh`: Force a refresh of the project constitution.

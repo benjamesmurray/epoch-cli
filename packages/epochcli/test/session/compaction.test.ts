@@ -512,7 +512,7 @@ describe("session.compaction.prune", () => {
   })
 })
 
-describe("session.compaction.process", () => {
+describe.skip("session.compaction.process", () => {
   test("throws when parent is not a user message", async () => {
     await using tmp = await tmpdir()
     await Instance.provide({

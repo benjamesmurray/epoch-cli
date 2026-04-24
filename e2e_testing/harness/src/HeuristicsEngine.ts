@@ -1,3 +1,6 @@
+import { TurnAggregator } from "./telemetry/TurnAggregator";
+import { Turn } from "./telemetry/types";
+
 export class LoopException extends Error {
   constructor(message: string) {
     super(message);
@@ -6,6 +9,7 @@ export class LoopException extends Error {
 }
 
 export class HeuristicsEngine {
+  private aggregator: TurnAggregator;
   private toolCallHistory: string[] = [];
   private loopThreshold: number;
   private usedTools: Set<string> = new Set();
@@ -17,8 +21,11 @@ export class HeuristicsEngine {
   private ttftHistory: number[] = [];
   private totalTokens: number = 0;
   private fullPrompts: any[] = [];
+  public totalEpochs: number = 0;
+  public lastContinuityWrite: number = 0;
 
   constructor(runId: string, loopThreshold: number = 3) {
+    this.aggregator = new TurnAggregator();
     this.loopThreshold = loopThreshold;
     this.runId = runId;
   }
@@ -28,11 +35,28 @@ export class HeuristicsEngine {
    * Throws LoopException if an infinite loop is detected.
    */
   public processLine(line: string): void {
-    // Check for EnhancedModelExecutionEvent JSON events
+    const turn = this.aggregator.processLine(line);
+    
+    // If a turn was just finished, update metrics
+    if (turn) {
+      if (turn.tps) this.tpsHistory.push(turn.tps);
+      if (turn.ttftMs) this.ttftHistory.push(turn.ttftMs);
+      if (turn.totalTokens) this.totalTokens = turn.totalTokens;
+      if (turn.isEpochTransition) {
+          this.totalEpochs++;
+          console.log(`    [${this.runId}] 🔄 Epoch Transition detected (Total: ${this.totalEpochs})`);
+      }
+    }
+
+    if (line.includes("Wrote .epoch-continuity.toon") || line.includes("Wrote .epoch-continuity.md")) {
+        this.lastContinuityWrite++;
+        console.log(`    [${this.runId}] 📝 Continuity Report updated (Total: ${this.lastContinuityWrite})`);
+    }
+
+    // Check for START_GENERATE to capture Turn Payload (prompt/tools)
+    // We still use regex here because TurnAggregator doesn't store the massive payload strings to keep memory low
     if (line.includes('event=START_GENERATE')) {
       try {
-        // Robust extraction that handles both quoted and unquoted values in Log.EnhancedModelExecutionEvent format
-        // We match until the next tag (e.g. " tools=") or the end of the line message
         const payloadMatch = line.match(/payload=([\[{].*?[\]}])(?=\s+\w+=|\s+[\w\s]+$|$)/);
         const toolsMatch = line.match(/tools=([\[{].*?[\]}])(?=\s+\w+=|\s+[\w\s]+$|$)/);
         
@@ -44,55 +68,34 @@ export class HeuristicsEngine {
                 tools: toolsMatch ? JSON.parse(toolsMatch[1]!) : []
             });
             console.log(`    [${this.runId}] ✅ Captured turn payload (${this.fullPrompts.length} turns so far, ${payloadMatch[1]!.length} bytes)`);
-            
-            // Doom Loop Escape Hatch: If we reach an unreasonable number of turns, kill the process to save resources
-            if (this.fullPrompts.length > 30) {
-              throw new LoopException(`Agent exceeded maximum turn threshold (30 turns). Aborting to prevent doom loop.`);
-            }
           } catch (parseErr: any) {
-            console.log(`    [${this.runId}] ❌ Failed to parse payload JSON: ${parseErr.message}`);
-          }
-        } else {
-           console.log(`    [${this.runId}] ❌ event=START_GENERATE found but payload regex failed`);
-        }
-      } catch (e) {
-        // Parse failed, continue
-      }
-    }
-
-    if (line.includes('event=END_GENERATE')) {
-        try {
-            const metricsMatch = line.match(/metrics=({.*?})(?:\s|$)/);
-            if (metricsMatch) {
-                const metrics = JSON.parse(metricsMatch[1]!);
-                if (metrics.tps) this.tpsHistory.push(metrics.tps);
-                if (metrics.ttftMs) this.ttftHistory.push(metrics.ttftMs);
-                if (metrics.promptTokens) this.totalTokens += metrics.promptTokens;
-                if (metrics.completionTokens) this.totalTokens += metrics.completionTokens;
-                if (metrics.json_repaired) {
-                    this.jsonRepairs++;
-                    console.log(`    [${this.runId}] ⚠️ Model payload repaired by middleware (Total: ${this.jsonRepairs})`);
+             // If it's a JSON event, we might need a different regex or just parse the line
+             try {
+                const json = JSON.parse(line);
+                if (json.event === "START_GENERATE" && json.payload) {
+                    this.fullPrompts.push({
+                        payload: json.payload,
+                        tools: json.tools || []
+                    });
+                     console.log(`    [${this.runId}] ✅ Captured turn payload from JSON (${this.fullPrompts.length} turns so far)`);
                 }
-            }
-        } catch (e) {}
+             } catch (e) {}
+          }
+        }
+      } catch (e) {}
     }
 
-    // Check for JSON repairs in legacy epochcli audit logs (fallback)
-    if (line.includes('"json_repaired":true') && !line.includes('"event":')) {
-      this.jsonRepairs++;
-      console.log(`    [${this.runId}] ⚠️ Model payload repaired by middleware (Total: ${this.jsonRepairs})`);
+    // Capture JSON Repairs
+    if (line.includes('"json_repaired":true')) {
+        this.jsonRepairs++;
+        console.log(`    [${this.runId}] ⚠️ Model payload repaired by middleware (Total: ${this.jsonRepairs})`);
     }
 
-    // Attempt to extract tool calls.
-    // In our CLI, tool calls might appear as raw JSON or specific tool markers.
-    // Attempt to extract tool calls.
-    // 1. Raw JSON events: {"name": "tool_name", "arguments": {...}}
-    // 2. Pretty-printed logs: ⚙ tool_name {"args"}
-    
+    // Tool Invocation Tracking & Loop Detection
     let toolName: string | undefined;
     let toolArgs: string | undefined;
 
-    // Try Raw JSON first
+    // Try Raw JSON first (Logfmt style)
     const jsonMatch = line.match(/name["\s:]+([a-zA-Z0-9_-]+)["\s,]+(?:arguments|args)["\s:]+({[^}]+})/i);
     if (jsonMatch && jsonMatch[1] && jsonMatch[2]) {
       toolName = jsonMatch[1];
@@ -103,6 +106,15 @@ export class HeuristicsEngine {
       if (prettyMatch && prettyMatch[1] && prettyMatch[2]) {
         toolName = prettyMatch[1];
         toolArgs = prettyMatch[2].trim();
+      } else {
+        // Try structured JSON event
+        try {
+            const json = JSON.parse(line);
+            if (json.event === "TOOL_START") {
+                toolName = json.tool;
+                toolArgs = JSON.stringify(json.input);
+            }
+        } catch (e) {}
       }
     }
     
@@ -120,18 +132,12 @@ export class HeuristicsEngine {
         if (allIdentical) {
           throw new LoopException(`Infinite loop detected: ${toolSignature} called ${this.loopThreshold} times in a row.`);
         }
-      } else if (this.toolCallHistory.length >= 2) {
-        const recent = this.toolCallHistory.slice(-2);
-        const allIdentical = recent.every(sig => sig === recent[0]);
-        if (allIdentical) {
-           console.log(`    [${this.runId}] ⚠️ Warning: Identical tool call repeated (${toolName}). One more will trigger kill.`);
-        }
       }
     }
     
-    // Also explicitly track tool invocations by just the name if arguments aren't logged easily
+    // Fallback for spec-cli tools if they appear in logs without full arguments
     if (line.match(/^(DEBUG|INFO|ERROR|WARN)\s/) && !line.includes('event=START_GENERATE')) {
-        const specCliMatch = line.match(/(sc_init|sc_todo_start|sc_todo_complete|sc_plan|pm_query)/);
+        const specCliMatch = line.match(/(sc_init|sc_plan|sc_approve|sc_todo_start|sc_todo_complete|sc_status|sc_guidance|pm_query|pm_plan|pm_init|pm_status|gt_status|gt_exec)/);
         if (specCliMatch && specCliMatch[1] && !toolName) {
             this.usedTools.add(specCliMatch[1]);
             console.log(`    [${this.runId}] 🛠️ Spec Tool Invoked: ${specCliMatch[1]}`);
@@ -158,7 +164,8 @@ export class HeuristicsEngine {
     return {
       avgTps,
       avgTtftMs,
-      totalTokens: this.totalTokens > 0 ? this.totalTokens : undefined
+      totalTokens: this.totalTokens > 0 ? this.totalTokens : undefined,
+      totalEpochs: this.totalEpochs
     };
   }
 
@@ -170,4 +177,3 @@ export class HeuristicsEngine {
     return this.fullPrompts.length > 0;
   }
 }
-

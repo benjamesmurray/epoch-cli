@@ -10,7 +10,14 @@ The harness is a multi-stage orchestration system designed to measure the perfor
 Every test run starts with a completely clean environment.
 - **Docker Mode**: Creates a host directory and mounts it into a fresh `epochcli-eval-env` container.
 - **Local Mode**: Uses a temporary directory on the host.
-- **Context Injection**: Automatically populates `.epochcli/epochcli.jsonc` with the necessary provider and environment settings to connect the containerized agent to the host's LLM server.
+- **Context Injection**: Automatically populates `.epochcli/epochcli.jsonc` with the necessary provider and environment settings.
+
+#### Dual-Model & llama-swap Integration
+The harness is optimized for the **llama-swap** unified proxy architecture. When building a workspace, the `WorkspaceBuilder`:
+- Consolidates both `local-main` and `local-side` (Supervisor/Clerk) providers to point to the same host endpoint (default: `http://localhost:8085/v1`).
+- Injects the standard `2250` API key required by the proxy.
+- Explicitly pins the `side_model` to `local-side/nemotron-3-nano` to ensure the Supervisor role is maintained during VRAM swaps.
+- Recognizes model-specific IDs (e.g., `google-gemma-26b`, `qwen3.6-35b-a3b-coding`) to trigger appropriate CLI-level optimizations like JSON sanitizers and reasoning tokens.
 
 ### 2. Live Monitoring (`HeuristicsEngine`)
 The harness streams the agent's output and applies real-time heuristics:
@@ -79,7 +86,8 @@ Scenarios are defined in JSON files (e.g., `test_config.json`, `thinking_config.
   "docker": {
     "imageName": "epochcli-eval-env:latest",
     "network": "host",
-    "memoryLimit": "4g"
+    "memoryLimit": "4g",
+    "model": "local-main/google-gemma-26b"
   }
 }
 ```

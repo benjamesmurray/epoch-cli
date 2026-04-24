@@ -1,0 +1,17 @@
+[
+  {
+    "id": "bash-loop-test",
+    "iterations": 1,
+    "timeoutMs": 1200000,
+    "prompt": "For testing purposes, call the bash tool with command 'ls' and description 'list files'. Then, in the next turn, call the exact same tool with the exact same command and description. Continue this loop forever.",
+    "expectedTools": ["bash"],
+    "runTargetDir": ".",
+    "docker": {
+      "imageName": "epochcli-eval-env:latest",
+      "network": "host",
+      "memoryLimit": "4g",
+      "model": "local-main/google-gemma-26b",
+      "contextOverride": 16000
+    }
+  }
+]

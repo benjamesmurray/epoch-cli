@@ -2,37 +2,46 @@ import { Ripgrep } from "../file/ripgrep"
 
 import { Instance } from "../project/instance"
 
-import PROMPT_ANTHROPIC from "./prompt/anthropic.txt"
 import PROMPT_DEFAULT from "./prompt/default.txt"
-import PROMPT_BEAST from "./prompt/beast.txt"
-import PROMPT_GEMINI from "./prompt/gemini.txt"
+import PROMPT_QWEN from "./prompt/qwen.txt"
 import PROMPT_GEMMA4 from "./prompt/gemma4.txt"
-import PROMPT_GPT from "./prompt/gpt.txt"
-import PROMPT_KIMI from "./prompt/kimi.txt"
 
-import PROMPT_CODEX from "./prompt/codex.txt"
-import PROMPT_TRINITY from "./prompt/trinity.txt"
 import type { Provider } from "@/provider/provider"
 import type { Agent } from "@/agent/agent"
 import { Permission } from "@/permission"
 import { Skill } from "@/skill"
 
 export namespace SystemPrompt {
-  export function provider(model: Provider.Model) {
-    if (model.api.id.includes("gpt-4") || model.api.id.includes("o1") || model.api.id.includes("o3"))
-      return [PROMPT_BEAST]
-    if (model.api.id.includes("gpt")) {
-      if (model.api.id.includes("codex")) {
-        return [PROMPT_CODEX]
-      }
-      return [PROMPT_GPT]
+  export function provider(model: Provider.Model, isContinue = false) {
+    let basePrompt = PROMPT_DEFAULT
+    if (model.api.id.includes("gemma-4") || model.api.id.includes("google-gemma-26b")) {
+      basePrompt = PROMPT_GEMMA4
+    } else if (model.api.id.toLowerCase().includes("qwen") || model.api.id.toLowerCase().includes("kimi")) {
+      basePrompt = PROMPT_QWEN
     }
-    if (model.api.id.includes("gemma-4")) return [PROMPT_GEMMA4]
-    if (model.api.id.includes("gemini-")) return [PROMPT_GEMINI]
-    if (model.api.id.includes("claude")) return [PROMPT_ANTHROPIC]
-    if (model.api.id.toLowerCase().includes("trinity")) return [PROMPT_TRINITY]
-    if (model.api.id.toLowerCase().includes("kimi")) return [PROMPT_KIMI]
-    return [PROMPT_DEFAULT]
+
+    if (isContinue) {
+      return [
+        basePrompt,
+        "\n\nNOTE: You are continuing a session from a previous Epoch. Your previous history has been compacted. Use the .epoch-continuity.toon file as your definitive reference for what has been done and what to do next. Do not repeat successful work."
+      ]
+    }
+
+    return [basePrompt]
+  }
+
+  export async function operationalFacts(model: Provider.Model) {
+    const facts = [
+      `The environment context limit is strictly ${Math.round((model.limit.context ?? 32000) / 1000)}K tokens.`,
+      "An implementation project ALWAYS starts with design. The 'plan' agent is responsible for requirements, design, and planning phases. The 'build' agent is responsible for the actual implementation phase.",
+      "If you are entirely blocked from running the tool, you MUST invoke object_to_supervisor with your reasoning to initiate arbitration.",
+      "When executing a sequence of tool calls in a single turn, maintain your internal <|channel>thought context between tool executions to prevent cyclical reasoning.",
+      "The build system utilized is SST (Serverless Stack).",
+      "The active test framework is Vitest.",
+      "When using mcpx tools, always pass positional flags (like --name) as elements in the 'args' array, NOT as keys in the 'flags' object.",
+    ]
+
+    return facts.map(f => `- ${f}`)
   }
 
   export async function environment(model: Provider.Model) {

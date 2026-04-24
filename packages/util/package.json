@@ -5,13 +5,15 @@
   "type": "module",
   "license": "MIT",
   "exports": {
+    "./telemetry": "./src/telemetry/index.ts",
     "./*": "./src/*.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "picocolors": "^1.1.1"
   },
   "devDependencies": {
     "typescript": "catalog:",

@@ -3,6 +3,7 @@ export interface DockerConfig {
   network: "none" | "host" | "bridge";
   memoryLimit?: string;
   model?: string;
+  contextOverride?: number;
 }
 
 export interface TestConfig {
@@ -28,4 +29,5 @@ export interface RunResult {
   avgTps?: number;
   avgTtftMs?: number;
   totalTokens?: number;
+  totalEpochs?: number;
 }

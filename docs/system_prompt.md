@@ -10,31 +10,32 @@ The prompt is divided into four distinct zones, each served by the **System Role
 *   **Purpose:** Immediate context, immutable engineering standards, and **Thinking Mode control**.
 *   **Content:**
     *   **Thinking Control:** For supported models (e.g., Gemma-4), the `<|think|>` control token is injected here.
-    *   **Persona:** Standardized identity as "Epoch CLI, an agentic engineer."
+    *   **Persona:** Standardized identity as "epochcli, a pragmatic software engineer."
     *   **Operational Facts:** Immutable truths about the environment (e.g., "The environment context limit is 32K tokens").
     *   **Technical Stack:** Extracted via Ground Truth (e.g., Language: TypeScript, Framework: Vitest).
     *   **Current Phase:** Injected via the Spec CLI (e.g., `[PLAN]` or `[BUILD]`).
     *   **Effort Instruction:** Explicit directive (e.g., `THINKING EFFORT: HIGH/LOW`) based on Clerk classification.
+*   **Header:** `=== ZONE 1: IMMEDIATE CONTEXT & PERSISTENCE ===`.
 
 ### **Zone 2: The Body (System Message 2)**
 *   **Purpose:** Behavioral discipline and general interaction context.
 *   **Content:**
     *   **Behavioral Rules:** Specific "Trigger/Behaviour/Example" packs (e.g., Suppressing conversational filler, handling non-coding questions).
     *   **General Context:** High-level project state or clerk-selected rule packs.
-*   **Header:** `=== BEHAVIORAL RULES & GENERAL CONTEXT ===`.
+*   **Header:** `=== ZONE 2: BEHAVIORAL RULES & GENERAL CONTEXT ===`.
 
 ### **Zone 3: The Tail (System Message 3)**
 *   **Purpose:** Project-specific anchors and high-attention technical rules.
 *   **Content:**
     *   **Project-Specific Rules:** Custom rules extracted from the codebase's specific conventions (e.g., stack conventions).
     *   **Cursor Context:** The active file, line number, and code fragment the user is currently focused on.
-*   **Header:** `=== PROJECT-SPECIFIC RULES & CURSOR CONTEXT ===`.
+*   **Header:** `=== ZONE 3: PROJECT-SPECIFIC RULES & CURSOR CONTEXT ===`.
 
 ### **Zone 4: The Guidelines (System Message 4)**
 *   **Purpose:** High-priority project intent and style guidelines.
 *   **Content:**
     *   **Extracted Guidelines:** Full or strategic snippets from `AGENTS.md` or `.cursorrules`.
-*   **Header:** `=== PROJECT GUIDELINES (AGENTS.md) ===`.
+*   **Header:** `=== ZONE 4: PROJECT GUIDELINES (AGENTS.md) ===`.
 
 ## 2. Internal State Check (User Role)
 
@@ -72,7 +73,8 @@ To ensure a "zero-config" experience, the system performs an automatic scan if r
 
 ### **Rule Extraction, Synthesis, & Deduplication**
 `LLM.stream` parses context and rules using a prioritized extraction strategy:
-*   **Zone 1 & 2:** Standard regex-based extraction from `.Model_rules.toon` into the internal prompt payload.
+*   **Zone 1:** Standard regex-based extraction from `.Model_rules.toon` into the internal prompt payload (Operational Facts).
+*   **Zone 2:** Behavioral rule packs and interaction context.
 *   **Zone 3 Synthesis & Deduplication:** The `ground` dynamically detects the project's framework/language (e.g., via `package.json`) and conditionally synthesizes a "Stack Conventions" rule. If multiple `ZONE 3` blocks are found in the TOON file (e.g., due to template merging or stale baseline files), the system **prioritizes the last block found**. This ensures that the most recent dynamically synthesized rules take precedence over static defaults.
 *   **Zone 4 Extraction:** To guarantee guidelines are always present regardless of Ground Truth status, `AGENTS.md` and `.cursorrules` are explicitly fetched via the `Instruction` service and injected as a dedicated system message, bypassing the TOON rules entirely.
 

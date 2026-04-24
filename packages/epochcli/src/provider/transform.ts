@@ -1061,7 +1061,7 @@ export namespace ProviderTransform {
       schema = sanitizeGemini(schema)
     }
 
-    if (model.api?.id?.includes("gemma-4") || model.id?.includes("big-pickle")) {
+    if (model.api?.id?.includes("gemma-4") || model.api?.id?.includes("google-gemma-26b") || model.id?.includes("big-pickle")) {
       const sanitizeGemma4 = (obj: any, isRoot = true): any => {
         if (obj === null || typeof obj !== "object") {
           return obj

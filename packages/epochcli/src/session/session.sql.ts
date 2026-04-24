@@ -31,6 +31,8 @@ export const SessionTable = sqliteTable(
     summary_diffs: text({ mode: "json" }).$type<Snapshot.FileDiff[]>(),
     share_url: text(),
     yolo: integer({ mode: "boolean" }),
+    intervention_requested: integer({ mode: "boolean" }),
+    intervention_hint: text(),
     revert: text({ mode: "json" }).$type<{ messageID: MessageID; partID?: PartID; snapshot?: string; diff?: string }>(),
     permission: text({ mode: "json" }).$type<Permission.Ruleset>(),
     ...Timestamps,

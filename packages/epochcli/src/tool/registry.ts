@@ -2,14 +2,13 @@ import { PlanExitTool } from "./plan"
 import { QuestionTool } from "./question"
 import { BashTool } from "./bash"
 import { EditTool } from "./edit"
+import { RevertFileTool } from "./revert"
 import { GlobTool } from "./glob"
 import { GrepTool } from "./grep"
 import { BatchTool } from "./batch"
 import { ReadTool } from "./read"
 import { TaskTool } from "./task"
-import { TodoWriteTool } from "./todo"
 import { WebFetchTool } from "./webfetch"
-import { RevertFileTool } from "./revert"
 import { WriteTool } from "./write"
 import { ArbitrationTool } from "./arbitration"
 import { TaskCompleteTool } from "./task_complete"
@@ -153,7 +152,6 @@ export namespace ToolRegistry {
       const write = yield* build(WriteTool)
       const task = yield* build(TaskTool)
       const fetch = yield* build(WebFetchTool)
-      const todo = yield* build(TodoWriteTool)
       const search = yield* build(WebSearchTool)
       const code = yield* build(CodeSearchTool)
       const skill = yield* build(SkillTool)
@@ -182,7 +180,6 @@ export namespace ToolRegistry {
           write,
           task,
           fetch,
-          todo,
           search,
           code,
           skill,
@@ -195,12 +192,7 @@ export namespace ToolRegistry {
           ...custom,
         ]
 
-        if (mcpxTool) {
-          tools.push({
-            id: "mcpx",
-            init: () => Promise.resolve(mcpxTool),
-          })
-        } else {
+        if (!mcpxTool) {
           const mcpTools = yield* mcp.tools()
           for (const [id, def] of Object.entries(mcpTools)) {
             tools.push({ id, ...def })

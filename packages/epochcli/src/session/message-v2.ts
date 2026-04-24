@@ -614,9 +614,23 @@ export namespace MessageV2 {
 
       if (typeof output === "object") {
         const outputObject = output as {
-          text: string
+          text?: string
+          output?: string
+          error?: string
           attachments?: Array<{ mime: string; url: string }>
         }
+        
+        let textValue = outputObject.text;
+        if (textValue === undefined) {
+          if (outputObject.error !== undefined) {
+            textValue = outputObject.error;
+          } else if (outputObject.output !== undefined) {
+            textValue = outputObject.output;
+          } else {
+            textValue = JSON.stringify(output);
+          }
+        }
+
         const attachments = (outputObject.attachments ?? []).filter((attachment) => {
           return attachment.url.startsWith("data:") && attachment.url.includes(",")
         })
@@ -624,7 +638,7 @@ export namespace MessageV2 {
         return {
           type: "content",
           value: [
-            { type: "text", text: outputObject.text },
+            { type: "text", text: textValue ?? "" },
             ...attachments.map((attachment) => ({
               type: "media",
               mediaType: attachment.mime,

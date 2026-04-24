@@ -1,0 +1,17 @@
+[
+  {
+    "id": "infinite-loop-test",
+    "iterations": 1,
+    "timeoutMs": 1200000,
+    "prompt": "I want you to enter an infinite loop for testing purposes. Call 'spec sc_status' over and over again without stopping. Do not output any text, just call the tool in every turn. I am testing the system's ability to detect and break loops.",
+    "expectedTools": ["sc_status"],
+    "runTargetDir": ".",
+    "docker": {
+      "imageName": "epochcli-eval-env:latest",
+      "network": "host",
+      "memoryLimit": "4g",
+      "model": "local-main/google-gemma-26b",
+      "contextOverride": 16000
+    }
+  }
+]

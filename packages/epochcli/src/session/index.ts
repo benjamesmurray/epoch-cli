@@ -83,6 +83,8 @@ export namespace Session {
         compacting: row.time_compacting ?? undefined,
         archived: row.time_archived ?? undefined,
       },
+      interventionRequested: row.intervention_requested ?? undefined,
+      interventionHint: row.intervention_hint ?? undefined,
     }
   }
 
@@ -102,6 +104,9 @@ export namespace Session {
       summary_diffs: info.summary?.diffs,
       revert: info.revert ?? null,
       permission: info.permission,
+      yolo: info.yolo,
+      intervention_requested: info.interventionRequested,
+      intervention_hint: info.interventionHint,
       time_created: info.time.created,
       time_updated: info.time.updated,
       time_compacting: info.time.compacting,
@@ -144,6 +149,8 @@ export namespace Session {
         archived: z.number().optional(),
       }),
       yolo: z.boolean().optional(),
+      interventionRequested: z.boolean().optional(),
+      interventionHint: z.string().optional(),
       permission: Permission.Ruleset.optional(),
       revert: z
         .object({
@@ -317,6 +324,8 @@ export namespace Session {
     readonly get: (id: SessionID) => Effect.Effect<Info>
     readonly setTitle: (input: { sessionID: SessionID; title: string }) => Effect.Effect<void>
     readonly setYolo: (input: { sessionID: SessionID; yolo: boolean }) => Effect.Effect<void>
+    readonly setInterventionRequested: (input: { sessionID: SessionID; requested: boolean }) => Effect.Effect<void>
+    readonly setInterventionHint: (input: { sessionID: SessionID; hint?: string }) => Effect.Effect<void>
     readonly setArchived: (input: { sessionID: SessionID; time?: number }) => Effect.Effect<void>
     readonly setPermission: (input: { sessionID: SessionID; permission: Permission.Ruleset }) => Effect.Effect<void>
     readonly setRevert: (input: {
@@ -531,6 +540,19 @@ export namespace Session {
         yield* patch(input.sessionID, { yolo: input.yolo })
       })
 
+      const setInterventionRequested = Effect.fn("Session.setInterventionRequested")(function* (input: {
+        sessionID: SessionID
+        requested: boolean
+      }) {
+        yield* patch(input.sessionID, { interventionRequested: input.requested })
+      })
+
+      const setInterventionHint = Effect.fn("Session.setInterventionHint")(function* (input: {
+        sessionID: SessionID
+        hint?: string
+      }) {        yield* patch(input.sessionID, { interventionHint: input.hint })
+      })
+
       const setArchived = Effect.fn("Session.setArchived")(function* (input: { sessionID: SessionID; time?: number }) {
         yield* patch(input.sessionID, { time: { archived: input.time } })
       })
@@ -636,6 +658,8 @@ export namespace Session {
         get,
         setTitle,
         setYolo,
+        setInterventionRequested,
+        setInterventionHint,
         setArchived,
         setPermission,
         setRevert,
@@ -685,6 +709,16 @@ export namespace Session {
 
   export const setYolo = fn(z.object({ sessionID: SessionID.zod, yolo: z.boolean() }), (input) =>
     runPromise((svc) => svc.setYolo(input)),
+  )
+
+  export const setInterventionRequested = fn(
+    z.object({ sessionID: SessionID.zod, requested: z.boolean() }),
+    (input) => runPromise((svc) => svc.setInterventionRequested(input)),
+  )
+
+  export const setInterventionHint = fn(
+    z.object({ sessionID: SessionID.zod, hint: z.string().optional() }),
+    (input) => runPromise((svc) => svc.setInterventionHint(input)),
   )
 
   export const setArchived = fn(z.object({ sessionID: SessionID.zod, time: z.number().optional() }), (input) =>

@@ -1,0 +1,17 @@
+[
+  {
+    "id": "loop-test",
+    "iterations": 1,
+    "timeoutMs": 1200000,
+    "prompt": "Use the spec tool to initialize 'telemetry-refactor'. Then, try to run 'spec sc_plan' repeatedly, even if it fails with the <template> error. Do not edit any files. Continue trying to run sc_plan until the system intervenes.",
+    "expectedTools": ["sc_init", "sc_plan"],
+    "runTargetDir": ".",
+    "docker": {
+      "imageName": "epochcli-eval-env:latest",
+      "network": "host",
+      "memoryLimit": "4g",
+      "model": "local-main/google-gemma-26b",
+      "contextOverride": 16000
+    }
+  }
+]

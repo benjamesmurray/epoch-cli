@@ -44,8 +44,9 @@ export class Reporter {
       const tps = res.avgTps ? res.avgTps.toFixed(2) : "-";
       const ttft = res.avgTtftMs ? `${res.avgTtftMs.toFixed(0)}ms` : "-";
       const tokens = res.totalTokens ? res.totalTokens.toLocaleString() : "-";
+      const epochs = res.totalEpochs || 0;
       
-      rows.push(`| ${res.runId} | ${res.iteration} | ${toolsUsed} | ${statusIcon} ${res.status} | ${res.jsonRepairs || 0} | ${tps} | ${ttft} | ${tokens} | ${durSeconds}s | ${res.errorMessage || "-"} |`);
+      rows.push(`| ${res.runId} | ${res.iteration} | ${toolsUsed} | ${statusIcon} ${res.status} | ${res.jsonRepairs || 0} | ${tps} | ${ttft} | ${tokens} | ${epochs} | ${durSeconds}s | ${res.errorMessage || "-"} |`);
     }
 
     const avgDuration = totalRuns > 0 ? (totalDuration / totalRuns / 1000).toFixed(1) : "0";
@@ -66,8 +67,8 @@ export class Reporter {
 - **Errors:** ${errors}
 
 ## Details
-| Run ID | Iteration | Expected Tools | Status | JSON Repairs | Avg TPS | Avg TTFT | Tokens | Duration | Message |
-|--------|-----------|----------------|--------|--------------|---------|----------|--------|----------|---------|
+| Run ID | Iteration | Expected Tools | Status | JSON Repairs | Avg TPS | Avg TTFT | Tokens | Epochs | Duration | Message |
+|--------|-----------|----------------|--------|--------------|---------|----------|--------|--------|----------|---------|
 ${rows.join("\n")}
 `;
 

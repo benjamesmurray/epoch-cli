@@ -15,34 +15,58 @@ export class WorkspaceBuilder {
 
     // Generate the epochcli.jsonc payload matching the user's dual-model config
     // but pointing to the offline MCP installations and host's LLM ports.
+    const mainModelName = config.docker?.model || "local-main/gemma-4-26b-q4-xl";
+    const mainModelID = mainModelName.split("/")[1] || "gemma-4-26b-q4-xl";
+    const llmHost = config.docker?.network === "host" ? "localhost" : "host.docker.internal";
+    
     const epochConfig = {
       ...config.epochcli,
+      "model": mainModelName,
+      "side_model": "local-side/nemotron-3-nano",
       "provider": {
         "local-main": {
           "npm": "@ai-sdk/openai-compatible",
-          "name": "Local Gemma (H100 x 8)",
+          "name": "Local Main (llama-swap)",
           "options": {
-            "baseURL": "http://localhost:8085/v1",
+            "baseURL": `http://${llmHost}:8085/v1`,
             "apiKey": "2250"
           },
           "models": {
-            "gemma-4-26b-q4-xl": { "name": "Gemma 4 26B" },
-            "qwen-3.5": { "name": "Qwen 3.5" }
+            [mainModelID]: { 
+                "name": mainModelID,
+                "limit": {
+                    "output": 4096,
+                    "context": config.docker?.contextOverride || 32000
+                }
+            },
+            "gemma-4-q5": { 
+              "name": "Gemma 4 26B Q5",
+              "limit": { "context": 32000, "output": 4096 }
+            },
+            "qwen-3.5": { 
+              "name": "Qwen 3.5",
+              "limit": { "context": 32000, "output": 4096 }
+            }
           }
         },
         "local-side": {
           "npm": "@ai-sdk/openai-compatible",
-          "name": "Local Nemotron (RTX 4090)",
+          "name": "Local Side (llama-swap)",
           "options": {
-            "baseURL": "http://localhost:8086/v1",
+            "baseURL": `http://${llmHost}:8085/v1`,
             "apiKey": "2250"
           },
           "models": {
-            "nemotron-3-nano-4b": { "name": "Nemotron 3 Nano" }
+            "nemotron-3-nano": { 
+              "name": "Nemotron 3 Nano",
+              "limit": { "context": 32000, "output": 4096 }
+            }
           }
         }
       },
-      "model": "local-main/gemma-4-26b-q4-xl",
+      "mcpx": {
+        "enabled": true
+      },
       "mcp": {},
       "experimental": {
         "mcp_timeout": 120000
@@ -141,7 +165,13 @@ args = ["/usr/local/lib/node_modules/ground-truth-cli/dist/index.js"]
     // Inject guidelines for Zone 4 testing
     await fs.writeFile(
       path.join(hostRunDir, "AGENTS.md"),
-      "# Project Guidelines\n- Use functional programming patterns.\n- Ensure all components are accessible.",
+      `# Project Guidelines
+- **Senior Style:** Suppress conversational filler. Output ONLY context and code.
+- **Workflow:** Use 'spec sc_status' to track progress. Mark tasks with 'spec sc_todo_start' and 'spec sc_todo_complete'.
+- **Discovery:** Use 'map pm_query' for symbol and file exploration.
+- **One-Shot:** In one-shot mode, immediately run 'spec sc_plan' after 'spec sc_init' to generate tasks, then 'spec sc_approve' to begin coding. Do not spend multiple turns drafting requirements.
+- **Continuity:** When a new epoch begins, strictly follow the directives in .epoch-continuity.toon.
+- **Architecture:** Keep things flat and composable. Avoid 'any'.`,
       "utf-8"
     );
 
