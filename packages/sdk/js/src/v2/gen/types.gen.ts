@@ -47,6 +47,13 @@ export type EventInstallationUpdateAvailable = {
   }
 }
 
+export type EventFileEdited = {
+  type: "file.edited"
+  properties: {
+    file: string
+  }
+}
+
 export type EventServerInstanceDisposed = {
   type: "server.instance.disposed"
   properties: {
@@ -192,32 +199,13 @@ export type EventMcpBrowserOpenFailed = {
   }
 }
 
-export type SessionStatus =
-  | {
-      type: "idle"
-    }
-  | {
-      type: "retry"
-      attempt: number
-      message: string
-      next: number
-    }
-  | {
-      type: "busy"
-    }
-
-export type EventSessionStatus = {
-  type: "session.status"
+export type EventCommandExecuted = {
+  type: "command.executed"
   properties: {
+    name: string
     sessionID: string
-    status: SessionStatus
-  }
-}
-
-export type EventSessionIdle = {
-  type: "session.idle"
-  properties: {
-    sessionID: string
+    arguments: string
+    messageID: string
   }
 }
 
@@ -292,20 +280,6 @@ export type EventQuestionRejected = {
   }
 }
 
-export type EventSessionCompacted = {
-  type: "session.compacted"
-  properties: {
-    sessionID: string
-  }
-}
-
-export type EventFileEdited = {
-  type: "file.edited"
-  properties: {
-    file: string
-  }
-}
-
 export type EventFileWatcherUpdated = {
   type: "file.watcher.updated"
   properties: {
@@ -337,13 +311,39 @@ export type EventTodoUpdated = {
   }
 }
 
-export type EventCommandExecuted = {
-  type: "command.executed"
+export type SessionStatus =
+  | {
+      type: "idle"
+    }
+  | {
+      type: "retry"
+      attempt: number
+      message: string
+      next: number
+    }
+  | {
+      type: "busy"
+    }
+
+export type EventSessionStatus = {
+  type: "session.status"
   properties: {
-    name: string
     sessionID: string
-    arguments: string
-    messageID: string
+    status: SessionStatus
+  }
+}
+
+export type EventSessionIdle = {
+  type: "session.idle"
+  properties: {
+    sessionID: string
+  }
+}
+
+export type EventSessionTransitioned = {
+  type: "session.transitioned"
+  properties: {
+    sessionID: string
   }
 }
 
@@ -361,6 +361,14 @@ export type EventSessionDiff = {
   properties: {
     sessionID: string
     diff: Array<FileDiff>
+  }
+}
+
+export type EventSessionEpochTransition = {
+  type: "session.epoch_transition"
+  properties: {
+    sessionID?: string
+    reason: string
   }
 }
 
@@ -425,6 +433,13 @@ export type ApiError = {
   }
 }
 
+export type MessageRamblingError = {
+  name: "MessageRamblingError"
+  data: {
+    reason: string
+  }
+}
+
 export type EventSessionError = {
   type: "session.error"
   properties: {
@@ -437,6 +452,7 @@ export type EventSessionError = {
       | StructuredOutputError
       | ContextOverflowError
       | ApiError
+      | MessageRamblingError
   }
 }
 
@@ -573,6 +589,7 @@ export type AssistantMessage = {
     | StructuredOutputError
     | ContextOverflowError
     | ApiError
+    | MessageRamblingError
   parentID: string
   modelID: string
   providerID: string
@@ -729,6 +746,7 @@ export type ToolStateRunning = {
   input: {
     [key: string]: unknown
   }
+  raw?: string
   title?: string
   metadata?: {
     [key: string]: unknown
@@ -761,6 +779,7 @@ export type ToolStateError = {
   input: {
     [key: string]: unknown
   }
+  raw?: string
   error: string
   metadata?: {
     [key: string]: unknown
@@ -856,11 +875,11 @@ export type RetryPart = {
   }
 }
 
-export type CompactionPart = {
+export type TransitionPart = {
   id: string
   sessionID: string
   messageID: string
-  type: "compaction"
+  type: "transition"
   auto: boolean
   overflow?: boolean
 }
@@ -877,7 +896,7 @@ export type Part =
   | PatchPart
   | AgentPart
   | RetryPart
-  | CompactionPart
+  | TransitionPart
 
 export type EventMessagePartUpdated = {
   type: "message.part.updated"
@@ -929,6 +948,8 @@ export type Session = {
     archived?: number
   }
   yolo?: boolean
+  interventionRequested?: boolean
+  interventionHint?: string
   permission?: PermissionRuleset
   revert?: {
     messageID: string
@@ -966,6 +987,7 @@ export type Event =
   | EventProjectUpdated
   | EventInstallationUpdated
   | EventInstallationUpdateAvailable
+  | EventFileEdited
   | EventServerInstanceDisposed
   | EventServerConnected
   | EventGlobalDisposed
@@ -980,17 +1002,17 @@ export type Event =
   | EventTuiSessionSelect
   | EventMcpToolsChanged
   | EventMcpBrowserOpenFailed
-  | EventSessionStatus
-  | EventSessionIdle
+  | EventCommandExecuted
   | EventQuestionAsked
   | EventQuestionReplied
   | EventQuestionRejected
-  | EventSessionCompacted
-  | EventFileEdited
   | EventFileWatcherUpdated
   | EventTodoUpdated
-  | EventCommandExecuted
+  | EventSessionStatus
+  | EventSessionIdle
+  | EventSessionTransitioned
   | EventSessionDiff
+  | EventSessionEpochTransition
   | EventSessionError
   | EventVcsBranchUpdated
   | EventWorkspaceReady
@@ -1088,6 +1110,8 @@ export type SyncEventSessionUpdated = {
         archived: number | null
       }
       yolo: boolean | null
+      interventionRequested: boolean | null
+      interventionHint: string | null
       permission: PermissionRuleset | null
       revert: {
         messageID: string
@@ -1280,9 +1304,9 @@ export type ProviderConfig = {
         }
       }
       limit?: {
-        context: number
+        context?: number
         input?: number
-        output: number
+        output?: number
       }
       modalities?: {
         input: Array<"text" | "audio" | "image" | "video" | "pdf">
@@ -1826,6 +1850,8 @@ export type GlobalSession = {
     archived?: number
   }
   yolo?: boolean
+  interventionRequested?: boolean
+  interventionHint?: string
   permission?: PermissionRuleset
   revert?: {
     messageID: string

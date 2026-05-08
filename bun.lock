@@ -26,7 +26,7 @@
     },
     "packages/epochcli": {
       "name": "epochcli-ai",
-      "version": "2.2.0",
+      "version": "2.2.1",
       "bin": {
         "epochcli": "bin/epochcli",
       },
@@ -169,7 +169,7 @@
     },
     "packages/plugin": {
       "name": "@epoch-ai/plugin",
-      "version": "2.2.0",
+      "version": "2.2.1",
       "dependencies": {
         "@epoch-ai/sdk": "2.2.0",
         "zod": "catalog:",
@@ -193,7 +193,7 @@
     },
     "packages/script": {
       "name": "@epoch-ai/script",
-      "version": "2.2.0",
+      "version": "2.2.1",
       "dependencies": {
         "semver": "^7.6.3",
       },
@@ -204,7 +204,7 @@
     },
     "packages/sdk/js": {
       "name": "@epoch-ai/sdk",
-      "version": "2.2.0",
+      "version": "2.2.1",
       "dependencies": {
         "cross-spawn": "catalog:",
       },
@@ -219,7 +219,7 @@
     },
     "packages/util": {
       "name": "@epoch-ai/util",
-      "version": "2.2.0",
+      "version": "2.2.1",
       "dependencies": {
         "picocolors": "^1.1.1",
         "zod": "catalog:",
@@ -2478,6 +2478,8 @@
     "@bufbuild/protoplugin/typescript": ["typescript@5.4.5", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-vcI4UpRgg81oIRUFwR0WSIHKt11nJ7SAVlYNIu+QpqeyXP+gpQJy/Z4+F0aGxSE4MqwjyXvW/TzgkLAx2AGHwQ=="],
 
     "@effect/platform-node/undici": ["undici@7.24.7", "", {}, "sha512-H/nlJ/h0ggGC+uRL3ovD+G0i4bqhvsDOpbDv7At5eFLlj2b41L8QliGbnl2H7SnDiYhENphh1tQFJZf+MyfLsQ=="],
+
+    "@epoch-ai/plugin/@epoch-ai/sdk": ["@epoch-ai/sdk@2.2.0", "", { "dependencies": { "cross-spawn": "catalog:" } }, "sha512-rDvb6IWKgV8G/5DcWMH68rIcBiqRl3s1ebFPr3ITjB1DZeAMOgYKqjFZPOJV+8uj4AM5uvubH4AF4Te1YymQOA=="],
 
     "@gitlab/gitlab-ai-provider/zod": ["zod@3.25.76", "", {}, "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ=="],
 

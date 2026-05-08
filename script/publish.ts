@@ -38,7 +38,7 @@ const pkgjsons = await Array.fromAsync(
   new Bun.Glob("**/package.json").scan({
     absolute: true,
   }),
-).then((arr) => arr.filter((x) => !x.includes("node_modules") && !x.includes("dist")))
+).then((arr) => arr.filter((x) => !x.includes("node_modules") && !x.includes("dist") && !x.includes("e2e_testing")))
 
 for (const file of pkgjsons) {
   let pkg = await Bun.file(file).text()
@@ -48,11 +48,13 @@ for (const file of pkgjsons) {
 }
 
 const extensionToml = fileURLToPath(new URL("../packages/extensions/zed/extension.toml", import.meta.url))
-let toml = await Bun.file(extensionToml).text()
-toml = toml.replace(/^version = "[^"]+"/m, `version = "${Script.version}"`)
-toml = toml.replaceAll(/releases\/download\/v[^/]+\//g, `releases/download/v${Script.version}/`)
-console.log("updated:", extensionToml)
-await Bun.file(extensionToml).write(toml)
+if (await Bun.file(extensionToml).exists()) {
+  let toml = await Bun.file(extensionToml).text()
+  toml = toml.replace(/^version = "[^"]+"/m, `version = "${Script.version}"`)
+  toml = toml.replaceAll(/releases\/download\/v[^/]+\//g, `releases/download/v${Script.version}/`)
+  console.log("updated:", extensionToml)
+  await Bun.file(extensionToml).write(toml)
+}
 
 await $`bun install`
 await import(`../packages/sdk/js/script/build.ts`)
