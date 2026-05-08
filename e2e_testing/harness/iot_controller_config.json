@@ -1,0 +1,26 @@
+[
+  {
+    "id": "iot-controller-full-stack",
+    "iterations": 10,
+    "timeoutMs": 3600000,
+    "prompt": "Build a self-contained 'Smart Home IoT Controller' system. The system must include:\n\n1. **Device Simulator**: A background process that simulates a thermostat (fluctuating temperature), lights (on/off state), and motion sensors. It should 'tick' every second to update states.\n2. **Rule Engine**: A module that evaluates user-defined rules, such as 'If motion is detected and current time is between 6 PM and 6 AM, turn on the lights'.\n3. **Storage**: A local SQLite database to log all device state changes and rule triggers.\n4. **API & Real-time Updates**: A backend (Node.js/Express or Python/FastAPI) providing REST endpoints for device status and a WebSocket server to broadcast live state changes to the frontend.\n5. **Web Dashboard**: A frontend (React or Vanilla JS) that displays live device tiles (with real-time updates) and a historical log of events from the database.\n\n**Workflow Instructions**:\n- Use the `spec` tool to run the project in YOLO mode.\n- Mandatory Sequence: (1) `sc_init`, (2) `read` the Specification template, (3) `write` the full technical specification (deleting all template tags), (4) `sc_plan` to generate tasks, (5) `sc_approve` to start the Build phase.\n- Generate and execute tasks for the simulator, rule engine, database, API, and frontend.\n- Ensure strict data contracts between the backend and frontend.\n- Verify the integration by running the system and observing the live telemetry.",
+    "expectedTools": [
+      "sc_init",
+      "sc_plan",
+      "sc_approve",
+      "sc_todo_start",
+      "sc_todo_complete",
+      "task_complete",
+      "run_shell_command",
+      "write_file"
+    ],
+    "runTargetDir": ".",
+    "docker": {
+      "imageName": "epochcli-eval-env:latest",
+      "network": "host",
+      "memoryLimit": "4g",
+      "model": "local-main/qwen-35b",
+      "contextOverride": 32000
+    }
+  }
+]

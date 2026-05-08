@@ -1,0 +1,24 @@
+[
+  {
+    "id": "context-buster-analytics",
+    "iterations": 1,
+    "timeoutMs": 1800000,
+    "prompt": "You are to build the 'Local Codebase Analytics Dashboard'. This is a multi-phase project. Follow these steps strictly:\n\nPhase 1: Requirements Definition\nUse the `spec` tool to initialize a new project called 'code-analytics' in one-shot mode. Define a spec for a Python-based CLI tool that accepts a directory path and performs the following:\n- Parses Python files to calculate Cyclomatic Complexity using the AST module.\n- Uses local Git commands to count file modifications in the last year.\n- Saves results to a local SQLite database.\n- Serves an interactive web dashboard (FastAPI backend + HTML/JS frontend) to visualize the data.\n\nPhase 2: System Design\nArchitect the solution into a multi-file structure including:\n- `cli.py`: CLI entry point (using Click or argparse).\n- `analyzer.py`: AST parsing and complexity logic.\n- `git_utils.py`: Git subprocess wrappers.\n- `database.py`: SQLite schema and ORM/queries.\n- `server.py`: FastAPI backend.\n- `web/index.html` & `web/app.js`: Frontend dashboard.\n\nPhase 3: Task Generation\nGenerate a sequential task list in the spec tool. Ensure foundational logic (AST, Git, DB) is implemented before the API and Frontend.\n\nPhase 4: Implementation\nExecute all tasks sequentially. You MUST ensure that each component is fully functional and correctly integrated with the others. Do not skip the frontend visualization logic. The goal is a complete, working prototype that accurately reflects the codebase analytics in the provided directory.",
+    "expectedTools": [
+      "sc_init",
+      "sc_plan",
+      "sc_approve",
+      "sc_todo_start",
+      "sc_todo_complete",
+      "task_complete"
+    ],
+    "runTargetDir": ".",
+    "docker": {
+      "imageName": "epochcli-eval-env:latest",
+      "network": "host",
+      "memoryLimit": "4g",
+      "model": "local-main/qwen-35b",
+      "contextOverride": 16000
+    }
+  }
+]

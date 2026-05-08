@@ -1,0 +1,28 @@
+[
+  {
+    "id": "thinking-low",
+    "iterations": 1,
+    "timeoutMs": 60000,
+    "prompt": "Hi",
+    "expectedTools": [],
+    "runTargetDir": ".",
+    "docker": {
+      "imageName": "epochcli-eval-env:latest",
+      "network": "host",
+      "memoryLimit": "4g"
+    }
+  },
+  {
+    "id": "thinking-high",
+    "iterations": 1,
+    "timeoutMs": 60000,
+    "prompt": "Refactor the entire session management system to improve architectural consistency and performance. Provide a detailed plan first.",
+    "expectedTools": ["sc_init", "sc_plan"],
+    "runTargetDir": ".",
+    "docker": {
+      "imageName": "epochcli-eval-env:latest",
+      "network": "host",
+      "memoryLimit": "4g"
+    }
+  }
+]
