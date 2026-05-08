@@ -1,13 +1,13 @@
-import { generateText } from "ai";
-import { Provider } from "@/provider/provider";
+import { generateText } from "ai"
+import { Provider } from "@/provider/provider"
 
-export type RulePackID = 
+export type RulePackID =
   | "debugging_pack"
   | "refactoring_pack"
   | "new_feature_pack"
   | "code_review_pack"
   | "context_mgmt_pack"
-  | "core_interaction_pack";
+  | "core_interaction_pack"
 
 /**
  * Service for classifying user intent to select appropriate behavioral rule packs.
@@ -16,13 +16,13 @@ export class RuleRouter {
   /**
    * Classifies the user's input and returns a list of relevant rule pack IDs.
    * Uses heuristic keyword matching for fast, lightweight classification.
-   * 
+   *
    * @param input The user's prompt or intent description.
    * @returns An array of RulePackID.
    */
   static classify(input: string): RulePackID[] {
-    const lowerInput = input.toLowerCase();
-    const packs = new Set<RulePackID>();
+    const lowerInput = input.toLowerCase()
+    const packs = new Set<RulePackID>()
 
     // Debugging heuristics
     if (
@@ -33,7 +33,7 @@ export class RuleRouter {
       lowerInput.includes("stack trace") ||
       lowerInput.includes("exception")
     ) {
-      packs.add("debugging_pack");
+      packs.add("debugging_pack")
     }
 
     // Refactoring heuristics
@@ -44,7 +44,7 @@ export class RuleRouter {
       lowerInput.includes("improve") ||
       lowerInput.includes("restructure")
     ) {
-      packs.add("refactoring_pack");
+      packs.add("refactoring_pack")
     }
 
     // New Feature heuristics
@@ -55,7 +55,7 @@ export class RuleRouter {
       lowerInput.includes("new feature") ||
       lowerInput.includes("generate")
     ) {
-      packs.add("new_feature_pack");
+      packs.add("new_feature_pack")
     }
 
     // Code Review heuristics
@@ -65,7 +65,7 @@ export class RuleRouter {
       lowerInput.includes("how does") ||
       lowerInput.includes("what does")
     ) {
-      packs.add("code_review_pack");
+      packs.add("code_review_pack")
     }
 
     // Context Management heuristics
@@ -75,47 +75,68 @@ export class RuleRouter {
       lowerInput.includes("undo") ||
       lowerInput.includes("forget")
     ) {
-      packs.add("context_mgmt_pack");
+      packs.add("context_mgmt_pack")
     }
 
     // Always include core interaction
-    packs.add("core_interaction_pack");
+    packs.add("core_interaction_pack")
 
-    return Array.from(packs);
+    return Array.from(packs)
   }
 
   /**
-   * Uses the Clerk model (4B) to identify the appropriate agent persona based on user intent.
+   * Deterministically identifies the appropriate agent persona based on the continuity report state.
+   * Eliminates the need for LLM prediction by directly reading the workflow phase.
    */
-  static async identifyAgent(input: string, clerkModel: any, groundTruths?: string): Promise<"build" | "plan" | "explore"> {
-    const { text } = await generateText({
-      model: clerkModel,
-      system: `You are the Conversational Supervisor for Gemini CLI. 
-Review the provided conversation transcript (User, Agent, and Tool interactions) to determine the most appropriate agent persona for the NEXT turn.
+  static async identifyAgent(
+    input: string,
+    currentAgent: string,
+    continuityReport?: string,
+  ): Promise<"build" | "plan" | "explore"> {
+    if (!continuityReport) {
+      // No explicit state tracking; default to build for execution capability
+      // or maintain current agent if provided
+      const normalizedCurrent = currentAgent.toLowerCase()
+      if (normalizedCurrent === "plan" || normalizedCurrent === "explore") {
+        return normalizedCurrent
+      }
+      return "build"
+    }
 
-Agent Personas:
-- "plan": High-level requirements, design, architecture, or implementation planning (using Spec CLI tools like sc_plan, sc_init). Stay in "plan" until all planning documents are completed and approved.
-- "build": Implementation, coding, bug fixes, or testing. Shift to "build" ONLY when planning is demonstrably finished (e.g., sc_todo_start was called and the agent is ready to write source code).
-- "explore": Read-only exploration, searching, or understanding the codebase. Use this if the user asks questions or the agent needs to research without making changes.
+    const reportLower = continuityReport.toLowerCase()
 
-Decision Logic:
-1. Identify the CURRENT active persona from the last few turns.
-2. Maintain PERSONA INERTIA: Do not shift personas unless there is a clear semantic signal that the phase has changed.
-3. If the agent calls "object_to_supervisor", HONOUR their request immediately unless it is obviously nonsensical.
-4. Planning tools (sc_plan, sc_init) are strong signals for "plan".
-5. Implementation tools (write, sc_todo_start) are strong signals for "build".
-6. If the agent is trying to write code but is in "plan" mode (and thus restricted), shift them to "build".
+    // Check for explicit workflow phase indicators in the TOON document
+    // These strings match the typical output of the spec continuity generator
+    if (
+      reportLower.includes("phase: 'requirements'") ||
+      reportLower.includes("phase: requirements") ||
+      reportLower.includes("phase: 'design'") ||
+      reportLower.includes("phase: design") ||
+      reportLower.includes("phase: 'tasks'") ||
+      reportLower.includes("phase: tasks")
+    ) {
+      // If we are actively reviewing a planning document but haven't approved it yet
+      return "plan"
+    }
 
-${groundTruths ? `Project Operational Rules:\n${groundTruths}\n\n` : ''}Return ONLY the name of the agent in lowercase.`,
-      prompt: input,
-      abortSignal: AbortSignal.timeout(60000),
-      maxRetries: 0,
-    });
+    if (
+      reportLower.includes("phase: 'implementation'") ||
+      reportLower.includes("phase: implementation") ||
+      reportLower.includes("phase: 'build'") ||
+      reportLower.includes("phase: build") ||
+      reportLower.includes("tasks ready") ||
+      reportLower.includes("scaffolding the build")
+    ) {
+      return "build"
+    }
 
-    const identified = text.trim().toLowerCase();
-    if (identified.includes("plan")) return "plan";
-    if (identified.includes("explore")) return "explore";
-    return "build";
+    // Default to maintaining current state or defaulting to build if ambiguous
+    const normalizedCurrent = currentAgent.toLowerCase()
+    if (normalizedCurrent === "plan" || normalizedCurrent === "explore" || normalizedCurrent === "build") {
+      return normalizedCurrent as "build" | "plan" | "explore"
+    }
+
+    return "build"
   }
 
   /**
@@ -138,19 +159,19 @@ Return ONLY a comma-separated list of the relevant rule pack IDs. Always include
       prompt: transcript,
       abortSignal: AbortSignal.timeout(60000),
       maxRetries: 0,
-    });
+    })
 
-    const packs = new Set<RulePackID>();
-    const identified = text.toLowerCase();
-    
-    if (identified.includes("debugging")) packs.add("debugging_pack");
-    if (identified.includes("refactoring")) packs.add("refactoring_pack");
-    if (identified.includes("new_feature")) packs.add("new_feature_pack");
-    if (identified.includes("code_review")) packs.add("code_review_pack");
-    if (identified.includes("context_mgmt")) packs.add("context_mgmt_pack");
-    
-    packs.add("core_interaction_pack");
-    return Array.from(packs);
+    const packs = new Set<RulePackID>()
+    const identified = text.toLowerCase()
+
+    if (identified.includes("debugging")) packs.add("debugging_pack")
+    if (identified.includes("refactoring")) packs.add("refactoring_pack")
+    if (identified.includes("new_feature")) packs.add("new_feature_pack")
+    if (identified.includes("code_review")) packs.add("code_review_pack")
+    if (identified.includes("context_mgmt")) packs.add("context_mgmt_pack")
+
+    packs.add("core_interaction_pack")
+    return Array.from(packs)
   }
 
   /**
@@ -169,8 +190,8 @@ Return ONLY "high" or "low". Default to "low" for ambiguous cases.`,
       prompt: transcript,
       abortSignal: AbortSignal.timeout(60000),
       maxRetries: 0,
-    });
+    })
 
-    return text.trim().toLowerCase().includes("high") ? "high" : "low";
+    return text.trim().toLowerCase().includes("high") ? "high" : "low"
   }
 }

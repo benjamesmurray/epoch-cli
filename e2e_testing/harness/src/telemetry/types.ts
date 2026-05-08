@@ -16,9 +16,12 @@ export interface Turn {
   mcpxFailures: string[];
   phase?: string;
   activeAgent?: string;
+  tools: string[];
   promptTokens?: number;
   completionTokens?: number;
   totalTokens?: number;
+  tps?: number;
+  ttftMs?: number;
   contextLimit?: number;
   contextFullness?: number; // 0-1 percentage
   isEpochTransition?: boolean;

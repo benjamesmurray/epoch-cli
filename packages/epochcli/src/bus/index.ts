@@ -1,4 +1,6 @@
 import z from "zod"
+import path from "node:path"
+import fs from "node:fs/promises"
 import { Effect, Exit, Layer, PubSub, Scope, ServiceMap, Stream } from "effect"
 import { Log } from "../util/log"
 import { Instance } from "../project/instance"
@@ -6,6 +8,8 @@ import { BusEvent } from "./bus-event"
 import { GlobalBus } from "./global"
 import { InstanceState } from "@/effect/instance-state"
 import { makeRuntime } from "@/effect/run-service"
+import { Process } from "@/util/process"
+import { File } from "@/file"
 
 export namespace Bus {
   const log = Log.create({ service: "bus" })
@@ -65,9 +69,47 @@ export namespace Bus {
             }),
           )
 
+          yield* Stream.fromPubSub(wildcard).pipe(
+            Stream.filter((evt) => evt.type === File.Event.Edited.type),
+            Stream.runForEach(() =>
+              Effect.promise(async () => {
+                log.info("triggering project map refresh")
+                await Process.spawn(["mcpx-rust", "map", "pm_init"]).exited.catch(() => {})
+
+                try {
+                  const out = await Process.run(["mcpx-rust", "map", "pm_query", "--path", "."])
+                  if (out.stdout) {
+                    const toonPath = path.join(Instance.directory, ".project-map", "latest", "map.toon")
+                    await fs.mkdir(path.dirname(toonPath), { recursive: true }).catch(() => {})
+                    await fs.writeFile(toonPath, out.stdout.toString("utf-8"), "utf-8")
+                    log.info("exported map.toon", { path: toonPath })
+                  }
+                } catch (e) {
+                  log.warn("failed to export map.toon", { error: String(e) })
+                }
+              }),
+            ),
+            Effect.forkScoped,
+          )
+
           return { wildcard, typed }
         }),
       )
+
+      function summarizeProperties(props: any): Record<string, any> {
+        if (typeof props !== "object" || props === null) return {}
+        const result: Record<string, any> = {}
+        for (const [key, value] of Object.entries(props)) {
+          if (typeof value === "string") {
+            result[key] = value.length > 40 ? value.substring(0, 40) + "..." : value
+          } else if (typeof value === "object" && value !== null) {
+            result[key] = "[Object]"
+          } else {
+            result[key] = value
+          }
+        }
+        return result
+      }
 
       function getOrCreate<D extends BusEvent.Definition>(state: State, def: D) {
         return Effect.gen(function* () {
@@ -84,7 +126,7 @@ export namespace Bus {
         return Effect.gen(function* () {
           const s = yield* InstanceState.get(state)
           const payload: Payload = { type: def.type, properties }
-          log.info("publishing", { type: def.type })
+          log.info("publishing", { type: def.type, ...summarizeProperties(properties) })
 
           const ps = s.typed.get(def.type)
           if (ps) yield* PubSub.publish(ps, payload)

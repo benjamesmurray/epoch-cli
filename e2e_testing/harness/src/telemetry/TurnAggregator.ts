@@ -93,9 +93,16 @@ export class TurnAggregator {
       mcpxFailures: [],
       phase,
       activeAgent,
+      tools: [],
       contextLimit: this.lastContextLimit,
     };
     return finishedTurn;
+  }
+
+  public registerTool(toolName: string): void {
+    if (this.currentTurn) {
+      this.currentTurn.tools.push(toolName);
+    }
   }
 
   private endCurrentTurn(timestamp: string, metrics: any): Turn | null {

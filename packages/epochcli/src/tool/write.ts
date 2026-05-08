@@ -11,6 +11,7 @@ import { Format } from "../format"
 import { FileTime } from "../file/time"
 import { Filesystem } from "../util/filesystem"
 import { Instance } from "../project/instance"
+import { Log } from "@/util/log"
 import { trimDiff } from "./edit"
 import { assertExternalDirectory } from "./external-directory"
 
@@ -44,7 +45,7 @@ export const WriteTool = Tool.define("write", {
 
     await Filesystem.write(filepath, params.content)
     await Format.file(filepath)
-    Bus.publish(File.Event.Edited, { file: filepath })
+    await Bus.publish(File.Event.Edited, { file: filepath })
     await Bus.publish(FileWatcher.Event.Updated, {
       file: filepath,
       event: exists ? "change" : "add",

@@ -14,6 +14,7 @@ import { ToolRegistry } from "../../../src/tool/registry"
 import { Truncate } from "../../../src/tool/truncate"
 import { Permission } from "../../../src/permission"
 import { InputResolver } from "../../../src/session/prompt/resolver"
+import { Todo } from "../../../src/session/todo"
 import { InstanceRef } from "@/effect/instance-ref"
 import { testEffect } from "../../lib/effect"
 import { SessionID, MessageID } from "../../../src/session/schema"
@@ -22,12 +23,30 @@ const mockFsys = Layer.succeed(AppFileSystem.Service, AppFileSystem.Service.of({
 const mockBus = Layer.succeed(Bus.Service, Bus.Service.of({ publish: () => Effect.void } as any))
 const mockSessions = Layer.succeed(Session.Service, Session.Service.of({ updatePart: () => Effect.void } as any))
 const mockAgents = Layer.succeed(Agent.Service, Agent.Service.of({} as any))
-const mockPlugin = Layer.succeed(Plugin.Service, Plugin.Service.of({ trigger: (name: string, payload: any, state: any) => Effect.succeed(state) } as any))
+const mockPlugin = Layer.succeed(
+  Plugin.Service,
+  Plugin.Service.of({ trigger: (name: string, payload: any, state: any) => Effect.succeed(state) } as any),
+)
 const mockMcp = Layer.succeed(MCP.Service, MCP.Service.of({ tools: () => Effect.succeed({}) } as any))
-const mockRegistry = Layer.succeed(ToolRegistry.Service, ToolRegistry.Service.of({ tools: () => Effect.succeed([]) } as any))
+const mockRegistry = Layer.succeed(
+  ToolRegistry.Service,
+  ToolRegistry.Service.of({ tools: () => Effect.succeed([]) } as any),
+)
 const mockTruncate = Layer.succeed(Truncate.Service, Truncate.Service.of({} as any))
-const mockPermission = Layer.succeed(Permission.Service, Permission.Service.of({ ask: () => Effect.succeed(true) } as any))
+const mockPermission = Layer.succeed(
+  Permission.Service,
+  Permission.Service.of({ ask: () => Effect.succeed(true) } as any),
+)
 const mockResolver = Layer.succeed(InputResolver.Service, InputResolver.Service.of({} as any))
+
+const mockTodo = Layer.succeed(
+  Todo.Service,
+  Todo.Service.of({
+    update: () => Effect.void,
+    get: () => Effect.succeed([]),
+    syncWithFile: () => Effect.void,
+  }),
+)
 
 const mockDeps = Layer.mergeAll(
   mockFsys,
@@ -40,6 +59,7 @@ const mockDeps = Layer.mergeAll(
   mockTruncate,
   mockPermission,
   mockResolver,
+  mockTodo,
 )
 
 const { effect: it } = testEffect(ToolOrchestrator.layer.pipe(Layer.provideMerge(mockDeps)))
@@ -53,17 +73,23 @@ describe("ToolOrchestrator", () => {
       let success = false
       const tool = orchestrator.createStructuredOutputTool({
         schema: { type: "object", properties: { result: { type: "string" } } },
-        onSuccess: (args: any) => { 
-          if (args.result === "done") success = true 
-        }
+        onSuccess: (args: any) => {
+          if (args.result === "done") success = true
+        },
       })
 
       expect(tool.description).toContain("structured format")
-      // @ts-ignore
-      yield* Effect.promise(() => tool.execute({ result: "done" }, { abortSignal: new AbortController().signal, toolCallId: "1" }))
+      if (tool.execute) {
+        // @ts-ignore
+        yield* Effect.promise(() =>
+          tool.execute!(
+            { result: "done" },
+            { abortSignal: new AbortController().signal, toolCallId: "1", messages: [] },
+          ),
+        )
+      }
       expect(success).toBe(true)
-    }),
-  )
+    }))
 
   it("resolveTools - returns tools from registry", () =>
     Effect.gen(function* () {
@@ -74,10 +100,9 @@ describe("ToolOrchestrator", () => {
         session: { id: SessionID.descending() } as any,
         processor: { message: { id: MessageID.ascending() }, partFromToolCall: () => undefined } as any,
         bypassAgentCheck: true,
-        messages: []
+        messages: [],
       })
 
       expect(tools).toBeDefined()
-    }).pipe(Effect.provideService(InstanceRef, testContext)),
-  )
+    }).pipe(Effect.provideService(InstanceRef, testContext)))
 })

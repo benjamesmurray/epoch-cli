@@ -121,6 +121,15 @@ ZONE 2: BEHAVIORAL RULE PACKS
     expect(result.operationalFacts).not.toContain("zone_1")
   })
 
+  test("replaces [CONTEXT_LIMIT] placeholder in operational facts", () => {
+    const raw = `
+ZONE 1 & 3: OPERATIONAL FACTS
+fact_01, "zone_1", "Always", "The environment context limit is strictly [CONTEXT_LIMIT]."
+`
+    const result = LLM.parseGroundTruthRules(raw, [], 128000)
+    expect(result.operationalFacts).toContain("- The environment context limit is strictly 128K tokens.")
+  })
+
   test("filters behavioral rules based on active agent pack", () => {
     const raw = `
 ZONE 1 & 3: OPERATIONAL FACTS
@@ -177,7 +186,7 @@ reas_01, "Trigger 2", "Behaviour 2", "Example 2"
   test("falls back to raw text when markers are missing", () => {
     const raw = `Just some plain text without any zone markers.`
     const result = LLM.parseGroundTruthRules(raw, ["new_feature_pack"])
-    
+
     expect(result.operationalFacts).toBe("")
     expect(result.projectSpecific).toBe("")
     expect(result.behavioralRules).toBe(raw)
@@ -191,7 +200,7 @@ ZONE 2: BEHAVIORAL RULE PACKS
 Rule 1`
 
     const result = LLM.parseGroundTruthRules(raw, ["new_feature_pack"])
-    
+
     expect(result.operationalFacts).toContain("Fact 1")
     expect(result.behavioralRules).toContain("Rule 1") // Falls back to raw zone 2 string if pack matches fail
     expect(result.projectSpecific).toBe("")
@@ -1194,7 +1203,16 @@ describe("session.llm.stream", () => {
     const fixture = await loadFixture(providerID, modelID)
     const model = fixture.model
 
-    const request = new Promise<Capture>((resolve) => state.queue.push({ path: "/chat/completions", response: new Response(createChatStream("Hello"), { status: 200, headers: { "Content-Type": "text/event-stream" } }), resolve }))
+    const request = new Promise<Capture>((resolve) =>
+      state.queue.push({
+        path: "/chat/completions",
+        response: new Response(createChatStream("Hello"), {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        }),
+        resolve,
+      }),
+    )
 
     await using tmp = await tmpdir({
       init: async (dir) => {
@@ -1252,15 +1270,13 @@ describe("session.llm.stream", () => {
 
         const capture = await request
         const messages = capture.body.messages as any[]
-        
+
         // Find the system messages
-        const systemMessages = messages.filter(m => m.role === "system")
+        const systemMessages = messages.filter((m) => m.role === "system")
         expect(systemMessages.length).toBeGreaterThanOrEqual(1)
-        
+
         // Find the user message containing state check
-        const userMsg = messages.find(
-          (m) => m.role === "user" && m.content.includes("[INTERNAL STATE CHECK]"),
-        )
+        const userMsg = messages.find((m) => m.role === "user" && m.content.includes("[INTERNAL STATE CHECK]"))
 
         expect(userMsg).toBeDefined()
         expect(userMsg.content).toContain("Hello")

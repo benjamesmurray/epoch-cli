@@ -22,7 +22,7 @@ export class WorkspaceBuilder {
     const epochConfig = {
       ...config.epochcli,
       "model": mainModelName,
-      "side_model": "local-side/nemotron-3-nano",
+      "side_model": "local-side/qwen-35b",
       "provider": {
         "local-main": {
           "npm": "@ai-sdk/openai-compatible",
@@ -57,8 +57,8 @@ export class WorkspaceBuilder {
             "apiKey": "2250"
           },
           "models": {
-            "nemotron-3-nano": { 
-              "name": "Nemotron 3 Nano",
+            "qwen-35b": { 
+              "name": "Qwen 35B Clerk",
               "limit": { "context": 32000, "output": 4096 }
             }
           }
@@ -88,25 +88,21 @@ export class WorkspaceBuilder {
     const mcpxConfigDir = path.join(hostRunDir, ".config", "mcpx");
     await fs.mkdir(mcpxConfigDir, { recursive: true });
     const mcpxConfig = `
-[servers.spec]
-command = "node"
-args = ["/usr/local/lib/node_modules/@epoch-ai/deliver-cli/dist/index.js"]
+[mcp_servers.spec]
+command = "deliver-cli"
+args = ["mcp"]
 
-[servers.map]
-command = "/opt/project-map-cli-env/bin/python"
-args = ["-m", "project_map_cli.mcp.server"]
+[mcp_servers.map]
+command = "project-map-cli-rust"
+args = ["mcp"]
 
-[servers.project-map-cli]
-command = "/opt/project-map-cli-env/bin/python"
-args = ["-m", "project_map_cli.mcp.server"]
+[mcp_servers.ground]
+command = "ground-truth-cli-rust"
+args = ["mcp"]
 
-[servers.ground]
-command = "node"
-args = ["/usr/local/lib/node_modules/ground-truth-cli/dist/index.js"]
-
-[servers.ground-truth-cli]
-command = "node"
-args = ["/usr/local/lib/node_modules/ground-truth-cli/dist/index.js"]
+[mcp_servers.ground-truth-cli]
+command = "ground-truth-cli-rust"
+args = ["mcp"]
 `;
     await fs.writeFile(
       path.join(mcpxConfigDir, "config.toml"),
@@ -123,29 +119,6 @@ args = ["/usr/local/lib/node_modules/ground-truth-cli/dist/index.js"]
         await execAsync("git init", { cwd: hostRunDir });
     } catch (e) {
         // Ignore if git is not available on host
-    }
-
-    // Install shims for the servers
-    try {
-        const shimDir = path.join(hostRunDir, ".local", "bin");
-        await fs.mkdir(shimDir, { recursive: true });
-        
-        const writeShim = async (name: string, server: string) => {
-            const content = `#!/bin/sh\n# mcpx-shim:server=${server}\nexec mcpx '${server}' "$@"\n`;
-            await fs.writeFile(path.join(shimDir, name), content, { mode: 0o755 });
-        };
-        
-        // Canonical shims
-        await writeShim("spec", "spec");
-        await writeShim("map", "map");
-        await writeShim("ground", "ground");
-
-        // Legacy compatibility shims
-        await writeShim("project-map-cli", "project-map-cli");
-        await writeShim("ground-truth-cli", "ground-truth-cli");
-
-    } catch (e) {
-        console.error("Failed to install shims manually:", e);
     }
 
     // Mock an auth.json to bypass the "no providers found" crash gracefully
@@ -167,9 +140,9 @@ args = ["/usr/local/lib/node_modules/ground-truth-cli/dist/index.js"]
       path.join(hostRunDir, "AGENTS.md"),
       `# Project Guidelines
 - **Senior Style:** Suppress conversational filler. Output ONLY context and code.
-- **Workflow:** Use 'spec sc_status' to track progress. Mark tasks with 'spec sc_todo_start' and 'spec sc_todo_complete'.
-- **Discovery:** Use 'map pm_query' for symbol and file exploration.
-- **One-Shot:** In one-shot mode, immediately run 'spec sc_plan' after 'spec sc_init' to generate tasks, then 'spec sc_approve' to begin coding. Do not spend multiple turns drafting requirements.
+- **Workflow:** Use the 'mcpx' tool with server='spec' and tool='sc_status' to track progress. Mark tasks with 'sc_todo_start' and 'sc_todo_complete'.
+- **Discovery:** Use the 'mcpx' tool with server='map' and tool='pm_query' for symbol and file exploration.
+- **One-Shot:** In one-shot mode, after running 'sc_init' (via mcpx: e.g., mcpx spec sc_init --name my-project), you MUST first use the 'read' tool to view the generated Specification.md template. Then, in a subsequent turn, use the 'write' tool to overwrite the file entirely with your technical specification, ensuring you remove all '<template-specification>' tags. This is a mandatory safety sequence. Finally, run 'sc_plan' and 'sc_approve' to proceed.
 - **Continuity:** When a new epoch begins, strictly follow the directives in .epoch-continuity.toon.
 - **Architecture:** Keep things flat and composable. Avoid 'any'.`,
       "utf-8"

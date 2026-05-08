@@ -324,9 +324,7 @@ export namespace ProviderTransform {
       })
     }
 
-    const supportsModelRole =
-      model.api.npm === "@ai-sdk/google" ||
-      model.api.npm === "@ai-sdk/google-vertex"
+    const supportsModelRole = model.api.npm === "@ai-sdk/google" || model.api.npm === "@ai-sdk/google-vertex"
 
     return msgs.map((m) => {
       if (m.role === "assistant" && supportsModelRole) {
@@ -806,7 +804,7 @@ export namespace ProviderTransform {
       if (input.model.capabilities.reasoning) {
         result["thinkingConfig"] = {
           includeThoughts: true,
-          thinkingLevel: effort
+          thinkingLevel: effort,
         }
       }
     }
@@ -1061,7 +1059,12 @@ export namespace ProviderTransform {
       schema = sanitizeGemini(schema)
     }
 
-    if (model.api?.id?.includes("gemma-4") || model.api?.id?.includes("google-gemma-26b") || model.id?.includes("big-pickle")) {
+    if (
+      model.api?.id?.includes("gemma-4") ||
+      model.api?.id?.includes("google-gemma-26b") ||
+      model.api?.id?.toLowerCase().includes("qwen") ||
+      model.id?.includes("big-pickle")
+    ) {
       const sanitizeGemma4 = (obj: any, isRoot = true): any => {
         if (obj === null || typeof obj !== "object") {
           return obj
@@ -1098,7 +1101,7 @@ export namespace ProviderTransform {
         if (!isRoot && result.type === "object" && result.properties) {
           result.type = "string"
           if (!result.description) {
-             result.description = "JSON stringified object"
+            result.description = "JSON stringified object"
           }
           delete result.properties
           delete result.required

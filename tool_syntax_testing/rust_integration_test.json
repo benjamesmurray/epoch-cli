@@ -1,0 +1,30 @@
+[
+  {
+    "id": "rust-mcpx-map-query",
+    "iterations": 1,
+    "timeoutMs": 300000,
+    "prompt": "Use the 'mcpx' tool to query the repository map for the current directory (path '.'). Use the 'map' server and 'pm_query' tool. Once you have the results, call task_complete.",
+    "expectedTools": ["mcpx", "pm_query"],
+    "runTargetDir": ".",
+    "docker": {
+      "imageName": "epochcli-eval-env:latest",
+      "network": "host",
+      "memoryLimit": "4g",
+      "model": "local-main/qwen-27b"
+    }
+  },
+  {
+    "id": "rust-mcpx-map-init",
+    "iterations": 1,
+    "timeoutMs": 300000,
+    "prompt": "Use the 'mcpx' tool to refresh the repository map index. Use the 'map' server and 'pm_init' tool. After refreshing, call task_complete.",
+    "expectedTools": ["mcpx", "pm_init"],
+    "runTargetDir": ".",
+    "docker": {
+      "imageName": "epochcli-eval-env:latest",
+      "network": "host",
+      "memoryLimit": "4g",
+      "model": "local-main/qwen-27b"
+    }
+  }
+]

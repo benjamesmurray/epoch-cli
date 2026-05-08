@@ -16,6 +16,7 @@ export namespace ProviderError {
     /maximum context length is \d+ tokens/i, // OpenRouter, DeepSeek, vLLM
     /exceeds the limit of \d+/i, // GitHub Copilot
     /exceeds the available context size/i, // llama.cpp server
+    /context size has been exceeded/i, // llama.cpp alternative overflow error
     /greater than the context length/i, // LM Studio
     /context window exceeds limit/i, // MiniMax
     /exceeded model token limit/i, // Kimi For Coding, Moonshot
@@ -37,13 +38,44 @@ export namespace ProviderError {
 
   // Providers not reliably handled in this function:
   // - z.ai: can accept overflow silently (needs token-count/context-window checks)
-  function isOverflow(message: string) {
-    if (OVERFLOW_PATTERNS.some((p) => p.test(message))) return true
+  export function isOverflow(input: unknown): boolean {
+    if (typeof input === "string") {
+      if (OVERFLOW_PATTERNS.some((p) => p.test(input))) return true
+      // Providers/status patterns handled outside of regex list:
+      // - Cerebras: often returns "400 (no body)" / "413 (no body)"
+      // - Mistral: often returns "400 (no body)" / "413 (no body)"
+      if (/^4(00|13)\s*(status code)?\s*\(no body\)/i.test(input)) return true
 
-    // Providers/status patterns handled outside of regex list:
-    // - Cerebras: often returns "400 (no body)" / "413 (no body)"
-    // - Mistral: often returns "400 (no body)" / "413 (no body)"
-    return /^4(00|13)\s*(status code)?\s*\(no body\)/i.test(message)
+      // Handle stringified JSON that might contain an overflow message
+      if (input.startsWith("{") && input.endsWith("}")) {
+        try {
+          const body = JSON.parse(input)
+          return isOverflow(body)
+        } catch {
+          // ignore parse errors
+        }
+      }
+
+      return false
+    }
+
+    if (typeof input === "object" && input !== null) {
+      const body = input as Record<string, any>
+      // Check common error fields recursively
+      const candidates = [
+        body.message,
+        body.error,
+        body.error?.message,
+        body.error?.code,
+        body.code,
+      ]
+      for (const c of candidates) {
+        if (typeof c === "string" && isOverflow(c)) return true
+        if (typeof c === "object" && c !== null && isOverflow(c)) return true
+      }
+    }
+
+    return false
   }
 
   function message(providerID: ProviderID, e: APICallError) {
@@ -117,10 +149,38 @@ export namespace ProviderError {
       }
 
   export function parseStreamError(input: unknown): ParsedStreamError | undefined {
+    const isErrorInstance = input instanceof Error
     const body = json(input)
-    if (!body) return
 
+    if (isOverflow(input) || isOverflow(body)) {
+      const errorString =
+        (typeof body?.error === "string" ? body.error : undefined) ||
+        (isErrorInstance ? (input as Error).message : undefined) ||
+        "Context overflow"
+
+      return {
+        type: "context_overflow",
+        message: errorString,
+        responseBody: JSON.stringify(body || { error: errorString }),
+      }
+    }
+
+    if (!body) return
     const responseBody = JSON.stringify(body)
+
+    if (typeof body.error === "string") {
+      // If it's a standard Error instance but wasn't an overflow, we should
+      // return undefined so fromError can use specialized cases (like ZlibError).
+      if (isErrorInstance) return undefined
+
+      return {
+        type: "api_error",
+        message: body.error,
+        isRetryable: false,
+        responseBody,
+      }
+    }
+
     if (body.type !== "error") return
 
     switch (body?.error?.code) {
@@ -173,7 +233,13 @@ export namespace ProviderError {
   export function parseAPICallError(input: { providerID: ProviderID; error: APICallError }): ParsedAPICallError {
     const m = message(input.providerID, input.error)
     const body = json(input.error.responseBody)
-    if (isOverflow(m) || input.error.statusCode === 413 || body?.error?.code === "context_length_exceeded") {
+    if (
+      isOverflow(m) ||
+      isOverflow(input.error.responseBody) ||
+      isOverflow(body) ||
+      input.error.statusCode === 413 ||
+      body?.error?.code === "context_length_exceeded"
+    ) {
       return {
         type: "context_overflow",
         message: m,
@@ -182,13 +248,15 @@ export namespace ProviderError {
     }
 
     const metadata = input.error.url ? { url: input.error.url } : undefined
+    const isLocal = input.providerID.startsWith("local-main") || input.providerID.startsWith("local-side")
     return {
       type: "api_error",
       message: m,
       statusCode: input.error.statusCode,
-      isRetryable: input.providerID.startsWith("openai")
-        ? isOpenAiErrorRetryable(input.error)
-        : input.error.isRetryable,
+      isRetryable:
+        input.providerID.startsWith("openai") || isLocal
+          ? isOpenAiErrorRetryable(input.error)
+          : input.error.isRetryable,
       responseHeaders: input.error.responseHeaders,
       responseBody: input.error.responseBody,
       metadata,

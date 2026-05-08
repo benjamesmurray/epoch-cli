@@ -341,7 +341,8 @@ export const RunCommand = cmd({
     if (!process.stdin.isTTY) message += "\n" + (await Bun.stdin.text())
 
     if (args.yolo) {
-      message += "\n\n[System: YOLO mode enabled. You MUST use the task_complete tool when you are completely finished.]"
+      message +=
+        "\n\n[System: YOLO mode enabled. You MUST use the task_complete tool when you are completely finished.]"
     }
 
     if (message.trim().length === 0 && !args.command) {
@@ -513,6 +514,20 @@ export const RunCommand = cmd({
             error = error ? error + EOL + err : err
             if (emit("error", { error: props.error })) continue
             UI.error(err)
+          }
+
+          if (event.type === "session.epoch_transition") {
+            const props = event.properties as any
+            if (props.sessionID !== sessionID) continue
+            if (args.format !== "json") {
+              UI.empty()
+              UI.println(
+                UI.Style.TEXT_DIM +
+                  `[System: Context limit reached. Initiating automatic Epoch transition. Reason: ${props.reason}]` +
+                  UI.Style.TEXT_NORMAL,
+              )
+              UI.empty()
+            }
           }
 
           if (

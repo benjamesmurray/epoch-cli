@@ -34,7 +34,12 @@ import { Config } from "../config/config"
 import * as CrossSpawnSpawner from "@/effect/cross-spawn-spawner"
 import { tool, jsonSchema, type Tool as AITool } from "ai"
 
-import { PromptInput as _PromptInput, LoopInput as _LoopInput, ShellInput as _ShellInput, CommandInput as _CommandInput } from "./prompt/types"
+import {
+  PromptInput as _PromptInput,
+  LoopInput as _LoopInput,
+  ShellInput as _ShellInput,
+  CommandInput as _CommandInput,
+} from "./prompt/types"
 import { SessionState } from "./prompt/state"
 import { InputResolver } from "./prompt/resolver"
 import { ToolOrchestrator } from "./prompt/orchestrator"
@@ -44,7 +49,14 @@ import { makeRuntime } from "@/effect/run-service"
 // @ts-ignore
 globalThis.AI_SDK_LOG_WARNINGS = false
 
-import { STRUCTURED_OUTPUT_DESCRIPTION, STRUCTURED_OUTPUT_SYSTEM_PROMPT, bashRegex, argsRegex, placeholderRegex, quoteTrimRegex } from "./prompt/utils"
+import {
+  STRUCTURED_OUTPUT_DESCRIPTION,
+  STRUCTURED_OUTPUT_SYSTEM_PROMPT,
+  bashRegex,
+  argsRegex,
+  placeholderRegex,
+  quoteTrimRegex,
+} from "./prompt/utils"
 
 export namespace SessionPrompt {
   const log = Log.create({ service: "session.prompt" })
@@ -248,7 +260,7 @@ export namespace SessionPrompt {
         command,
         resolvePromptParts,
       })
-    })
+    }),
   )
 
   export const layer: Layer.Layer<Service, never, any> = facadeLayer.pipe(

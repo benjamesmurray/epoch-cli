@@ -18,11 +18,7 @@ const mockStatus = Layer.succeed(
 
 const mockBus = Layer.succeed(Bus.Service, Bus.Service.of({ publish: () => Effect.void } as any))
 
-const mockDeps = Layer.mergeAll(
-  mockStatus,
-  mockBus,
-  Session.defaultLayer,
-)
+const mockDeps = Layer.mergeAll(mockStatus, mockBus, Session.defaultLayer)
 
 const { effect: it } = testEffect(SessionState.layer.pipe(Layer.provideMerge(mockDeps)))
 
@@ -33,32 +29,29 @@ describe("SessionState", () => {
     Effect.gen(function* () {
       const state = yield* SessionState.Service
       const sessionID = SessionID.descending()
-      
+
       const runner1 = yield* state.getRunner(sessionID)
       const runner2 = yield* state.getRunner(sessionID)
-      
+
       expect(runner1).toBeDefined()
       expect(runner1).toBe(runner2)
-    }).pipe(Effect.provideService(InstanceRef, testContext)),
-  )
+    }).pipe(Effect.provideService(InstanceRef, testContext)))
 
   it("assertNotBusy - succeeds when idle", () =>
     Effect.gen(function* () {
       const state = yield* SessionState.Service
       const sessionID = SessionID.descending()
-      
+
       yield* state.assertNotBusy(sessionID)
       // Success if no throw
-    }).pipe(Effect.provideService(InstanceRef, testContext)),
-  )
+    }).pipe(Effect.provideService(InstanceRef, testContext)))
 
   it("cancel - ignores if no runner", () =>
     Effect.gen(function* () {
       const state = yield* SessionState.Service
       const sessionID = SessionID.descending()
-      
+
       yield* state.cancel(sessionID)
       // Should resolve cleanly
-    }).pipe(Effect.provideService(InstanceRef, testContext)),
-  )
+    }).pipe(Effect.provideService(InstanceRef, testContext)))
 })

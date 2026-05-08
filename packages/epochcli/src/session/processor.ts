@@ -19,6 +19,7 @@ import { SessionSummary } from "./summary"
 import { SanitizerMiddleware } from "./sanitizer"
 import type { Provider } from "@/provider/provider"
 import { Question } from "@/question"
+import { Todo } from "./todo"
 
 import { Lock } from "../util/lock.js"
 
@@ -53,6 +54,8 @@ export namespace SessionProcessor {
     snapshot: string | undefined
     blocked: boolean
     needsCompaction: boolean
+    streamingLoopDetected: boolean
+    streamingLoopReason?: string
     currentText: MessageV2.TextPart | undefined
     reasoningMap: Record<string, MessageV2.ReasoningPart>
   }
@@ -73,6 +76,7 @@ export namespace SessionProcessor {
     | Permission.Service
     | Plugin.Service
     | SessionStatus.Service
+    | Todo.Service
   > = Layer.effect(
     Service,
     Effect.gen(function* () {
@@ -85,6 +89,7 @@ export namespace SessionProcessor {
       const permission = yield* Permission.Service
       const plugin = yield* Plugin.Service
       const status = yield* SessionStatus.Service
+      const todo = yield* Todo.Service
 
       const create = Effect.fn("SessionProcessor.create")(function* (input: Input) {
         // Pre-capture snapshot before the LLM stream starts. The AI SDK
@@ -100,9 +105,13 @@ export namespace SessionProcessor {
           snapshot: initialSnapshot,
           blocked: false,
           needsCompaction: false,
+          streamingLoopDetected: false,
+          streamingLoopReason: undefined,
           currentText: undefined,
           reasoningMap: {},
         }
+
+        yield* todo.syncWithFile(ctx.sessionID).pipe(Effect.ignore)
         let aborted = false
 
         const parse = (e: unknown) =>
@@ -113,23 +122,93 @@ export namespace SessionProcessor {
 
         const handleEvent = Effect.fn("SessionProcessor.handleEvent")(function* (value: StreamEvent) {
           switch (value.type) {
-            case "start":
-              yield* status.set(ctx.sessionID, { type: "busy" })
+            case "stream-start":
               return
 
-            case "reasoning-start":
-              if (value.id in ctx.reasoningMap) return
-              ctx.reasoningMap[value.id] = {
+            case "response-metadata":
+              ctx.assistantMessage.modelID = value.modelId as ModelID
+              ctx.assistantMessage.providerID = input.model.providerID
+              if (value.timestamp) ctx.assistantMessage.time.created = value.timestamp.getTime()
+              return
+
+            case "text-start":
+              ctx.currentText = {
                 id: PartID.ascending(),
                 messageID: ctx.assistantMessage.id,
                 sessionID: ctx.assistantMessage.sessionID,
-                type: "reasoning",
+                type: "text",
                 text: "",
                 time: { start: Date.now() },
                 metadata: value.providerMetadata,
               }
-              yield* session.updatePart(ctx.reasoningMap[value.id])
+              yield* session.updatePart(ctx.currentText)
               return
+
+            case "text-delta": {
+              const delta =
+                (value as any).text ?? ("delta" in value ? (value as any).delta : (value as any).textDelta)
+              if (!ctx.currentText) {
+                ctx.currentText = {
+                  id: PartID.ascending(),
+                  messageID: ctx.assistantMessage.id,
+                  sessionID: ctx.assistantMessage.sessionID,
+                  type: "text",
+                  text: "",
+                  time: { start: Date.now() },
+                  metadata: value.providerMetadata,
+                }
+                yield* session.updatePart(ctx.currentText)
+              }
+              ctx.currentText.text += delta || ""
+              if (value.providerMetadata) ctx.currentText.metadata = value.providerMetadata
+
+              // In-Stream Rambling Heuristics
+              // 1. Actionless Token Limit: Too much text without any tool calls
+              if (ctx.currentText.text.length > 3000 && Object.keys(ctx.toolcalls).length === 0) {
+                ctx.streamingLoopDetected = true
+                ctx.streamingLoopReason = "STREAM_ABORT_RAMBLING"
+                ctx.assistantMessage.error = new MessageV2.RamblingError({
+                  reason: ctx.streamingLoopReason,
+                }).toObject()
+                return
+              }
+
+              // 2. Sentence Repetition: Check if the agent is repeating similar sentences
+              const sentences = ctx.currentText.text
+                .split(/[.!?\n]/)
+                .map((s) => s.trim())
+                .filter((s) => s.length > 25)
+              if (sentences.length >= 4) {
+                const last = sentences[sentences.length - 1]
+                const window = sentences.slice(-4, -1)
+                const isRepeating = window.some((prev) => {
+                  const s1 = new Set(last.toLowerCase().split(/\s+/))
+                  const s2 = new Set(prev.toLowerCase().split(/\s+/))
+                  const intersection = new Set([...s1].filter((x) => s2.has(x)))
+                  const union = new Set([...s1, ...s2])
+                  return intersection.size / union.size > 0.85
+                })
+
+                if (isRepeating) {
+                  ctx.streamingLoopDetected = true
+                  ctx.streamingLoopReason = "STREAM_ABORT_LOOP"
+                  ctx.assistantMessage.error = new MessageV2.RamblingError({
+                    reason: ctx.streamingLoopReason,
+                  }).toObject()
+                  return
+                }
+              }
+
+
+              yield* session.updatePartDelta({
+                sessionID: ctx.currentText.sessionID,
+                messageID: ctx.currentText.messageID,
+                partID: ctx.currentText.id,
+                field: "text",
+                delta: delta || "",
+              })
+              return
+            }
 
             case "reasoning-delta":
               if (!(value.id in ctx.reasoningMap)) return
@@ -168,8 +247,24 @@ export namespace SessionProcessor {
               } satisfies MessageV2.ToolPart)
               return
 
-            case "tool-input-delta":
+            case "tool-input-delta": {
+              const id = ("id" in value ? value.id : (value as any).toolCallId) as string
+              const delta = ("delta" in value ? value.delta : (value as any).argsTextDelta) as string
+              const match = ctx.toolcalls[id]
+              if (!match || match.state.status !== "pending") return
+              match.state.raw += delta || ""
+              // Persisting every delta token is too expensive. We update the local state.
+              // It will be persisted when the stream finishes or aborts via cleanup()
+              // For UI responsiveness, we emit the delta.
+              yield* session.updatePartDelta({
+                sessionID: match.sessionID,
+                messageID: match.messageID,
+                partID: match.id,
+                field: "tool",
+                delta: delta || "",
+              })
               return
+            }
 
             case "tool-input-end":
               return
@@ -314,32 +409,6 @@ export namespace SessionProcessor {
               return
             }
 
-            case "text-start":
-              ctx.currentText = {
-                id: PartID.ascending(),
-                messageID: ctx.assistantMessage.id,
-                sessionID: ctx.assistantMessage.sessionID,
-                type: "text",
-                text: "",
-                time: { start: Date.now() },
-                metadata: value.providerMetadata,
-              }
-              yield* session.updatePart(ctx.currentText)
-              return
-
-            case "text-delta":
-              if (!ctx.currentText) return
-              ctx.currentText.text += value.text
-              if (value.providerMetadata) ctx.currentText.metadata = value.providerMetadata
-              yield* session.updatePartDelta({
-                sessionID: ctx.currentText.sessionID,
-                messageID: ctx.currentText.messageID,
-                partID: ctx.currentText.id,
-                field: "text",
-                delta: value.text,
-              })
-              return
-
             case "text-end":
               if (!ctx.currentText) return
               ctx.currentText.text = ctx.currentText.text.trimEnd()
@@ -402,10 +471,15 @@ export namespace SessionProcessor {
           const parts = MessageV2.parts(ctx.assistantMessage.id)
           for (const part of parts) {
             if (part.type !== "tool" || part.state.status === "completed" || part.state.status === "error") continue
+            
+            // Use the in-memory state if available to capture any accumulated raw JSON deltas
+            const memPart = ctx.toolcalls[part.callID]
+            const latestState = memPart ? memPart.state : part.state
+
             yield* session.updatePart({
               ...part,
               state: {
-                ...part.state,
+                ...latestState,
                 status: "error",
                 error: "Tool execution aborted",
                 time: { start: Date.now(), end: Date.now() },
@@ -421,10 +495,15 @@ export namespace SessionProcessor {
           const error = parse(e)
           if (MessageV2.ContextOverflowError.isInstance(error)) {
             ctx.needsCompaction = true
-            yield* bus.publish(Session.Event.Error, { sessionID: ctx.sessionID, error })
+            yield* bus.publish(Session.Event.EpochTransition, {
+              sessionID: ctx.sessionID,
+              reason: "Context size exceeded",
+            })
             return
           }
-          ctx.assistantMessage.error = error
+          if (!ctx.streamingLoopDetected && !ctx.assistantMessage.error) {
+            ctx.assistantMessage.error = error
+          }
           yield* bus.publish(Session.Event.Error, {
             sessionID: ctx.assistantMessage.sessionID,
             error: ctx.assistantMessage.error,
@@ -448,6 +527,7 @@ export namespace SessionProcessor {
         const process = Effect.fn("SessionProcessor.process")(function* (streamInput: LLM.StreamInput) {
           log.info("process")
           ctx.needsCompaction = false
+          ctx.streamingLoopDetected = false
           ctx.shouldBreak = (yield* config.get()).experimental?.continue_loop_on_deny !== true
 
           return yield* Effect.gen(function* () {
@@ -459,7 +539,7 @@ export namespace SessionProcessor {
               yield* stream.pipe(
                 SanitizerMiddleware.transform(),
                 Stream.tap((event) => handleEvent(event)),
-                Stream.takeUntil(() => ctx.needsCompaction),
+                Stream.takeUntil(() => ctx.needsCompaction || ctx.streamingLoopDetected),
                 Stream.runDrain,
               )
             }).pipe(
@@ -488,7 +568,7 @@ export namespace SessionProcessor {
               yield* abort()
             }
             if (ctx.needsCompaction) return "compact"
-            if (ctx.blocked || ctx.assistantMessage.error || aborted) return "stop"
+            if (ctx.blocked || ctx.assistantMessage.error || aborted || ctx.streamingLoopDetected) return "stop"
             return "continue"
           }).pipe(Effect.onInterrupt(() => abort().pipe(Effect.asVoid)))
         })

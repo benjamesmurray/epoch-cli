@@ -7,7 +7,7 @@ describe("LLM Payload Zones E2E Verification", () => {
     // We are verifying against the explicit e2e test output mentioned by the user
     const payloadPath = path.resolve(
       __dirname,
-      "../../../../e2e_testing/results/suite_2026-04-13T23-32-46-621Z/system-prompt-hi-run-1/initial_payload.json"
+      "../../../../e2e_testing/results/suite_2026-04-13T23-32-46-621Z/system-prompt-hi-run-1/initial_payload.json",
     )
 
     // Skip if the file doesn't exist (e.g. in CI where this specific run isn't present)
@@ -33,7 +33,7 @@ describe("LLM Payload Zones E2E Verification", () => {
     // Verify it contains the Behavioral Rules (Zone 2)
     const assistantContent = assistantMsg.content[0].text
     expect(assistantContent).toContain("=== BEHAVIORAL RULES & GENERAL CONTEXT ===")
-    
+
     // Verify core_interaction_pack rules ARE present
     expect(assistantContent).toContain("Trigger: Generating code in response to a user prompt.") // comm_01
     expect(assistantContent).toContain("Trigger: User asks a non-coding general knowledge question.") // comm_05

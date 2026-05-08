@@ -31,7 +31,7 @@ export const RevertFileTool = Tool.define("revert_file", {
     return {
       title: `${path.relative(Instance.worktree, filePath)} reverted`,
       output: `Successfully reverted ${filePath} to its state prior to the last edit.`,
-      metadata: {}
+      metadata: {},
     }
   },
 })

@@ -19,25 +19,37 @@ import { SessionID } from "../../../src/session/schema"
 
 const mockDeps = Layer.mergeAll(
   Layer.succeed(Bus.Service, Bus.Service.of({ publish: () => Effect.void } as any)),
-  Layer.succeed(Session.Service, Session.Service.of({ 
-    get: () => Effect.succeed({} as any),
-    updateMessage: () => Effect.void,
-    updatePart: () => Effect.void
-  } as any)),
-  Layer.succeed(Agent.Service, Agent.Service.of({ 
-    get: () => Effect.succeed(undefined),
-    list: () => Effect.succeed([])
-  } as any)),
+  Layer.succeed(
+    Session.Service,
+    Session.Service.of({
+      get: () => Effect.succeed({} as any),
+      updateMessage: () => Effect.void,
+      updatePart: () => Effect.void,
+    } as any),
+  ),
+  Layer.succeed(
+    Agent.Service,
+    Agent.Service.of({
+      get: () => Effect.succeed(undefined),
+      list: () => Effect.succeed([]),
+    } as any),
+  ),
   Layer.succeed(Provider.Service, Provider.Service.of({} as any)),
-  Layer.succeed(Plugin.Service, Plugin.Service.of({ trigger: (name: string, payload: any, state: any) => Effect.succeed(state) } as any)),
+  Layer.succeed(
+    Plugin.Service,
+    Plugin.Service.of({ trigger: (name: string, payload: any, state: any) => Effect.succeed(state) } as any),
+  ),
   Layer.succeed(ChildProcessSpawner, ChildProcessSpawner.of({} as any)),
   Layer.succeed(SessionStatus.Service, SessionStatus.Service.of({ set: () => Effect.void } as any)),
   Layer.succeed(SessionCompaction.Service, SessionCompaction.Service.of({} as any)),
   Layer.succeed(SessionProcessor.Service, SessionProcessor.Service.of({} as any)),
   Layer.succeed(Instruction.Service, Instruction.Service.of({} as any)),
-  Layer.succeed(InputResolver.Service, InputResolver.Service.of({ 
-    lastModel: () => Effect.succeed({ providerID: "p", modelID: "m" }) 
-  } as any)),
+  Layer.succeed(
+    InputResolver.Service,
+    InputResolver.Service.of({
+      lastModel: () => Effect.succeed({ providerID: "p", modelID: "m" }),
+    } as any),
+  ),
   Layer.succeed(ToolOrchestrator.Service, ToolOrchestrator.Service.of({} as any)),
 )
 
@@ -50,15 +62,17 @@ describe("SessionEngine", () => {
     Effect.gen(function* () {
       const engine = yield* SessionEngine.Service
       const sessionID = SessionID.descending()
-      
-      const task = engine.shellImpl({
-        sessionID,
-        command: "echo 1",
-        agent: "non-existent"
-      }, new AbortController().signal)
-      
+
+      const task = engine.shellImpl(
+        {
+          sessionID,
+          command: "echo 1",
+          agent: "non-existent",
+        },
+        new AbortController().signal,
+      )
+
       const result = yield* Effect.exit(task)
       expect(result._tag).toBe("Failure")
-    }).pipe(Effect.provideService(InstanceRef, testContext)),
-  )
+    }).pipe(Effect.provideService(InstanceRef, testContext)))
 })

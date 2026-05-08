@@ -6,7 +6,7 @@ import { SessionTelemetry } from "../../src/util/session-telemetry"
 
 describe("Telemetry Integration - End-to-End State Extraction", () => {
   const tmpDir = path.join(process.cwd(), "test-telemetry-tmp")
-  
+
   beforeAll(async () => {
     await fs.mkdir(tmpDir, { recursive: true })
     // Initialize SessionTelemetry to point to our temp dir
@@ -27,10 +27,10 @@ describe("Telemetry Integration - End-to-End State Extraction", () => {
           {
             type: "tool",
             tool: "bash",
-            state: { status: "completed", input: { command: "spec sc_init --name eventbus" } }
-          }
-        ]
-      }
+            state: { status: "completed", input: { command: "spec sc_init --name eventbus" } },
+          },
+        ],
+      },
     ] as any
 
     // 2. Emit telemetry via SessionTelemetry
@@ -40,40 +40,42 @@ describe("Telemetry Integration - End-to-End State Extraction", () => {
       event: "START_GENERATE",
       providerId: "local-main",
       phase: "Phase 1",
-      activeAgent: "plan"
+      activeAgent: "plan",
     } as any)
 
     SessionTelemetry.emitToolEvent({
-        sessionID,
-        callID: "call_init",
-        event: "TOOL_START",
-        tool: "bash",
-        input: { command: "spec sc_init --name eventbus" }
+      sessionID,
+      callID: "call_init",
+      event: "TOOL_START",
+      tool: "bash",
+      input: { command: "spec sc_init --name eventbus" },
     } as any)
 
     SessionTelemetry.emitToolEvent({
-        sessionID,
-        callID: "call_init",
-        event: "TOOL_END",
-        tool: "bash",
-        status: "completed",
-        output: "Successfully ran: spec sc_init --name eventbus"
+      sessionID,
+      callID: "call_init",
+      event: "TOOL_END",
+      tool: "bash",
+      status: "completed",
+      output: "Successfully ran: spec sc_init --name eventbus",
     } as any)
 
     SessionTelemetry.emitModelEvent({
       mainEpochId: sessionID,
       event: "END_GENERATE",
-      metrics: { promptTokens: 100 }
+      metrics: { promptTokens: 100 },
     } as any)
 
     await SessionTelemetry.flush()
 
     // 3. Analyze via SessionAnalyzer
-    const analysis = await SessionAnalyzer.analyze(sessionID, chatHistory)
+    const analysis = await SessionAnalyzer.analyze(sessionID, chatHistory, process.cwd())
 
     // 4. Verify results
     // Updated expectation: The timeline uses semantically mapped tool names and Turn indexing
-    expect(analysis.actionTimeline).toContain("Turn 1: Tool 'sc_init' executed (input: {\"command\":\"spec sc_init --name eventbus\"}) -> Result: completed")
+    expect(analysis.actionTimeline).toContain(
+      'Turn 1: Tool \'sc_init\' executed (input: {"command":"spec sc_init --name eventbus"}) -> Result: completed',
+    )
   })
 
   it("handles failed tools correctly", async () => {
@@ -85,18 +87,18 @@ describe("Telemetry Integration - End-to-End State Extraction", () => {
       mainEpochId: sessionID,
       event: "START_GENERATE",
     } as any)
-    
+
     SessionTelemetry.emitToolEvent({
-        sessionID,
-        event: "TOOL_END",
-        tool: "read",
-        status: "failed",
-        error: "File not found"
+      sessionID,
+      event: "TOOL_END",
+      tool: "read",
+      status: "failed",
+      error: "File not found",
     })
 
     await SessionTelemetry.flush()
 
-    const analysis = await SessionAnalyzer.analyze(sessionID, chatHistory)
+    const analysis = await SessionAnalyzer.analyze(sessionID, chatHistory, process.cwd())
     expect(analysis.telemetry.mcpxFailures).toContain("read: File not found")
   })
 })

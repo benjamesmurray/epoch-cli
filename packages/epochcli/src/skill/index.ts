@@ -244,8 +244,7 @@ export namespace Skill {
       return [
         "<available_skills>",
         ...list.map(
-          (skill) =>
-            `- **${skill.name}**: ${skill.description} (Location: ${pathToFileURL(skill.location).href})`,
+          (skill) => `- **${skill.name}**: ${skill.description} (Location: ${pathToFileURL(skill.location).href})`,
         ),
         "</available_skills>",
       ].join("\n")

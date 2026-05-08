@@ -1,5 +1,5 @@
 import { TurnAggregator } from "./telemetry/TurnAggregator";
-import { Turn } from "./telemetry/types";
+import type { Turn } from "./telemetry/types";
 
 export class LoopException extends Error {
   constructor(message: string) {
@@ -35,6 +35,11 @@ export class HeuristicsEngine {
    * Throws LoopException if an infinite loop is detected.
    */
   public processLine(line: string): void {
+    if (line.includes("Context limit reached")) {
+        this.totalEpochs++;
+        console.log(`    [${this.runId}] 🔄 Epoch Transition detected (Total: ${this.totalEpochs})`);
+    }
+
     const turn = this.aggregator.processLine(line);
     
     // If a turn was just finished, update metrics
@@ -42,10 +47,6 @@ export class HeuristicsEngine {
       if (turn.tps) this.tpsHistory.push(turn.tps);
       if (turn.ttftMs) this.ttftHistory.push(turn.ttftMs);
       if (turn.totalTokens) this.totalTokens = turn.totalTokens;
-      if (turn.isEpochTransition) {
-          this.totalEpochs++;
-          console.log(`    [${this.runId}] 🔄 Epoch Transition detected (Total: ${this.totalEpochs})`);
-      }
     }
 
     if (line.includes("Wrote .epoch-continuity.toon") || line.includes("Wrote .epoch-continuity.md")) {
@@ -123,8 +124,23 @@ export class HeuristicsEngine {
 
       this.usedTools.add(toolName);
       this.toolCallHistory.push(toolSignature);
+      this.aggregator.registerTool(toolName);
       
-      console.log(`    [${this.runId}] 🛠️ Tool Invoked: ${toolName}`);
+      let logSuffix = "";
+      if (toolName === "bash") {
+          try {
+              const args = JSON.parse(toolArgs);
+              const cmd = args.command || "";
+              logSuffix = ` (${cmd.slice(0, 60)}${cmd.length > 60 ? "..." : ""})`;
+          } catch (e) {}
+      } else if (toolName === "mcpx") {
+          try {
+              const args = JSON.parse(toolArgs);
+              logSuffix = ` [${args.server}.${args.tool}]`;
+          } catch (e) {}
+      }
+      
+      console.log(`    [${this.runId}] 🛠️ Tool Invoked: ${toolName}${logSuffix}`);
       // Check loop
       if (this.toolCallHistory.length >= this.loopThreshold) {
         const recent = this.toolCallHistory.slice(-this.loopThreshold);
@@ -136,10 +152,16 @@ export class HeuristicsEngine {
     }
     
     // Fallback for spec-cli tools if they appear in logs without full arguments
-    if (line.match(/^(DEBUG|INFO|ERROR|WARN)\s/) && !line.includes('event=START_GENERATE')) {
+    // We ignore matches that appear to be part of the 'args=[' log field or permission logs
+    if (line.match(/^(DEBUG|INFO|ERROR|WARN)\s/) && 
+        !line.includes('event=START_GENERATE') && 
+        !line.includes('args=["') &&
+        !line.includes('"permission"') &&
+        !line.includes('"ruleset"')) {
         const specCliMatch = line.match(/(sc_init|sc_plan|sc_approve|sc_todo_start|sc_todo_complete|sc_status|sc_guidance|pm_query|pm_plan|pm_init|pm_status|gt_status|gt_exec)/);
         if (specCliMatch && specCliMatch[1] && !toolName) {
             this.usedTools.add(specCliMatch[1]);
+            this.aggregator.registerTool(specCliMatch[1]);
             console.log(`    [${this.runId}] 🛠️ Spec Tool Invoked: ${specCliMatch[1]}`);
         }
     }

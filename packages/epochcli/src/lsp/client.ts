@@ -49,6 +49,10 @@ export namespace LSPClient {
       new StreamMessageWriter(input.server.process.stdin as any),
     )
 
+    input.server.process.stderr.on("data", (chunk) => {
+      l.debug("server stderr", { data: chunk.toString().trim() })
+    })
+
     const diagnostics = new Map<string, Diagnostic[]>()
     connection.onNotification("textDocument/publishDiagnostics", (params) => {
       const filePath = Filesystem.normalizePath(fileURLToPath(params.uri))

@@ -133,7 +133,8 @@ export namespace Agent {
             },
             plan: {
               name: "plan",
-              description: "The Spec-Driven Engineer persona. Responsible for Requirements, Design, and Implementation Planning.",
+              description:
+                "The Spec-Driven Engineer persona. Responsible for Requirements, Design, and Implementation Planning.",
               options: {},
               permission: Permission.merge(
                 defaults,
@@ -150,7 +151,6 @@ export namespace Agent {
                   sc_refresh: "allow",
                   sc_epoch: "allow",
                   sc_mode: "allow",
-                  object_to_supervisor: "allow",
                   // Project Map Tool Pack
                   pm_query: "allow",
                   pm_plan: "allow",
@@ -183,6 +183,7 @@ export namespace Agent {
                 defaults,
                 Permission.fromConfig({
                   "*": "deny",
+                  mcpx: "allow",
                   grep: "allow",
                   glob: "allow",
                   list: "allow",

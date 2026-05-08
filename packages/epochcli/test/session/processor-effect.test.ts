@@ -14,6 +14,7 @@ import { Session } from "../../src/session"
 import { LLM } from "../../src/session/llm"
 import { MessageV2 } from "../../src/session/message-v2"
 import { SessionProcessor } from "../../src/session/processor"
+import { Todo } from "../../src/session/todo"
 import { MessageID, PartID, SessionID } from "../../src/session/schema"
 import { SessionStatus } from "../../src/session/status"
 import { Snapshot } from "../../src/snapshot"
@@ -153,6 +154,7 @@ const deps = Layer.mergeAll(
   Permission.defaultLayer,
   Plugin.defaultLayer,
   Config.defaultLayer,
+  Todo.defaultLayer,
   LLM.defaultLayer,
   Provider.defaultLayer,
   status,
@@ -742,6 +744,61 @@ it.live("session.processor effect tests mark interruptions aborted without manua
           expect(stored.info.error?.name).toBe("MessageAbortedError")
         }
         expect(state).toMatchObject({ type: "idle" })
+      }),
+    { git: true, config: (url) => providerCfg(url) },
+  ),
+)
+
+it.live("session.processor effect tests emit EpochTransition and return compact on ContextOverflowError", () =>
+  provideTmpdirServer(
+    ({ dir, llm }) =>
+      Effect.gen(function* () {
+        const seen = defer<void>()
+        const { processors, session, provider } = yield* boot()
+        const bus = yield* Bus.Service
+
+        yield* llm.error(400, { type: "error", error: { code: "context_length_exceeded" } })
+
+        const chat = yield* session.create({})
+        const parent = yield* user(chat.id, "overflow")
+        const msg = yield* assistant(chat.id, parent.id, path.resolve(dir))
+        const mdl = yield* provider.getModel(ref.providerID, ref.modelID)
+        let transitionEventReason: string | undefined
+
+        const off = yield* bus.subscribeCallback(Session.Event.EpochTransition, (evt) => {
+          if (evt.properties.sessionID !== chat.id) return
+          transitionEventReason = evt.properties.reason
+          seen.resolve()
+        })
+        const handle = yield* processors.create({
+          assistantMessage: msg,
+          sessionID: chat.id,
+          model: mdl,
+        })
+
+        const result = yield* handle.process({
+          user: {
+            id: parent.id,
+            sessionID: chat.id,
+            role: "user",
+            time: parent.time,
+            agent: parent.agent,
+            model: { providerID: ref.providerID, modelID: ref.modelID },
+          } satisfies MessageV2.User,
+          sessionID: chat.id,
+          model: mdl,
+          agent: agent(),
+          system: { zone1: [], zone2: [] },
+          messages: [{ role: "user", content: "overflow" }],
+          tools: {},
+        })
+
+        yield* Effect.promise(() => seen.promise)
+        off()
+
+        expect(result).toBe("compact")
+        expect(transitionEventReason).toBe("Context size exceeded")
+        expect(handle.message.error).toBeUndefined()
       }),
     { git: true, config: (url) => providerCfg(url) },
   ),

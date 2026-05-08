@@ -184,7 +184,6 @@ export function Prompt(props: PromptProps) {
     extmarkToPartIndex: Map<number, number>
     interrupt: number
     placeholder: number
-    yolo: boolean
   }>({
     placeholder: randomIndex(list().length),
     prompt: {
@@ -194,14 +193,6 @@ export function Prompt(props: PromptProps) {
     mode: "normal",
     extmarkToPartIndex: new Map(),
     interrupt: 0,
-    yolo: false,
-  })
-
-  createEffect(() => {
-    const s = sync.session.get(props.sessionID ?? "")
-    if (s) {
-      setStore("yolo", !!s.yolo)
-    }
   })
 
   createEffect(
@@ -725,7 +716,7 @@ export function Prompt(props: PromptProps) {
           agent: local.agent.current().name,
           model: selectedModel,
           variant,
-          yolo: store.yolo,
+          yolo: local.yolo.current(),
           // @ts-ignore
           cursorContext: store.prompt.cursorContext,
           parts: [
@@ -997,23 +988,6 @@ export function Prompt(props: PromptProps) {
                     return
                   }
                 }
-                if (e.ctrl && e.name === "y") {
-                  const newYolo = !store.yolo
-                  setStore("yolo", newYolo)
-                  if (newYolo) {
-                    toast.show({
-                      variant: "success",
-                      message: "YOLO Mode Enabled",
-                    })
-                  } else {
-                    toast.show({
-                      variant: "info",
-                      message: "YOLO Mode Disabled",
-                    })
-                  }
-                  e.preventDefault()
-                  return
-                }
                 if (store.mode === "normal") autocomplete.onKeyDown(e)
                 if (!autocomplete.visible) {
                   if (
@@ -1165,16 +1139,25 @@ export function Prompt(props: PromptProps) {
                         </text>
                       </box>
                     </Show>
-                    <Show when={store.yolo}>
-                      <box flexDirection="row" gap={1}>
+                    <box flexDirection="row" gap={1}>
+                      <Show
+                        when={local.yolo.current()}
+                        fallback={
+                          <box flexDirection="row" gap={1}>
+                            <text fg={theme.textMuted}>•</text>
+                            <text fg={theme.textMuted}>Interactive</text>
+                          </box>
+                        }
+                      >
                         <Show when={status().type === "busy"} fallback={<text fg={theme.warning}>•</text>}>
-                          <spinner frames={createFrames({ color: theme.warning })} color={createColors({ color: theme.warning })} />
+                          <spinner
+                            frames={createFrames({ color: theme.warning })}
+                            color={createColors({ color: theme.warning })}
+                          />
                         </Show>
-                        <text fg={theme.warning}>
-                          {status().type === "busy" ? "Autonomous Mode" : "YOLO"}
-                        </text>
-                      </box>
-                    </Show>
+                        <text fg={theme.warning}>{status().type === "busy" ? "Autonomous Mode" : "YOLO"}</text>
+                      </Show>
+                    </box>
                   </Show>
                 </box>
                 <Show when={store.mode === "normal"}>

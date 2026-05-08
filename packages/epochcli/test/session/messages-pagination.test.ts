@@ -86,17 +86,17 @@ async function addAssistant(
   return id
 }
 
-async function addCompactionPart(sessionID: SessionID, messageID: MessageID) {
+async function addTransitionPart(sessionID: SessionID, messageID: MessageID) {
   await Session.updatePart({
     id: PartID.ascending(),
-    sessionID,
     messageID,
-    type: "compaction",
+    sessionID,
+    type: "transition",
     auto: true,
-  } as any)
+  })
 }
 
-describe("MessageV2.page", () => {
+describe("MessageV2.filterByEpoch", () => {
   test("returns sync result", async () => {
     await Instance.provide({
       directory: root,
@@ -633,15 +633,15 @@ describe("MessageV2.get", () => {
   })
 })
 
-describe("MessageV2.filterCompacted", () => {
-  test("returns all messages when no compaction", async () => {
+describe("MessageV2.filterByEpoch", () => {
+  test("returns all messages when no transition", async () => {
     await Instance.provide({
       directory: root,
       fn: async () => {
         const session = await Session.create({})
         const ids = await fill(session.id, 5)
 
-        const result = MessageV2.filterCompacted(MessageV2.stream(session.id))
+        const result = MessageV2.filterByEpoch(MessageV2.stream(session.id))
         expect(result).toHaveLength(5)
         // reversed from newest-first to chronological
         expect(result.map((item) => item.info.id)).toEqual(ids)
@@ -651,14 +651,14 @@ describe("MessageV2.filterCompacted", () => {
     })
   })
 
-  test("stops at compaction boundary and returns chronological order", async () => {
+  test("stops at transition boundary and returns chronological order", async () => {
     await Instance.provide({
       directory: root,
       fn: async () => {
         const session = await Session.create({})
 
-        // Chronological: u1(+compaction part), a1(summary, parentID=u1), u2, a2
-        // Stream (newest first): a2, u2, a1(adds u1 to completed), u1(in completed + compaction) -> break
+        // Chronological: u1(+transition part), a1(summary, parentID=u1), u2, a2
+        // Stream (newest first): a2, u2, a1(adds u1 to completed), u1(in completed + transition) -> break
         const u1 = await addUser(session.id, "first question")
         const a1 = await addAssistant(session.id, u1, { summary: true, finish: "end_turn" })
         await Session.updatePart({
@@ -668,7 +668,7 @@ describe("MessageV2.filterCompacted", () => {
           type: "text",
           text: "summary",
         })
-        await addCompactionPart(session.id, u1)
+        await addTransitionPart(session.id, u1)
 
         const u2 = await addUser(session.id, "new question")
         const a2 = await addAssistant(session.id, u2)
@@ -680,8 +680,8 @@ describe("MessageV2.filterCompacted", () => {
           text: "new response",
         })
 
-        const result = MessageV2.filterCompacted(MessageV2.stream(session.id))
-        // Includes compaction boundary: u1, a1, u2, a2
+        const result = MessageV2.filterByEpoch(MessageV2.stream(session.id))
+        // Includes transition boundary: u1, a1, u2, a2
         expect(result[0].info.id).toBe(u1)
         expect(result.length).toBe(4)
 
@@ -691,21 +691,21 @@ describe("MessageV2.filterCompacted", () => {
   })
 
   test("handles empty iterable", () => {
-    const result = MessageV2.filterCompacted([])
+    const result = MessageV2.filterByEpoch([])
     expect(result).toEqual([])
   })
 
-  test("does not break on compaction part without matching summary", async () => {
+  test("does not break on transition part without matching summary", async () => {
     await Instance.provide({
       directory: root,
       fn: async () => {
         const session = await Session.create({})
 
         const u1 = await addUser(session.id, "hello")
-        await addCompactionPart(session.id, u1)
+        await addTransitionPart(session.id, u1)
         const u2 = await addUser(session.id, "world")
 
-        const result = MessageV2.filterCompacted(MessageV2.stream(session.id))
+        const result = MessageV2.filterByEpoch(MessageV2.stream(session.id))
         expect(result).toHaveLength(2)
 
         await Session.remove(session.id)
@@ -720,7 +720,7 @@ describe("MessageV2.filterCompacted", () => {
         const session = await Session.create({})
 
         const u1 = await addUser(session.id, "hello")
-        await addCompactionPart(session.id, u1)
+        await addTransitionPart(session.id, u1)
 
         const error = new MessageV2.APIError({
           message: "boom",
@@ -729,8 +729,8 @@ describe("MessageV2.filterCompacted", () => {
         await addAssistant(session.id, u1, { summary: true, finish: "end_turn", error })
         const u2 = await addUser(session.id, "retry")
 
-        const result = MessageV2.filterCompacted(MessageV2.stream(session.id))
-        // Error assistant doesn't add to completed, so compaction boundary never triggers
+        const result = MessageV2.filterByEpoch(MessageV2.stream(session.id))
+        // Error assistant doesn't add to completed, so transition boundary never triggers
         expect(result).toHaveLength(3)
 
         await Session.remove(session.id)
@@ -745,13 +745,13 @@ describe("MessageV2.filterCompacted", () => {
         const session = await Session.create({})
 
         const u1 = await addUser(session.id, "hello")
-        await addCompactionPart(session.id, u1)
+        await addTransitionPart(session.id, u1)
 
         // summary=true but no finish
         await addAssistant(session.id, u1, { summary: true })
         const u2 = await addUser(session.id, "next")
 
-        const result = MessageV2.filterCompacted(MessageV2.stream(session.id))
+        const result = MessageV2.filterByEpoch(MessageV2.stream(session.id))
         expect(result).toHaveLength(3)
 
         await Session.remove(session.id)
@@ -760,7 +760,7 @@ describe("MessageV2.filterCompacted", () => {
   })
 
   test("works with array input", () => {
-    // filterCompacted accepts any Iterable, not just generators
+    // filterByEpoch accepts any Iterable, not just generators
     const id = MessageID.ascending()
     const items: MessageV2.WithParts[] = [
       {
@@ -775,7 +775,7 @@ describe("MessageV2.filterCompacted", () => {
         parts: [{ type: "text", text: "hello" }] as unknown as MessageV2.Part[],
       },
     ]
-    const result = MessageV2.filterCompacted(items)
+    const result = MessageV2.filterByEpoch(items)
     expect(result).toHaveLength(1)
     expect(result[0].info.id).toBe(id)
   })
@@ -866,14 +866,14 @@ describe("MessageV2 consistency", () => {
     })
   })
 
-  test("filterCompacted of full stream returns same as Array.from when no compaction", async () => {
+  test("filterByEpoch of full stream returns same as Array.from when no transition", async () => {
     await Instance.provide({
       directory: root,
       fn: async () => {
         const session = await Session.create({})
         const ids = await fill(session.id, 4)
 
-        const filtered = MessageV2.filterCompacted(MessageV2.stream(session.id))
+        const filtered = MessageV2.filterByEpoch(MessageV2.stream(session.id))
         const all = Array.from(MessageV2.stream(session.id)).reverse()
 
         expect(filtered.map((m) => m.info.id)).toEqual(all.map((m) => m.info.id))

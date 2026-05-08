@@ -27,9 +27,13 @@ The harness streams the agent's output and applies real-time heuristics:
 - **Tool Validation**: Tracks which tools were actually invoked versus the `expectedTools` list in the configuration.
 
 ### 3. Evaluation (`TestEvaluator`)
-After the agent finishes its task, the harness enters the evaluation phase:
-- It executes `bun test` (or a specified test runner) within the target workspace.
-- A run is only marked as `Success` if the agent completes AND the resulting code passes all functional tests.
+After the agent finishes its task, the harness enters the evaluation phase to verify functional correctness:
+- **Polyglot Awareness**: The harness dynamically detects the appropriate test runner based on the project structure:
+    - **Rust**: Runs `cargo test` if `Cargo.toml` is found.
+    - **Python**: Runs `pytest` if `requirements.txt` or `.py` files are found.
+    - **TypeScript/JavaScript**: Defaults to `bun test` (or runs `bunx tsc --noEmit` first if a `tsconfig.json` is present).
+- **Execution Environment**: Tests are executed in the same environment (Docker or Host) where the agent performed its work.
+- **Success Criteria**: A run is only marked as `Success` if the agent completes the task AND the resulting code passes the detected functional tests. Logs are captured in `test_output.log` within the workspace.
 
 ### 4. Evidence & Reporting
 The harness generates a comprehensive audit trail for every run in `e2e_testing/results/suite_[timestamp]/`:
@@ -66,7 +70,7 @@ The tests run inside ephemeral Docker containers (`epochcli-eval-env`) built via
 
 - **Base OS**: Debian Bookworm (`node:22-bookworm`)
 - **Runtime Dependencies**: Node.js v22, Bun (latest), Python 3 + pip, Git.
-- **Offline MCP Servers**: `ground-truth-cli`, `spec`, and `project-map-cli` are pre-installed.
+- **Offline MCP Servers**: `ground`, `spec`, and `map` are pre-installed.
 - **Baseline Context Files**: Baked-in `.assistant_rules.toon`, `AGENTS.md`, and `.editorconfig`.
 - **Memory Limits**: Bounded by the `memoryLimit` specified in `test_config.json` (e.g., `4g`).
 - **Host Codebase**: The entire CLI codebase is mounted read-only (`:ro`) into the container at `/cli`. This allows the agent to run the absolute latest code without needing to rebuild the Docker image.

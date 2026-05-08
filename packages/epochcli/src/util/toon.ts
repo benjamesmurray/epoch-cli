@@ -7,7 +7,7 @@ export namespace ToonEncoder {
   export function encode(data: any, indentLevel = 0): string {
     if (data === null) return "null"
     if (data === undefined) return ""
-    
+
     if (typeof data === "string" || typeof data === "number" || typeof data === "boolean") {
       return String(data)
     }
@@ -17,10 +17,8 @@ export namespace ToonEncoder {
 
     if (Array.isArray(data)) {
       // If array of primitives, join as CSV
-      const isPrimitiveArray = data.every(
-        (item) => item === null || typeof item !== "object"
-      )
-      
+      const isPrimitiveArray = data.every((item) => item === null || typeof item !== "object")
+
       if (isPrimitiveArray) {
         return `[${data.join(",")}]`
       }

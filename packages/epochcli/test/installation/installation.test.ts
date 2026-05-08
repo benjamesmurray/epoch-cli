@@ -136,7 +136,8 @@ describe("installation", () => {
       const layer = testLayer(
         () => jsonResponse({}), // HTTP not used for tap formula
         (cmd, args) => {
-          if (cmd === "brew" && args.includes("benjamesmurray/tap/epochcli") && args.includes("--formula")) return "epochcli"
+          if (cmd === "brew" && args.includes("benjamesmurray/tap/epochcli") && args.includes("--formula"))
+            return "epochcli"
           if (cmd === "brew" && args.includes("--json=v2")) return brewInfoJson
           return ""
         },

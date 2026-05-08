@@ -1,56 +1,31 @@
 # Gemini CLI Workspace Instructions
 
-This workspace is configured with several Model Context Protocol (MCP) servers. When operating in this project, leverage the following tools to enhance your capabilities:
-t
+This workspace is configured with several Model Context Protocol (MCP) servers, all unified under the `mcpx` tool. You MUST use the `mcpx` tool for all MCP operations.
 
-## 1. GitHub MCP Server (`github`)
+## 1. Unified MCP Interface (`mcpx`)
 
-- **Purpose:** Allows direct interaction with GitHub repositories, issues, pull requests, and Actions.
-- **When to use:** Use this server's tools to read remote repository code, fetch issue details, create/update pull requests, or check CI/CD workflow status.
+- **Purpose:** A single, discoverable CLI interface for all MCP servers (github, map, spec, ground, etc.).
+- **When to use:** Use this tool for ALL interactions with MCP servers. Do NOT use individual tools if they are exposed.
+- **Workflow (AI Tool Syntax):**
+  1. **Discover Tools:** Call `mcpx` with `server="<server>"` and `tool="--help"`.
+  2. **Inspect Tool Schema:** Call `mcpx` with `server="<server>"`, `tool="<tool>"`, and `args=["--help"]`.
+  3. **Execute:** Call `mcpx` with `server="<server>"`, `tool="<tool>"`, and any required `args` or `flags`.
+
+- **Workflow (Manual Shell Syntax):**
+  1. **Discover:** Run `mcpx-rust <server>` to list available tools.
+  2. **Inspect:** Run `mcpx-rust <server> <tool> --help` to see the schema and flags.
+  3. **Execute:** Run `mcpx-rust <server> <tool> --flag=value`.
 
 ## Tooling Integrity
-- **MCPX Composition:** All interactions with external MCP servers (spec, map, ground) MUST use the structured `mcpx` JSON tool. Do NOT attempt to pass raw shell strings or shim commands into tool parameters.
+- **MCPX Composition:** All interactions with external MCP servers (spec, map, ground, github) MUST use the structured `mcpx` JSON tool. Do NOT attempt to pass raw shell strings or shim commands into tool parameters.
 - **Syntax Mapping:** Always decompose shim-style commands (e.g., `spec sc_status`) into their JSON components: `server="spec"`, `tool="sc_status"`. See `AGENTS.md` for mandatory mapping examples and discovery rules.
 
-## Project Map CLI (`map`)
+## Configured Servers
 
+The following servers are available via `mcpx`:
 
-- **Purpose:** Provides a contextually efficient architectural map of the local project.
-- **When to use:** Invoke this tool when you need to understand the project structure, file dependencies, or system-wide layout without wasting context on exhaustive manual directory listings or file reads. Create new projects here: /home/benmurray/Projects/cli/Projects/Active
-- **Tools:**
-  - **`pm_status`**: Returns current workspace context, last active project, and available commands.
-  - **`pm_help`**: Accepts a topic/command (e.g., 'find') and returns the detailed help text.
-  - **`pm_init`**: Initializes or refreshes the project map index. Use this after significant code changes.
-  - **`pm_query`**: Search for symbols or get file context. Provide 'query' for symbol search or 'path' for file context.
-  - **`pm_plan`**: Analyzes the architectural impact of a symbol. Useful for planning refactors or changes.
-  - **`pm_verify`**: Checks the health of the project map system and recent indexing status.
+1.  **`github`**: Interact with GitHub repositories, issues, and pull requests.
+2.  **`map`**: Contextually efficient architectural map of the local project.
+3.  **`spec`**: Intelligent, specification-driven development workflows.
+4.  **`ground`**: Project Constitution and behavioral constraints scanning.
 
-## 3. Spec CLI (`spec`)
-
-- **Purpose:** Manages intelligent, specification-driven development workflows via `@epoch-ai/deliver-cli`.
-- **When to use:** Use these tools to structure feature development and track progress.
-- **Tools:**
-  - **`sc_status`**: Get a health check of the active project and next steps.
-  - **`sc_verify`**: Validate that the last action worked and check consistency.
-  - **`sc_init`**: Initialize a new feature specification in `projects/active/`.
-  - **`sc_plan`**: Progress the workflow state. Automatically archives when finished.
-  - **`sc_approve`**: Explicitly approve the current drafted phase after review.
-  - **`sc_guidance`**: Get detailed behavioral instructions for the current state.
-  - **`sc_todo_list`**: List all implementation tasks and their status.
-  - **`sc_todo_start`**: Mark a specific task as being actively worked on.
-  - **`sc_todo_complete`**: Mark a specific task as completed.
-  - **`sc_epoch`**: Update the task-epoch context (focus, intentions, hypotheses, questions).
-  - **`sc_feedback`**: Provide user feedback or answers to open questions.
-  - **`sc_mode`**: Toggle project mode between `one-shot` and `step-through`.
-  - **`sc_archive`**: Manually move the project to the `projects/completed/` folder.
-  - **`sc_help`**: Learn how to use the tools and get deep documentation.
-
-## 4. Ground Truth CLI (`ground`)
-
-- **Purpose:** Scans the active project to synthesize a "Project Constitution" (TOON formatted). Ensures the AI agent operates using strict project-specific behavioral constraints, stack details, and architectural rules.
-- **When to use:** Use this tool when onboarding to a new repository, bootstrapping a new agent session, or when you need explicit operational constraints generated for the current codebase.
-- **Tools:**
-  - **`gt_status`**: Orient the agent: returns current scanning state and findings.
-  - **`gt_help`**: Pull deep documentation for a specific feature or command (e.g., 'scan').
-  - **`gt_exec`**: The primary workhorse. Action format: [action] [resource] (e.g., `{"action": "scan", "resource": "."}`).
-  - **`gt_refresh`**: Force a refresh of the project constitution rules.

@@ -807,7 +807,7 @@ describe("ProviderTransform.schema - gemma4 schema flattening", () => {
           properties: { name: { type: "string" } },
           required: ["name"],
         },
-        simple: { type: "string" }
+        simple: { type: "string" },
       },
     } as any
 
@@ -855,6 +855,40 @@ describe("ProviderTransform.schema - gemma4 schema flattening", () => {
     expect(result.properties.data.anyOf).toBeUndefined()
     expect(result.properties.data2.type).toBe("boolean")
     expect(result.properties.data2.oneOf).toBeUndefined()
+  })
+})
+
+describe("ProviderTransform.schema - qwen schema flattening", () => {
+  const qwenModel = {
+    providerID: "local-main",
+    id: "qwen-35b",
+    api: {
+      id: "qwen-35b",
+    },
+  } as any
+
+  test("flattens nested object parameters for qwen", () => {
+    const schema = {
+      type: "object",
+      properties: {
+        config: {
+          type: "object",
+          description: "Configuration object",
+          properties: {
+            debug: { type: "boolean" },
+            nested: {
+              type: "object",
+              properties: { key: { type: "string" } },
+            },
+          },
+        },
+      },
+    } as any
+
+    const result = ProviderTransform.schema(qwenModel, schema) as any
+
+    expect(result.properties.config.type).toBe("string")
+    expect(result.properties.config.properties).toBeUndefined()
   })
 })
 

@@ -6,7 +6,7 @@ describe("telemetry truncation", () => {
     const payload: Log.ZoneStructuredPayload = {
       zone1_critical_rules: "Zone 1: Task Instructions",
       zone2_context_files: "Zone 2: Big Context 1\nZone 2: Big Context 2\nZone 2: Big Context 3",
-      zone3_active_cursor: "Zone 3: Cursor Position"
+      zone3_active_cursor: "Zone 3: Cursor Position",
     }
 
     const truncated = Log.truncatePayload(payload)
@@ -26,7 +26,7 @@ describe("telemetry truncation", () => {
     const payload: Log.ZoneStructuredPayload = {
       zone1_critical_rules: "Zone 1",
       zone2_context_files: "",
-      zone3_active_cursor: "Zone 3"
+      zone3_active_cursor: "Zone 3",
     }
 
     const truncated = Log.truncatePayload(payload)

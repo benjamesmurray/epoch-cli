@@ -1,4 +1,3 @@
-
 import { describe, it, expect } from "bun:test"
 import { StreamingMonitor } from "../../../src/session/llm/monitor"
 
@@ -26,7 +25,7 @@ describe("StreamingMonitor", () => {
     expect(monitor.push(shortPattern)).toBe(false)
     expect(monitor.push(shortPattern)).toBe(false)
     expect(monitor.push(shortPattern)).toBe(false)
-    
+
     const longPattern = "This is a long pattern "
     expect(monitor.push(longPattern)).toBe(false)
     expect(monitor.push(longPattern)).toBe(false)
@@ -37,7 +36,7 @@ describe("StreamingMonitor", () => {
     const monitor = new StreamingMonitor({ minMatchLength: 10, maxOccurrences: 3 })
     const pattern = "Thinking about the next step... "
     const fullText = pattern + pattern + pattern
-    
+
     for (let i = 0; i < fullText.length - 1; i++) {
       expect(monitor.push(fullText[i])).toBe(false)
     }

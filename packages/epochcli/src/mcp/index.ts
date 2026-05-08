@@ -40,6 +40,12 @@ export namespace MCP {
   const log = Log.create({ service: "mcp" })
   const DEFAULT_TIMEOUT = 30_000
 
+  export const resolveMcpxBinary = (config: any): string => {
+    if (config.mcpx?.binaryPath) return config.mcpx.binaryPath
+    // Standardize on mcpx-rust for the new architecture.
+    return "mcpx-rust"
+  }
+
   export const Resource = z
     .object({
       name: z.string(),
@@ -147,16 +153,18 @@ export namespace MCP {
             const content = await fsNode.readFile(f, "utf-8")
             if (content.includes("<template") || content.includes("</template")) {
               return {
-                output: "Error: PROGRAMMATIC SCAN DETECTED <template> TAGS. DO NOT APPROVE REQUIREMENTS OR DESIGN. Remove all template tags before approving.",
+                output:
+                  "Error: PROGRAMMATIC SCAN DETECTED <template> TAGS. DO NOT APPROVE REQUIREMENTS OR DESIGN. Remove all template tags before approving.",
                 title: "Template Validation Error",
                 isError: true,
-                metadata: {}
+                metadata: {},
               }
             }
           }
         }
 
-        const result = (await client.callTool(          {
+        const result = (await client.callTool(
+          {
             name: mcpTool.name,
             arguments: (args || {}) as Record<string, unknown>,
           },
@@ -685,22 +693,25 @@ export namespace MCP {
         const config = yield* cfgSvc.get()
         if (config.mcpx?.enabled === false) return undefined
 
-        // Default to the found global path if not specified
-        const binary = config.mcpx?.binaryPath || "mcpx"
+        const binary = resolveMcpxBinary(config)
 
         return {
           description:
-            "Execute an MCP tool via the mcpx CLI. This tool bypasses standard JSON-RPC bloat and allows for shell-like composition of MCP operations. Discover capabilities by running 'mcpx <server> --help'.",
+            "Execute an MCP tool via the unified mcpx-rust interface. This tool bypasses standard JSON-RPC bloat and allows for shell-like composition of MCP operations. Discover capabilities by calling this tool with server='<server>' and tool='--help'.",
           parameters: z.object({
             server: z.string().describe("The name of the MCP server (e.g. 'spec', 'map')"),
             tool: z.string().describe("The name of the tool to invoke (e.g. 'sc_init', 'pm_query')"),
             args: z
               .array(z.string())
-              .describe("Positional arguments to pass to the tool. IMPORTANT: When an argument contains complex strings, spaces, or quotes, pass the EXACT literal string. Do NOT add extra quotes around the string, they will be properly escaped. Example: `[\"--description\", \"Implement a strictly typed Event Sourcing Bus\"]`")
+              .describe(
+                'Positional arguments to pass to the tool. IMPORTANT: When an argument contains complex strings, spaces, or quotes, pass the EXACT literal string. Do NOT add extra quotes around the string, they will be properly escaped. Example: `["--description", "Implement a strictly typed Event Sourcing Bus"]`',
+              )
               .optional(),
             flags: z
               .record(z.string(), z.string())
-              .describe("Named flags to pass to the tool (e.g. { 'path': '/foo' } becomes --path /foo). Prefer using flags over args where possible.")
+              .describe(
+                "Named flags to pass to the tool (e.g. { 'path': '/foo' } becomes --path /foo). CRITICAL: Initialization tools (like `sc_init`) often require a `--name` flag for descriptive project naming. If unsure of available flags, ALWAYS call the tool with `args=['--help']` first. Prefer using flags over args where possible.",
+              )
               .optional(),
           }) as any,
           execute: async (input: any, ctx: ToolSvc.Context) => {
@@ -710,10 +721,11 @@ export namespace MCP {
                 const content = await fsNode.readFile(f, "utf-8")
                 if (content.includes("<template") || content.includes("</template")) {
                   return {
-                    output: "Error: PROGRAMMATIC SCAN DETECTED <template> TAGS. DO NOT APPROVE REQUIREMENTS OR DESIGN. Remove all template tags before approving.",
+                    output:
+                      "Error: PROGRAMMATIC SCAN DETECTED <template> TAGS. DO NOT APPROVE REQUIREMENTS OR DESIGN. Remove all template tags before approving.",
                     title: "Template Validation Error",
                     isError: true,
-                    metadata: {}
+                    metadata: {},
                   }
                 }
               }
@@ -727,7 +739,7 @@ export namespace MCP {
                 else args.push(String(arg))
               }
             }
-            
+
             for (const [k, v] of Object.entries(input.flags ?? {})) {
               args.push(`--${k}`, String(v))
             }

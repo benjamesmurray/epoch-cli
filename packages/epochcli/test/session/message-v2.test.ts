@@ -194,7 +194,7 @@ describe("session.message-v2.toModelMessage", () => {
     ])
   })
 
-  test("converts user text/file parts and injects compaction/subtask prompts", async () => {
+  test("converts user text/file parts and injects transition/subtask prompts", async () => {
     const messageID = "m-user"
 
     const input: MessageV2.WithParts[] = [
@@ -235,7 +235,7 @@ describe("session.message-v2.toModelMessage", () => {
           },
           {
             ...basePart(messageID, "p6"),
-            type: "compaction",
+            type: "transition",
             auto: true,
           },
           {
@@ -260,7 +260,7 @@ describe("session.message-v2.toModelMessage", () => {
             filename: "img.png",
             data: "https://example.com/img.png",
           },
-          { type: "text", text: "What did we do so far?" },
+          { type: "text", text: "[EPOCH_TRANSITION]" },
           { type: "text", text: "The following tool was executed by the user" },
         ],
       },

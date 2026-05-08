@@ -10,6 +10,7 @@ import { Bus } from "../bus"
 import { Command } from "../command"
 import { Instance } from "./instance"
 import { Log } from "@/util/log"
+
 export async function InstanceBootstrap() {
   Log.Default.info("bootstrapping", { directory: Instance.directory })
   await Plugin.init()

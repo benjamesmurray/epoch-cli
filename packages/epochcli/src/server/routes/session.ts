@@ -474,15 +474,26 @@ export const SessionRoutes = lazy(() =>
             break
           }
         }
-        await SessionCompaction.create({
-          sessionID,
-          agent: currentAgent,
+
+        const msg = await Session.updateMessage({
+          id: MessageID.ascending(),
+          role: "user",
           model: {
             providerID: body.providerID,
             modelID: body.modelID,
           },
+          sessionID,
+          agent: currentAgent,
+          time: { created: Date.now() },
+        })
+        await Session.updatePart({
+          id: PartID.ascending(),
+          messageID: msg.id,
+          sessionID: msg.sessionID,
+          type: "transition",
           auto: body.auto,
         })
+
         await SessionPrompt.loop({ sessionID })
         return c.json(true)
       },

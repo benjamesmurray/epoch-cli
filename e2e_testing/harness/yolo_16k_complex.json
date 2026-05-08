@@ -1,0 +1,17 @@
+[
+  {
+    "id": "yolo-16k-complex",
+    "iterations": 1,
+    "timeoutMs": 900000,
+    "prompt": "Use the spec tool to initialize a new project called 'complex-telemetry' in one-shot mode. 1. Implement a `LogAggregator` that collects JSON logs from multiple files, validates them against a Zod schema, and provides summary statistics (count per level, top 5 errors). 2. Implement an `AlertManager` that triggers callbacks when certain log patterns are detected. 3. Wire them together in a `TelemetrySystem` class. 4. Provide comprehensive unit tests for all components. Ensure the project structure is clean and follows standard TypeScript conventions.",
+    "expectedTools": ["sc_init", "sc_plan", "sc_approve", "sc_todo_start", "sc_todo_complete", "task_complete"],
+    "runTargetDir": ".",
+    "docker": {
+      "imageName": "epochcli-eval-env:latest",
+      "network": "host",
+      "memoryLimit": "4g",
+      "model": "local-main/google-gemma-26b",
+      "contextOverride": 16000
+    }
+  }
+]

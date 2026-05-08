@@ -8,7 +8,7 @@ import { Glob } from "./glob"
 import { SessionTelemetry } from "./session-telemetry"
 
 export namespace Log {
-  export type ZoneStructuredPayload = any; // 
+  export type ZoneStructuredPayload = any //
   export type OldZoneStructuredPayload = {
     zone1_critical_rules: string
     zone2_context_files: string
@@ -16,44 +16,44 @@ export namespace Log {
   }
 
   export interface EnhancedModelExecutionEvent {
-    timestamp: number;
-    event: "START_GENERATE" | "END_GENERATE" | "ERROR";
-    providerId: "local-main" | "local-side" | string;
-    phase: "Phase 1: Pre-Gen" | "Phase 2: Gen" | "Phase 3: Post-Gen" | string;
-    activeAgent?: string;
-    toolCount?: number;
-    contextLimit?: number;
-    mainEpochId: string;
-    clerkMicroEpochId?: string;
+    timestamp: number
+    event: "START_GENERATE" | "END_GENERATE" | "ERROR"
+    providerId: "local-main" | "local-side" | string
+    phase: "Phase 1: Pre-Gen" | "Phase 2: Gen" | "Phase 3: Post-Gen" | string
+    activeAgent?: string
+    toolCount?: number
+    contextLimit?: number
+    mainEpochId: string
+    clerkMicroEpochId?: string
 
     metrics?: {
-      promptTokens?: number;
-      completionTokens?: number;
-      ttftMs?: number;
-      toolsCalled?: number;
-      json_repaired?: boolean;
-      wrap_up_triggered?: boolean;
-      tps?: number;
-      loop_detected?: boolean;
-      loop_type?: string;
-    };
+      promptTokens?: number
+      completionTokens?: number
+      ttftMs?: number
+      toolsCalled?: number
+      json_repaired?: boolean
+      wrap_up_triggered?: boolean
+      tps?: number
+      loop_detected?: boolean
+      loop_type?: string
+    }
 
-    payload?: ZoneStructuredPayload | any;
-    tools?: any[] | Record<string, any>;
+    payload?: ZoneStructuredPayload | any
+    tools?: any[] | Record<string, any>
   }
 
   export function truncatePayload(payload: ZoneStructuredPayload | any | undefined): ZoneStructuredPayload | undefined {
-    if (!payload) return undefined;
-    if (Flag.EPOCHCLI_DEBUG_FULL_PROMPT) return payload;
-    
+    if (!payload) return undefined
+    if (Flag.EPOCHCLI_DEBUG_FULL_PROMPT) return payload
+
     // Deep clone to avoid mutating the original payload
-    const truncated = { ...payload };
+    const truncated = { ...payload }
 
     if (truncated.zone2_context_files && truncated.zone2_context_files.length > 0) {
-      truncated.zone2_context_files = "...[ZONE 2 TRUNCATED FOR LOGGING]";
+      truncated.zone2_context_files = "...[ZONE 2 TRUNCATED FOR LOGGING]"
     }
 
-    return truncated;
+    return truncated
   }
 
   export const Level = z.enum(["DEBUG", "INFO", "WARN", "ERROR"]).meta({ ref: "LogLevel", description: "Log level" })

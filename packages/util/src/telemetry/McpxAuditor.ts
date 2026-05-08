@@ -6,13 +6,13 @@ export class McpxAuditor {
   analyze(turn: Turn): void {
     for (const line of turn.lines) {
       // Look for mcpx tool execution start
-      // INFO  ... service=mcp server=project-map-cli method=pm_query executing mcpx
+      // INFO  ... service=mcp server=map method=pm_query executing mcpx
       if (line.metadata?.service === "mcp" && line.metadata?.method) {
         this.currentTool = `${line.metadata.server}.${line.metadata.method}`;
       }
 
       // Look for mcpx tool failures
-      // INFO  ... service=mcp server=project-map-cli method=pm_query exit=2 stderr="calling tool: invalid params: unknown argument \"path\""
+      // INFO  ... service=mcp server=map method=pm_query exit=2 stderr="calling tool: invalid params: unknown argument \"path\""
       if (line.metadata?.service === "mcp" && line.metadata?.exit && line.metadata?.exit !== "0") {
         const exitCode = line.metadata.exit;
         const stderr = line.metadata.stderr || "";

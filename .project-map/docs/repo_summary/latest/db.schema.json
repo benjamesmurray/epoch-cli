@@ -1,1 +1,1 @@
-{"orm_models":[],"reason":"postgres: PG_DSN not set; sqlalchemy: imports disabled","tables":[]}
+{"orm_models":[],"reason":"postgres: PG_DSN not set; sqlalchemy: imports disabled","tables":[{"columns":[{"name":"created_at","nullable":true,"type":"TIMESTAMP"},{"name":"id","nullable":true,"type":"SERIAL"},{"name":"username","nullable":true,"type":"TEXT"}],"name":"users","pk":[]}]}

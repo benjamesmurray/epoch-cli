@@ -611,6 +611,8 @@
         "lmsys/qwen-2.5-72b-instruct",
         "lmsys/qwen3-235b-a22b-instruct-2507",
         "lmsys/qwen3-max-preview",
+        "local-main/qwen-35b",
+        "local-side/qwen-35b",
         "minimax/MiniMax-M2",
         "minimax/MiniMax-M2.1",
         "minimax/MiniMax-M2.1-Lightning",

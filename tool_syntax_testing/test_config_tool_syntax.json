@@ -3,14 +3,14 @@
     "id": "syntax-mcpx-init-raw",
     "iterations": 1,
     "timeoutMs": 300000,
-    "prompt": "Initialize a new project called 'raw-mcpx-test' using the mcpx tool directly. You must use the tool name 'sc_init' and provide the project name correctly via the 'args' array (as per the schema). Do NOT use the bash shim.",
+    "prompt": "Initialize a new project called 'raw-mcpx-test' using the mcpx tool directly. Use the tool name 'sc_init' and provide the project name correctly via the 'args' array (as per the schema).",
     "expectedTools": ["sc_init"],
     "runTargetDir": ".",
     "docker": {
       "imageName": "epochcli-eval-env:latest",
       "network": "none",
       "memoryLimit": "4g",
-      "model": "local-main/google-gemma-26b"
+      "model": "local-main/qwen-27b"
     }
   },
   {
@@ -24,7 +24,7 @@
       "imageName": "epochcli-eval-env:latest",
       "network": "none",
       "memoryLimit": "4g",
-      "model": "local-main/google-gemma-26b"
+      "model": "local-main/qwen-27b"
     }
   },
   {
@@ -38,7 +38,7 @@
       "imageName": "epochcli-eval-env:latest",
       "network": "none",
       "memoryLimit": "4g",
-      "model": "local-main/google-gemma-26b"
+      "model": "local-main/qwen-27b"
     }
   }
 ]

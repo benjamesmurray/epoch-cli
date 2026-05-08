@@ -16,10 +16,7 @@ import type { MessageID } from "./schema"
 
 const log = Log.create({ service: "instruction" })
 
-const FILES = [
-  "AGENTS.md",
-  ".epoch-continuity.toon",
-]
+const FILES = ["AGENTS.md"]
 
 function globalFiles() {
   const files = []

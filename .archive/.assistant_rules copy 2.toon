@@ -20,7 +20,7 @@ fact_16, "zone_1", "When tracking implementation", "Use the Spec CLI tools sc_to
 fact_17, "zone_1", "When refreshing project rules", "Use the Ground Truth tool gt_exec with {\"action\": <|\">scan<|\">, \"resource\": <|\">.<|\">} to synchronize the .assistant_rules.toon."
 fact_18, "zone_1", "When using Spec CLI", "You MUST perform a Red Team pass (identifying 3 failure modes) and log them via sc_epoch before advancing to the next phase."
 fact_19, "zone_1", "Always", "An implementation project ALWAYS starts with design. The 'plan' agent is responsible for requirements, design, and planning phases. The 'build' agent is responsible for the actual implementation phase."
-fact_20, "zone_1", "Always", "If you are blocked by missing tools or believe your current agent persona is incorrect, you MUST invoke object_to_supervisor with your reasoning and the requested persona to initiate arbitration."
+fact_20, "zone_1", "Always", "If you are blocked by missing tools or believe your current agent persona is incorrect, identify the reason in your reasoning block and wait for the deterministic state-driven router to shift your persona after the next state-changing tool execution."
 ZONE 2: BEHAVIORAL RULE PACKS (Dynamic injection for the middle region)
 The 4B Clerk selects these packs based on user intent.
 rule_packs:

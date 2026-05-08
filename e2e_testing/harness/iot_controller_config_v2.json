@@ -1,0 +1,26 @@
+[
+  {
+    "id": "iot-controller-full-stack-v2",
+    "iterations": 10,
+    "timeoutMs": 3600000,
+    "prompt": "Build a self-contained 'Smart Home IoT Controller' system.\n\n### 1. Requirements\n- **Device Simulator**: Background process simulating thermostat, lights, motion sensors. Ticks every second.\n- **Rule Engine**: Evaluates rules (e.g., 'If motion detected and time is 6PM-6AM, turn on lights').\n- **Storage**: Local SQLite database to log state changes and triggers.\n- **API & WebSocket**: Backend (Node/Python) with REST endpoints and WebSocket live updates.\n- **Web Dashboard**: Frontend (React/Vanilla JS) with live tiles and historical log.\n\n### 2. Workflow Instructions\n- Use the `spec` tool to initialize 'iot-hub' and define architecture.\n- **CRITICAL**: If the `sc_todo_start` tool is unavailable, proceed by MARKING tasks manually in your thinking process and using `sc_todo_complete` directly after implementation.\n- **TESTING**: You MUST write a functional test suite (e.g., using `vitest` or `jest`) that verifies the simulator ticks and the rule engine triggers. This is required for the harness to mark the run as successful.\n- Ensure strict data contracts between backend and frontend.\n- Verify the integration by running the system and observing live telemetry.",
+    "expectedTools": [
+      "sc_init",
+      "sc_plan",
+      "sc_approve",
+      "sc_status",
+      "sc_todo_complete",
+      "task_complete",
+      "run_shell_command",
+      "write_file"
+    ],
+    "runTargetDir": ".",
+    "docker": {
+      "imageName": "epochcli-eval-env:latest",
+      "network": "host",
+      "memoryLimit": "4g",
+      "model": "local-main/qwen-35b",
+      "contextOverride": 16000
+    }
+  }
+]

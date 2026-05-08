@@ -107,7 +107,7 @@ describe("System Prompt Zone Refactor", () => {
     const server = state.server!
     const providerID = "vivgrid"
     const modelID = "gemini-3.1-pro-preview"
-    
+
     const request = waitRequest(
       "/chat/completions",
       new Response(createChatStream("Hello"), {
@@ -171,14 +171,15 @@ describe("System Prompt Zone Refactor", () => {
           tools: {},
         })
 
-        for await (const _ of stream.fullStream) {}
+        for await (const _ of stream.fullStream) {
+        }
 
         const capture = await request
         const body = capture.body as any
         const messages = body.messages as any[]
 
         // 1. Verify system message contains operational facts at the beginning
-        const systemMessage = messages.find(m => m.role === "system")
+        const systemMessage = messages.find((m) => m.role === "system")
         expect(systemMessage).toBeDefined()
         expect(systemMessage.content).toContain("Fact A")
         expect(systemMessage.content).toContain("Fact B")
@@ -212,7 +213,7 @@ describe("System Prompt Zone Refactor", () => {
       directory: tmp.path,
       fn: async () => {
         const resolved = await Provider.getModel(ProviderID.make(providerID), ModelID.make(modelID))
-        
+
         // Mock handle.process to capture messages
         let capturedMessages: any[] = []
         const mockHandle = {
@@ -220,21 +221,21 @@ describe("System Prompt Zone Refactor", () => {
             capturedMessages = input.messages
             return "stop" as const
           },
-          message: { id: MessageID.make("asst-1") }
+          message: { id: MessageID.make("asst-1") },
         }
 
         // We need to bypass the real SessionProcessor.create and use our mock
         // This is tricky because SessionPrompt.prompt uses SessionProcessor service.
         // For this test, we can just check if modelMsgs has the init message before handle.process call
         // by inspecting the code or adding a temporary test hook.
-        
-        // Actually, let's just verify the logic in prompt.ts by running a real prompt 
+
+        // Actually, let's just verify the logic in prompt.ts by running a real prompt
         // and checking the stored messages if we can.
-        
+
         const agent = { name: "build" } as any
         const zone2 = SystemPrompt.zone2(agent, resolved)
         expect(zone2).toContain("=== ZONE 2: BEHAVIORAL RULES & GENERAL CONTEXT ===")
-      }
+      },
     })
   })
 })

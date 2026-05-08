@@ -1,19 +1,2 @@
-Executes a bash command (OS: ${os}, Shell: ${shell}) in a persistent session.
-
-# Safety & Scope
-- **Target**: Use for terminal operations (git, npm, docker, mcpx, etc).
-- **Redirection**: NEVER use for file operations. Use Glob (find), Grep (search), Read (view), Edit (modify), Write (create).
-- **Directory**: All commands run in the current working directory. Use `workdir` parameter instead of `cd`.
-- **Verification**: Run `ls` to verify parent paths exist before creating files/folders.
-- **Quoting**: ALWAYS quote paths/arguments with spaces: `mkdir "my dir"`.
-
-# Usage
-- **Timeout**: Defaults to 120000ms.
-- **Description**: Provide a 5-10 word summary of intent.
-- **Output**: Truncated if >${maxLines} lines or >${maxBytes} bytes. Full output saved to a file.
-- **Parallelism**: Run independent commands in parallel by making multiple tool calls in one message.
-
-# Git & PRs
-- **Commits**: Only commit when explicitly requested. Use `git status`, `git diff`, and `git log` in parallel.
-- **PRs**: Use `gh` for GitHub actions. Analyze all relevant commits on the branch before creating a PR.
-- **Safety**: NEVER force push to main, update git config, or use interactive flags (e.g., `-i`).
+Executes a bash command.
+Quote args with spaces. Output truncated if >${maxLines} lines or >${maxBytes} bytes.

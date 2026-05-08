@@ -1,1 +1,1 @@
-{"links":[]}
+{"links":[{"clients":[{"component":"UserList.vue","pid":1875}],"route":"/api/v1/users#GET"}]}

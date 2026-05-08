@@ -31,12 +31,12 @@ describe("LLM Sanitizer Middleware Logic", () => {
 
     // Message level
     expect(result[0].providerOptions).toEqual({
-      anthropic: { cacheControl: { type: "ephemeral" } }
+      anthropic: { cacheControl: { type: "ephemeral" } },
     })
 
     // Part level
     expect(result[0].content[0].providerOptions).toEqual({
-      anthropic: { cacheControl: { type: "ephemeral" } }
+      anthropic: { cacheControl: { type: "ephemeral" } },
     })
   })
 

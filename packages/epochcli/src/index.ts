@@ -111,7 +111,7 @@ const cli = yargs(args)
       version: Installation.VERSION,
       args: process.argv.slice(2),
     })
-    
+
     // Engine Config Validator Injection
     try {
       const globalConfig = await Config.getGlobal()

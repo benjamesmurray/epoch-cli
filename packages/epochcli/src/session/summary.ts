@@ -109,7 +109,7 @@ export namespace SessionSummary {
         messageID: MessageID
       }) {
         const lock = yield* Effect.promise(() => Lock.write(input.sessionID))
-        
+
         yield* Effect.gen(function* () {
           const all = yield* sessions.messages({ sessionID: input.sessionID })
           if (!all.length) return
@@ -127,7 +127,8 @@ export namespace SessionSummary {
           yield* bus.publish(Session.Event.Diff, { sessionID: input.sessionID, diff: diffs })
 
           const messages = all.filter(
-            (m) => m.info.id === input.messageID || (m.info.role === "assistant" && m.info.parentID === input.messageID),
+            (m) =>
+              m.info.id === input.messageID || (m.info.role === "assistant" && m.info.parentID === input.messageID),
           )
           const target = messages.find((m) => m.info.id === input.messageID)
           if (!target || target.info.role !== "user") return

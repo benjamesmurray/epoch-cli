@@ -2,6 +2,7 @@ import { ConfigLoader } from "./ConfigLoader";
 import { AgentRunner } from "./AgentRunner";
 import { TestEvaluator } from "./TestEvaluator";
 import { Reporter } from "./Reporter";
+import { Classifier } from "./Classifier";
 import type { RunResult } from "./types";
 import { WorkspaceBuilder } from "./WorkspaceBuilder";
 import * as path from "path";
@@ -152,7 +153,7 @@ async function main() {
         
         if (!testsPassed) {
           finalStatus = "Failed_Tests";
-          errorMessage = "Test harness 'bun test' failed or workspace not found.";
+          errorMessage = "Test harness failed or workspace not found.";
           console.log(`  > Result: Tests Failed`);
         } else {
           console.log(`  > Result: Tests Passed`);
@@ -166,7 +167,7 @@ async function main() {
         durationMs: res.durationMs,
         status: finalStatus,
         usedExpectedTools,
-        logPath: path.join(targetWorkspace, "run.log"),
+        logPath,
         errorMessage,
         jsonRepairs: res.engine.jsonRepairs,
         avgTps: metrics.avgTps,
@@ -179,9 +180,16 @@ async function main() {
 
   const reportPath = path.join(suiteDir, `variance_report.md`);
   await Reporter.generateMarkdown(allResults, reportPath);
+
+  console.log(`\nGenerating failure classification report...`);
+  try {
+      await Classifier.analyze(suiteDir);
+  } catch (err) {
+      console.error("Failed to generate classification report:", err);
+  }
   
   console.log(`\n==================================================`);
-  console.log(`All evaluations complete. Evidence and report saved to:`);
+  console.log(`All evaluations complete. Evidence and reports saved to:`);
   console.log(`-> ${suiteDir}`);
 }
 

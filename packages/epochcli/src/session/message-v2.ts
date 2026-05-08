@@ -60,6 +60,7 @@ export namespace MessageV2 {
     "ContextOverflowError",
     z.object({ message: z.string(), responseBody: z.string().optional() }),
   )
+  export const RamblingError = NamedError.create("MessageRamblingError", z.object({ reason: z.string() }))
 
   export const OutputFormatText = z
     .object({
@@ -204,14 +205,14 @@ export namespace MessageV2 {
   })
   export type AgentPart = z.infer<typeof AgentPart>
 
-  export const CompactionPart = PartBase.extend({
-    type: z.literal("compaction"),
+  export const TransitionPart = PartBase.extend({
+    type: z.literal("transition"),
     auto: z.boolean(),
     overflow: z.boolean().optional(),
   }).meta({
-    ref: "CompactionPart",
+    ref: "TransitionPart",
   })
-  export type CompactionPart = z.infer<typeof CompactionPart>
+  export type TransitionPart = z.infer<typeof TransitionPart>
 
   export const SubtaskPart = PartBase.extend({
     type: z.literal("subtask"),
@@ -286,6 +287,7 @@ export namespace MessageV2 {
     .object({
       status: z.literal("running"),
       input: z.record(z.string(), z.any()),
+      raw: z.string().optional(),
       title: z.string().optional(),
       metadata: z.record(z.string(), z.any()).optional(),
       time: z.object({
@@ -320,6 +322,7 @@ export namespace MessageV2 {
     .object({
       status: z.literal("error"),
       input: z.record(z.string(), z.any()),
+      raw: z.string().optional(),
       error: z.string(),
       metadata: z.record(z.string(), z.any()).optional(),
       time: z.object({
@@ -394,7 +397,7 @@ export namespace MessageV2 {
       PatchPart,
       AgentPart,
       RetryPart,
-      CompactionPart,
+      TransitionPart,
     ])
     .meta({
       ref: "Part",
@@ -416,6 +419,7 @@ export namespace MessageV2 {
         StructuredOutputError.Schema,
         ContextOverflowError.Schema,
         APIError.Schema,
+        RamblingError.Schema,
       ])
       .optional(),
     parentID: MessageID.zod,
@@ -619,15 +623,15 @@ export namespace MessageV2 {
           error?: string
           attachments?: Array<{ mime: string; url: string }>
         }
-        
-        let textValue = outputObject.text;
+
+        let textValue = outputObject.text
         if (textValue === undefined) {
           if (outputObject.error !== undefined) {
-            textValue = outputObject.error;
+            textValue = outputObject.error
           } else if (outputObject.output !== undefined) {
-            textValue = outputObject.output;
+            textValue = outputObject.output
           } else {
-            textValue = JSON.stringify(output);
+            textValue = JSON.stringify(output)
           }
         }
 
@@ -687,10 +691,10 @@ export namespace MessageV2 {
             }
           }
 
-          if (part.type === "compaction") {
+          if (part.type === "transition") {
             userMessage.parts.push({
               type: "text",
-              text: "What did we do so far?",
+              text: "[EPOCH_TRANSITION]",
             })
           }
           if (part.type === "subtask") {
@@ -733,6 +737,13 @@ export namespace MessageV2 {
             })
           if (part.type === "tool") {
             toolNames.add(part.tool)
+
+            let safeInput = part.state.input;
+            if (typeof safeInput === "string") {
+              try { safeInput = JSON.parse(safeInput); }
+              catch { safeInput = {}; }
+            }
+
             if (part.state.status === "completed") {
               const outputText = part.state.time.compacted ? "[Old tool result content cleared]" : part.state.output
               const attachments = part.state.time.compacted || options?.stripMedia ? [] : (part.state.attachments ?? [])
@@ -758,7 +769,7 @@ export namespace MessageV2 {
                 type: ("tool-" + part.tool) as `tool-${string}`,
                 state: "output-available",
                 toolCallId: part.callID,
-                input: part.state.input,
+                input: safeInput,
                 output,
                 ...(differentModel ? {} : { callProviderMetadata: part.metadata }),
               })
@@ -768,7 +779,7 @@ export namespace MessageV2 {
                 type: ("tool-" + part.tool) as `tool-${string}`,
                 state: "output-error",
                 toolCallId: part.callID,
-                input: part.state.input,
+                input: safeInput,
                 errorText: part.state.error,
                 ...(differentModel ? {} : { callProviderMetadata: part.metadata }),
               })
@@ -779,7 +790,7 @@ export namespace MessageV2 {
                 type: ("tool-" + part.tool) as `tool-${string}`,
                 state: "output-error",
                 toolCallId: part.callID,
-                input: part.state.input,
+                input: safeInput,
                 errorText: "[Tool execution was interrupted]",
                 ...(differentModel ? {} : { callProviderMetadata: part.metadata }),
               })
@@ -919,47 +930,63 @@ export namespace MessageV2 {
     }
   }
 
-  export function filterCompacted(msgs: Iterable<MessageV2.WithParts>) {
+  export function filterByEpoch(msgs: Iterable<MessageV2.WithParts>) {
     const result = [] as MessageV2.WithParts[]
-    const completed = new Set<string>()
     for (const msg of msgs) {
-      result.push(msg)
-      if (
-        msg.info.role === "user" &&
-        completed.has(msg.info.id) &&
-        msg.parts.some((part) => part.type === "compaction")
-      )
+      if (msg.parts.some((part) => part.type === "transition")) {
+        result.push(msg)
         break
-      if (msg.info.role === "assistant" && msg.info.summary && msg.info.finish && !msg.info.error)
-        completed.add(msg.info.parentID)
+      }
+      result.push(msg)
     }
     result.reverse()
     return result
   }
 
-  export const filterCompactedEffect = Effect.fnUntraced(function* (sessionID: SessionID) {
-    return filterCompacted(stream(sessionID))
+  export const filterByEpochEffect = Effect.fnUntraced(function* (sessionID: SessionID) {
+    return filterByEpoch(stream(sessionID))
   })
 
   export function fromError(
     e: unknown,
     ctx: { providerID: ProviderID; aborted?: boolean },
   ): NonNullable<Assistant["error"]> {
+    // 1. Hoist the specific string/provider parsing to the top.
+    try {
+      const parsed = ProviderError.parseStreamError(e)
+      if (parsed?.type === "context_overflow") {
+        return new MessageV2.ContextOverflowError(
+          {
+            message: parsed.message,
+            responseBody: parsed.responseBody,
+          },
+          { cause: e },
+        ).toObject()
+      }
+    } catch {}
+
+    const isApiCallError =
+      APICallError.isInstance(e) ||
+      (typeof e === "object" &&
+        e !== null &&
+        (("statusCode" in e && "responseBody" in e) || (e as any).name === "APICallError"))
     switch (true) {
       case e instanceof DOMException && e.name === "AbortError":
         return new MessageV2.AbortedError(
-          { message: e.message },
+          { message: (e as Error).message },
           {
             cause: e,
           },
         ).toObject()
+      case e instanceof Error && (e.message === "STREAM_ABORT_RAMBLING" || e.message === "STREAM_ABORT_LOOP"):
+        return new MessageV2.RamblingError({ reason: e.message }).toObject()
       case MessageV2.OutputLengthError.isInstance(e):
         return e
       case LoadAPIKeyError.isInstance(e):
         return new MessageV2.AuthError(
           {
             providerID: ctx.providerID,
-            message: e.message,
+            message: (e as Error).message,
           },
           { cause: e },
         ).toObject()
@@ -991,10 +1018,10 @@ export namespace MessageV2 {
           },
           { cause: e },
         ).toObject()
-      case APICallError.isInstance(e):
+      case isApiCallError:
         const parsed = ProviderError.parseAPICallError({
           providerID: ctx.providerID,
-          error: e,
+          error: e as APICallError,
         })
         if (parsed.type === "context_overflow") {
           return new MessageV2.ContextOverflowError(
@@ -1023,24 +1050,13 @@ export namespace MessageV2 {
         try {
           const parsed = ProviderError.parseStreamError(e)
           if (parsed) {
-            if (parsed.type === "context_overflow") {
-              return new MessageV2.ContextOverflowError(
-                {
-                  message: parsed.message,
-                  responseBody: parsed.responseBody,
-                },
-                { cause: e },
-              ).toObject()
-            }
             return new MessageV2.APIError(
               {
                 message: parsed.message,
-                isRetryable: parsed.isRetryable,
+                isRetryable: false,
                 responseBody: parsed.responseBody,
               },
-              {
-                cause: e,
-              },
+              { cause: e },
             ).toObject()
           }
         } catch {}

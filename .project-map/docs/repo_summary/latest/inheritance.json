@@ -1,1 +1,1 @@
-{"edges":{},"metadata":{"shard_id":"inheritance","version":"1.0.0"}}
+{"edges":{"com.example.BaseProcessor":[{"dst":"com.example.Processor","ln":-1,"pid":-1}],"com.example.SubProcessor":[{"dst":"com.example.BaseProcessor","ln":-1,"pid":-1}]},"metadata":{"shard_id":"inheritance","version":"1.0.0"}}

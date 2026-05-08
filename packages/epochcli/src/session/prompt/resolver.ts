@@ -665,6 +665,6 @@ NOTE: At any point in time through this workflow you should feel free to ask the
         getModel,
         lastModel,
       })
-    })
+    }),
   )
 }

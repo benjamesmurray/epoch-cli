@@ -6,11 +6,11 @@ import * as Effect from "effect/Effect"
 
 describe("SanitizerMiddleware", () => {
   test("Stage 1: Regex Cleaning strips markdown and tool_call tags", () => {
-    const input = "```json\n{ \"a\": 1 }\n```"
+    const input = '```json\n{ "a": 1 }\n```'
     const result = SanitizerMiddleware.repair(input)
     expect(JSON.parse(result)).toEqual({ a: 1 })
-    
-    const input2 = "<|tool_call>{ \"a\": 1 }</tool_call>"
+
+    const input2 = '<|tool_call>{ "a": 1 }</tool_call>'
     const result2 = SanitizerMiddleware.repair(input2)
     expect(JSON.parse(result2)).toEqual({ a: 1 })
   })
@@ -37,23 +37,24 @@ describe("SanitizerMiddleware", () => {
     const mockEvents = [
       { type: "text-delta", textDelta: "Thinking...\n" },
       { type: "text-delta", textDelta: "<|tool_call>" },
-      { type: "text-delta", textDelta: "{ \"broken\": \"json" }, // Missing closing quote and brace
+      { type: "text-delta", textDelta: '{ "broken": "json' }, // Missing closing quote and brace
       { type: "text-delta", textDelta: "</tool_call>" },
-      { type: "finish" }
+      { type: "finish" },
     ] as any[]
 
-    const stream = Stream.fromIterable(mockEvents).pipe(
-      SanitizerMiddleware.transform()
-    )
+    const stream = Stream.fromIterable(mockEvents).pipe(SanitizerMiddleware.transform())
 
     const result = await Effect.runPromise(Stream.runCollect(stream))
     const outputEvents = Array.from(result)
-    
+
     expect(outputEvents[0].type).toBe("text-delta")
     expect((outputEvents[0] as any).textDelta).toBe("Thinking...\n")
-    
-    const repairedDelta = outputEvents.find(e => e.type === "text-delta" && (e as any).textDelta !== "Thinking...\n" && (e as any).textDelta !== "<|tool_call>")
-    
+
+    const repairedDelta = outputEvents.find(
+      (e) =>
+        e.type === "text-delta" && (e as any).textDelta !== "Thinking...\n" && (e as any).textDelta !== "<|tool_call>",
+    )
+
     expect(repairedDelta).toBeDefined()
     expect(JSON.parse((repairedDelta as any).textDelta)).toEqual({ broken: "json" })
   })

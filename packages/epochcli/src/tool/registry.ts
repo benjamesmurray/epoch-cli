@@ -10,7 +10,6 @@ import { ReadTool } from "./read"
 import { TaskTool } from "./task"
 import { WebFetchTool } from "./webfetch"
 import { WriteTool } from "./write"
-import { ArbitrationTool } from "./arbitration"
 import { TaskCompleteTool } from "./task_complete"
 import { InvalidTool } from "./invalid"
 import { SkillTool } from "./skill"
@@ -159,7 +158,6 @@ export namespace ToolRegistry {
       const lsp = yield* build(LspTool)
       const batch = yield* build(BatchTool)
       const plan = yield* build(PlanExitTool)
-      const arbitrate = yield* build(ArbitrationTool)
       const taskComplete = yield* build(TaskCompleteTool)
 
       const all = Effect.fn("ToolRegistry.all")(function* (custom: Tool.Info[]) {
@@ -184,7 +182,6 @@ export namespace ToolRegistry {
           code,
           skill,
           patch,
-          arbitrate,
           taskComplete,
           ...(Flag.EPOCHCLI_EXPERIMENTAL_LSP_TOOL ? [lsp] : []),
           ...(cfg.experimental?.batch_tool === true ? [batch] : []),
@@ -192,7 +189,9 @@ export namespace ToolRegistry {
           ...custom,
         ]
 
-        if (!mcpxTool) {
+        if (mcpxTool) {
+          tools.push({ id: "mcpx", ...mcpxTool })
+        } else {
           const mcpTools = yield* mcp.tools()
           for (const [id, def] of Object.entries(mcpTools)) {
             tools.push({ id, ...def })
@@ -255,7 +254,7 @@ export namespace ToolRegistry {
     }),
   )
 
-  export const defaultLayer: Layer.Layer<Service> = Layer.unwrap(
+  export const defaultLayer = Layer.unwrap(
     Effect.sync(() =>
       layer.pipe(
         Layer.provide(Config.defaultLayer),

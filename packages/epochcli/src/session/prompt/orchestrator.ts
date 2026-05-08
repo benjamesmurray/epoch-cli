@@ -23,6 +23,7 @@ import { InstanceState } from "@/effect/instance-state"
 import { InputResolver } from "./resolver"
 import { STRUCTURED_OUTPUT_DESCRIPTION } from "./utils"
 import z from "zod"
+import { Todo } from "../todo"
 
 export namespace ToolOrchestrator {
   const log = Log.create({ service: "session.prompt.orchestrator" })
@@ -66,6 +67,7 @@ export namespace ToolOrchestrator {
       const truncate = yield* Truncate.Service
       const permission = yield* Permission.Service
       const resolver = yield* InputResolver.Service
+      const todo = yield* Todo.Service
 
       const resolveTools = Effect.fn("SessionPrompt.resolveTools")(function* (input: {
         agent: Agent.Info
@@ -137,7 +139,7 @@ export namespace ToolOrchestrator {
                     sessionID: ctx.sessionID,
                     event: "TOOL_START",
                     tool: item.id,
-                    input: args
+                    input: args,
                   })
                   yield* plugin.trigger(
                     "tool.execute.before",
@@ -160,7 +162,7 @@ export namespace ToolOrchestrator {
                       event: "TOOL_END",
                       tool: item.id,
                       status: "completed",
-                      output: typeof output.output === "string" ? output.output : JSON.stringify(output.output)
+                      output: typeof output.output === "string" ? output.output : JSON.stringify(output.output),
                     })
                     yield* plugin.trigger(
                       "tool.execute.after",
@@ -174,7 +176,7 @@ export namespace ToolOrchestrator {
                       event: "TOOL_END",
                       tool: item.id,
                       status: "failed",
-                      error: String(e)
+                      error: String(e),
                     })
                     throw e
                   }
@@ -203,7 +205,7 @@ export namespace ToolOrchestrator {
                     sessionID: ctx.sessionID,
                     event: "TOOL_START",
                     tool: key,
-                    input: args
+                    input: args,
                   })
                   yield* plugin.trigger(
                     "tool.execute.before",
@@ -211,11 +213,11 @@ export namespace ToolOrchestrator {
                     { args },
                   )
                   try {
-                    yield* Effect.promise(() => ctx.ask({ permission: key, metadata: {}, patterns: ["*"], always: ["*"] }))
-                    const result: any = yield* Effect.promise(() =>
-                      execute(args, { ...ctx, callID: opts.toolCallId }),
+                    yield* Effect.promise(() =>
+                      ctx.ask({ permission: key, metadata: {}, patterns: ["*"], always: ["*"] }),
                     )
-                    
+                    const result: any = yield* Effect.promise(() => execute(args, { ...ctx, callID: opts.toolCallId }))
+
                     const textParts: string[] = []
                     const attachments: Omit<MessageV2.FilePart, "id" | "sessionID" | "messageID">[] = []
                     const content = result.content || (result.metadata?.content as any[]) || []
@@ -242,13 +244,13 @@ export namespace ToolOrchestrator {
                     }
 
                     const truncated = yield* truncate.output(textParts.join("\n\n") || result.output, {}, input.agent)
-                    
+
                     SessionTelemetry.emitToolEvent({
-                        sessionID: ctx.sessionID,
-                        event: "TOOL_END",
-                        tool: key,
-                        status: "completed",
-                        output: truncated.content
+                      sessionID: ctx.sessionID,
+                      event: "TOOL_END",
+                      tool: key,
+                      status: "completed",
+                      output: truncated.content,
                     })
 
                     yield* plugin.trigger(
@@ -256,6 +258,8 @@ export namespace ToolOrchestrator {
                       { tool: key, sessionID: ctx.sessionID, callID: opts.toolCallId, args },
                       result,
                     )
+
+                    yield* todo.syncWithFile(ctx.sessionID).pipe(Effect.ignore)
 
                     const metadata = {
                       ...(result.metadata ?? {}),
@@ -277,11 +281,11 @@ export namespace ToolOrchestrator {
                     }
                   } catch (e) {
                     SessionTelemetry.emitToolEvent({
-                        sessionID: ctx.sessionID,
-                        event: "TOOL_END",
-                        tool: key,
-                        status: "failed",
-                        error: String(e)
+                      sessionID: ctx.sessionID,
+                      event: "TOOL_END",
+                      tool: key,
+                      status: "failed",
+                      error: String(e),
                     })
                     throw e
                   }
@@ -310,7 +314,9 @@ export namespace ToolOrchestrator {
         const { task, model, lastUser, sessionID, session, msgs } = input
         const ctx = yield* InstanceState.context
         const taskTool = yield* Effect.promise(() => registry.named.task.init())
-        const taskModel = task.model ? yield* resolver.getModel(task.model.providerID, task.model.modelID, sessionID) : model
+        const taskModel = task.model
+          ? yield* resolver.getModel(task.model.providerID, task.model.modelID, sessionID)
+          : model
         const assistantMessage: MessageV2.Assistant = yield* sessions.updateMessage({
           id: MessageID.ascending(),
           role: "assistant",
@@ -523,6 +529,6 @@ export namespace ToolOrchestrator {
         handleSubtask,
         createStructuredOutputTool,
       })
-    })
+    }),
   )
 }

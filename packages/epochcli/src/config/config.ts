@@ -562,7 +562,9 @@ export namespace Config {
         .describe("Maximum number of agentic iterations before forcing text-only response"),
       maxSteps: z.number().int().positive().optional().describe("@deprecated Use 'steps' field instead."),
       permission: Permission.optional(),
-      side_model: ModelId.optional().describe("Force a specific model to be used for the background Supervisor (Clerk) duties."),
+      side_model: ModelId.optional().describe(
+        "Force a specific model to be used for the background Supervisor (Clerk) duties.",
+      ),
     })
     .catchall(z.any())
     .transform((agent, ctx) => {
@@ -638,7 +640,8 @@ export namespace Config {
       stash_delete: z.string().optional().default("ctrl+d").describe("Delete stash entry"),
       model_provider_list: z.string().optional().default("ctrl+a").describe("Open provider list from model dialog"),
       model_favorite_toggle: z.string().optional().default("ctrl+f").describe("Toggle model favorite status"),
-      session_interrupt: z.string().optional().default("escape").describe("Interrupt current session"),      session_compact: z.string().optional().default("<leader>c").describe("Compact the session"),
+      session_interrupt: z.string().optional().default("escape").describe("Interrupt current session"),
+      session_compact: z.string().optional().default("<leader>c").describe("Compact the session"),
       messages_page_up: z.string().optional().default("pageup,ctrl+alt+b").describe("Scroll messages up by one page"),
       messages_page_down: z
         .string()
@@ -695,6 +698,7 @@ export namespace Config {
       input_select_down: z.string().optional().default("shift+down").describe("Select down in input"),
       input_line_home: z.string().optional().default("ctrl+a").describe("Move to start of line in input"),
       input_line_end: z.string().optional().default("ctrl+e").describe("Move to end of line in input"),
+      toggle_yolo: z.string().optional().default("ctrl+y").describe("Toggle YOLO mode globally"),
       input_select_line_home: z
         .string()
         .optional()
@@ -883,7 +887,8 @@ export namespace Config {
           "Enable or disable snapshot tracking. When false, filesystem snapshots are not recorded and undoing or reverting will not undo/redo file changes. Defaults to true.",
         ),
       plugin: PluginSpec.array().optional(),
-      autoupdate: z        .union([z.boolean(), z.literal("notify")])
+      autoupdate: z
+        .union([z.boolean(), z.literal("notify")])
         .optional()
         .describe(
           "Automatically update to the latest version. Set to true to auto-update, false to disable, or 'notify' to show update notifications",
@@ -1042,7 +1047,9 @@ export namespace Config {
             .describe("Timeout in milliseconds for model context protocol (MCP) requests"),
         })
         .optional(),
-      side_model: ModelId.optional().describe("Force a specific model to be used for the background Supervisor (Clerk) duties."),
+      side_model: ModelId.optional().describe(
+        "Force a specific model to be used for the background Supervisor (Clerk) duties.",
+      ),
     })
     .strict()
     .meta({

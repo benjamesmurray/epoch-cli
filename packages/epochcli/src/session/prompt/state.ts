@@ -91,6 +91,6 @@ export namespace SessionState {
         assertNotBusy,
         cancel,
       })
-    })
+    }),
   )
 }

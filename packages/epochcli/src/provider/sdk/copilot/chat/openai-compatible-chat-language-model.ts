@@ -493,9 +493,9 @@ export class OpenAICompatibleChatLanguageModel implements LanguageModelV3 {
                 id: "reasoning-0",
                 delta: reasoningContent,
               })
-              }
+            }
 
-              if (delta.content) {
+            if (delta.content) {
               // If reasoning was active and we're starting text, end reasoning first
               // This handles the case where reasoning_opaque and content come in the same chunk
               if (isActiveReasoning && !isActiveText) {
@@ -521,7 +521,7 @@ export class OpenAICompatibleChatLanguageModel implements LanguageModelV3 {
                 id: "txt-0",
                 delta: delta.content,
               })
-              }
+            }
             if (delta.tool_calls != null) {
               // If reasoning was active and we're starting tool calls, end reasoning first
               // This handles the case where reasoning goes directly to tool calls with no content

@@ -85,6 +85,14 @@ export function extractMetrics(line: LogLine): any {
 }
 
 export function getSemanticToolName(tool: string, input: any): string {
+  if (tool === "mcpx" && input) {
+    const server = input.server;
+    const mcpxTool = input.tool;
+    if (server && mcpxTool) {
+      return `mcpx [${server}.${mcpxTool}]`;
+    }
+  }
+
   if (tool === "bash" && typeof input?.command === "string") {
     const cmd = input.command;
     if (cmd.includes("spec sc_")) {

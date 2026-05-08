@@ -24,6 +24,7 @@ target
 .direnv/
 
 # Local dev files
+.config/
 opencode-dev
 UPCOMING_CHANGELOG.md
 logs/
@@ -45,3 +46,21 @@ last_model_payload.json
 zone1_size.txt
 zone3_size.txt
 packages/epochcli/test-regex.js
+
+# Temporary and Debug Artifacts
+*.log
+request.json
+request_log.json
+temp_*.toml
+test_*.toml
+last_model_payload.json
+zone*_size.txt
+
+# Project Map Local State
+.project-map/backups/
+.project-map/latest
+**/.project-map/
+
+# Local session/history
+.epoch-continuity.toon
+.history/

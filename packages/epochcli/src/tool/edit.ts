@@ -26,7 +26,7 @@ const MAX_DIAGNOSTICS_PER_FILE = 20
 async function analyzeEditFailure(content: string, oldString: string, newString: string): Promise<string | null> {
   try {
     const sideLanguage = await Provider.getLanguage(
-      await Provider.getModel("local-side" as any, "nemotron-3-nano-4b" as any)
+      await Provider.getModel("local-side" as any, "nemotron-3-nano-4b" as any),
     )
     if (!sideLanguage) return null
 
@@ -45,7 +45,7 @@ ${content.substring(0, 8000)}`
 
     const response = await generateText({
       model: sideLanguage,
-      prompt
+      prompt,
     })
 
     return response.text
@@ -707,7 +707,10 @@ export function replace(content: string, oldString: string, newString: string, r
 
   if (notFound) {
     const preview = content.split("\\n").slice(0, 100).join("\\n")
-    const previewMessage = content.split("\\n").length > 100 ? `\\n\\nFirst 100 lines of current file:\\n${preview}\\n...` : `\\n\\nCurrent file contents:\\n${preview}`
+    const previewMessage =
+      content.split("\\n").length > 100
+        ? `\\n\\nFirst 100 lines of current file:\\n${preview}\\n...`
+        : `\\n\\nCurrent file contents:\\n${preview}`
     throw new Error(
       `Could not find oldString in the file. It must match exactly, including whitespace, indentation, and line endings.${previewMessage}`,
     )

@@ -1,68 +1,53 @@
-# Guide: Setting Up MCP Servers with `mcpx`
+# Guide: Setting Up MCP Servers with `mcpx-rust`
 
-This guide explains how to configure Model Context Protocol (MCP) servers within this project using the `mcpx` CLI utility. By using `mcpx`, we reduce prompt bloat by replacing massive JSON schemas with a single, discoverable CLI interface.
+This guide explains how to configure Model Context Protocol (MCP) servers within this project using the `mcpx-rust` CLI utility. By using `mcpx`, we reduce prompt bloat by replacing massive JSON schemas with a single, discoverable CLI interface.
 
 ## 1. Installation
 
-`mcpx` is a Go-based binary that turns MCP servers into composable shell commands.
+`mcpx-rust` is the Rust-based binary used in this project to turn MCP servers into composable shell commands.
 
 ```bash
-# Via npm
-npm install -g mcpx-go
-
-# Via Homebrew (macOS)
-brew tap lydakis/mcpx
-brew install --cask mcpx
+# Via Cargo
+cargo install mcpx-rust
 ```
 
 ## 2. Registering Servers
 
-`mcpx` stores its configuration in `~/.config/mcpx/config.toml`. You can add servers using the `mcpx add` command or by editing the file manually.
-
-### Using `mcpx add`
-Point `mcpx` at a local manifest file (JSON or TOML) or a direct MCP endpoint:
-
-```bash
-# Add from a local manifest
-mcpx add ./path/to/mcp-manifest.json --name my-server --overwrite
-
-# Add from a remote endpoint
-mcpx add https://docs.mcp.cloudflare.com/mcp
-```
+`mcpx-rust` stores its configuration in `~/.config/mcpx/config.toml`. You must edit this file manually to add or modify servers.
 
 ### Manual Configuration
-You can add entries directly to `~/.config/mcpx/config.toml`:
+Add entries to the `[mcp_servers]` section in `~/.config/mcpx/config.toml`:
 
 ```toml
-[servers.map]
-command = "/home/benmurray/Projects/cli/project-map-cli/venv/bin/python"
-args = ["-m", "project_map_cli.mcp.server"]
+[mcp_servers.map]
+command = "project-map-cli-rust"
+args = ["mcp"]
 
-[servers.spec]
-command = "npx"
-args = ["-y", "@epoch-ai/deliver-cli", "serve"]
+[mcp_servers.spec]
+command = "deliver-cli"
+args = ["mcp"]
 
-[servers.github]
+[mcp_servers.github]
 command = "npx"
 args = ["-y", "@modelcontextprotocol/server-github"]
 env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }
 ```
 
-## 3. `epochcli` Integration
+## 3. `epochcli` / `gemini-cli` Integration
 
-To enable `mcpx` in `epochcli`, update your `.epochcli/epochcli.jsonc` file:
+To enable `mcpx` integration, update your configuration file (e.g., `.epochcli/epochcli.jsonc` or `.gemini/settings.json`):
 
 ```jsonc
 {
   "mcpx": {
     "enabled": true,
-    "binaryPath": "/path/to/mcpx" // Optional: defaults to global 'mcpx'
+    "binaryPath": "mcpx-rust" // Optional: defaults to 'mcpx-rust'
   },
   "mcp": {} // Leave empty to disable standard schema-based MCP tools
 }
 ```
 
-When enabled, `epochcli` will only expose a single `mcpx` tool to the LLM. The agent will discover capabilities dynamically by running `mcpx <server> --help`.
+When enabled, the CLI will only expose a single `mcpx` tool to the LLM. The agent will discover capabilities dynamically by running `mcpx <server> --help`.
 
 ## 4. Usage and Composition
 
@@ -70,44 +55,30 @@ Once configured, tools can be called using standard shell composition:
 
 ```bash
 # List all servers
-mcpx
+mcpx-rust list
 
 # List tools for a server
-mcpx github
+mcpx-rust github
 
 # Inspect a specific tool's schema
-mcpx github search-repositories --help
+mcpx-rust github search-repositories --help
 
 # Call a tool and pipe to jq
-mcpx github search-repositories --query=mcp | jq -r '.items[0].full_name'
+mcpx-rust github search-repositories query=mcp --json | jq -r '.content[0].text'
 ```
 
-## 5. Command Shims (Optional)
+Note: `mcpx-rust` uses `key=value` syntax for positional arguments or standard `--flag value` syntax depending on the tool's implementation.
 
-You can install local passthrough shims so that `<server>` works as a standalone command in your terminal. This is the preferred way for agents to interact with project tools.
+## 5. Project Servers
 
-```bash
-# Install shims
-mcpx shim install map
-mcpx shim install spec
-mcpx shim install ground
-
-# Direct usage
-spec sc_status
-map pm_query --query "stallScore"
-ground gt_status
-```
-
-## 6. Project Servers
-
-The following project-specific servers are pre-configured in `mcpx`. Agents should use their respective shims for all operations:
+The following project-specific servers are pre-configured. Agents should use the unified `mcpx` tool for all operations:
 
 - **`spec`**: Management of specification-driven development.
-    - `spec sc_status`: View project health and next steps.
-    - `spec sc_todo_start`: Mark a task as active.
+    - `mcpx spec sc_status`: View project health and next steps.
+    - `mcpx spec sc_todo_start`: Mark a task as active.
 - **`map`**: Architectural mapping and symbol analysis.
-    - `map pm_query`: Search for symbols or get file context.
-    - `map pm_plan`: Analyze the architectural impact of a change.
+    - `mcpx map pm_query`: Search for symbols or get file context.
+    - `mcpx map pm_plan`: Analyze the architectural impact of a change.
 - **`ground`**: Synthesis of behavioral rules and operational facts.
-    - `ground gt_status`: Check current project rules.
-    - `ground gt_refresh`: Force a refresh of the project constitution.
+    - `mcpx ground gt_status`: Check current project rules.
+    - `mcpx ground gt_refresh`: Force a refresh of the project constitution.

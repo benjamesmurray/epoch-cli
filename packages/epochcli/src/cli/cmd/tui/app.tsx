@@ -299,6 +299,13 @@ function App(props: { onSnapshot?: () => Promise<string[]> }) {
     })
 
   useKeyboard((evt) => {
+    if (keybind.match("toggle_yolo", evt)) {
+      if (dialog.stack.length === 0) {
+        local.yolo.toggle()
+        evt.preventDefault()
+        evt.stopPropagation()
+      }
+    }
     if (!Flag.EPOCHCLI_EXPERIMENTAL_DISABLE_COPY_ON_SELECT) return
     const sel = renderer.getSelection()
     if (!sel) return

@@ -1,18 +1,18 @@
 {
   "$schema": "./config.json",
-  "model": "local-main/google-gemma-26b",
-  "side_model": "local-side/nemotron-3-nano",
+  "model": "local-main/qwen-27b",
+  "side_model": "local-side/qwen-35b",
   "provider": {
     "local-main": {
       "npm": "@ai-sdk/openai-compatible",
-      "name": "Local Main (Gemma)",
+      "name": "Local Main (Qwen 27B)",
       "options": {
         "baseURL": "http://localhost:8085/v1",
         "apiKey": "2250"
       },
       "models": {
-        "google-gemma-26b": {
-          "name": "Gemma 4 26B",
+        "qwen-27b": {
+          "name": "Qwen 27B Coding",
           "limit": {
             "context": 32000,
             "output": 4096
@@ -22,14 +22,14 @@
     },
     "local-side": {
       "npm": "@ai-sdk/openai-compatible",
-      "name": "Local Side (Nemotron Clerk)",
+      "name": "Local Side (Qwen 35B Clerk)",
       "options": {
         "baseURL": "http://localhost:8085/v1",
         "apiKey": "2250"
       },
       "models": {
-        "nemotron-3-nano": {
-          "name": "Nemotron 3 Nano",
+        "qwen-35b": {
+          "name": "Qwen 35B Clerk",
           "limit": {
             "context": 32000,
             "output": 4096

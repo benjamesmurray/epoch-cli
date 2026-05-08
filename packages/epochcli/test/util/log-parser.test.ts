@@ -5,7 +5,7 @@ import { LogParserTool } from "../../src/util/log-parser"
 
 describe("LogParserTool - State Machine Overlap Detection", () => {
   const tmpDir = path.join(process.cwd(), "test-logs-tmp")
-  
+
   beforeAll(async () => {
     await fs.mkdir(tmpDir, { recursive: true })
   })
@@ -18,7 +18,7 @@ describe("LogParserTool - State Machine Overlap Detection", () => {
     const logPath = path.join(tmpDir, "valid.log")
     const logContent = `
 2026-04-08T12:00:00 INFO {"mainEpochId":"123","event":"START_GENERATE","providerId":"local-side","phase":"Phase 1"}
-2026-04-08T12:00:01 INFO {"mainEpochId":"123","event":"END_GENERATE","providerId":"local-side","phase":"Phase 1","metrics":{"json_repaired":true}}
+2026-04-08T12:00:01 INFO {"mainEpochId":"123","event":"END_GENERATE","providerId":"local-side","phase":"Phase 1","metrics":{"metrics":{"json_repaired":true}}}
 2026-04-08T12:00:02 INFO {"mainEpochId":"123","event":"START_GENERATE","providerId":"local-main","phase":"Phase 2"}
 2026-04-08T12:00:05 INFO {"mainEpochId":"123","event":"END_GENERATE","providerId":"local-main","phase":"Phase 2"}
 `
@@ -40,7 +40,9 @@ describe("LogParserTool - State Machine Overlap Detection", () => {
 
     const result = await LogParserTool.verifySequentialExecution(logPath)
     expect(result.valid).toBe(false)
-    expect(result.message).toContain("Concurrency Violation: local-main started while local-side was still active in epoch 456")
+    expect(result.message).toContain(
+      "Concurrency Violation: local-main started while local-side was still active in epoch 456",
+    )
   })
 
   it("ignores malformed JSON and skips gracefully", async () => {

@@ -1,92 +1,100 @@
 # Epoch CLI
 
-Epoch CLI is an advanced, Agent-Native command-line interface designed to orchestrate complex development workflows using a novel **Dual-Model Architecture**.
+Epoch CLI is a tool for software development that coordinates local AI models to handle complex tasks. It focuses on managing context window limits and maintaining a structured engineering workflow.
 
-It is built to maximize the efficiency of local LLMs by intelligently routing tasks, strictly managing context windows via "Task-Epochs", and leveraging specialized external tools to explore and manipulate codebases without wasting context tokens.
+## Technical Approach
 
-## Key Features
+### Dual-Model Architecture
+The system uses two models:
+- **Main Model**: A larger model (e.g., Qwen 35B or Gemma 26B) used for reasoning and generating code.
+- **Side Model (Supervisor)**: A smaller, faster model used for background tasks like summarizing history and enforcing rules.
 
-### 🧠 Dual-Model Orchestration & Conversational Supervisor
-Epoch CLI seamlessly coordinates between two local language models using a "Baton Pass" event loop:
-- **`local-main` (e.g., 26B parameters)**: The execution lead. Responsible for complex reasoning, code generation, and primary task fulfillment.
-- **`local-side` (e.g., 4B parameters)**: The **Conversational Supervisor**. Analyzes a structural transcript of the conversation history (including tool calls) to manage environment state and persona discipline.
-- **Agent Routing & Persona Inertia**: The supervisor dynamically selects the active **Agent Persona** (`build`, `plan`, `explore`) based on semantic progress. It maintains "Persona Inertia," ensuring shifts only occur when logical phases are complete or the agent is fundamentally blocked.
-- **Arbitration Mechanism**: Empowering the main model to challenge environmental pruning. Through the `object_to_supervisor` tool, the main agent can object to a persona assignment. A circuit breaker ensures that persistent objections from the 26B model overrule the 4B supervisor to prevent deadlocks.
+These models are managed by **llama-swap**, a proxy that automatically loads and unloads models in VRAM as the system switches between coding and supervision.
 
-### 🛡️ mcpx Unified Tool Routing
-To reclaim context budget and prevent agentic drift, Epoch CLI utilizes the **mcpx** utility to route all Model Context Protocol (MCP) interactions:
-- **Zero-Schema Bloat**: Instead of injecting all MCP schemas globally (~8,000 tokens), the orchestrator injects only a single `mcpx` tool schema. This reduces static overhead by up to 95%.
-- **Syntax Enforcement**: The agent is strictly governed by the syntax `mcpx <server> <tool> --flag=value`. This leverages Gemma 4's strong coding logic to reason about CLI outputs and compose shell-based tool chains (e.g., `mcpx github search | jq`).
-- **Role-Based Filtering**: The `mcpx` tool is dynamically filtered based on agent persona permissions, ensuring strict execution boundaries.
+### Positional Prompting and Rules
+Prompts are structured into four zones to place information where models are most likely to attend to it (the beginning and end of the message). Immutable facts and thinking tokens are placed in Zone 1 (the head), while project-specific rules and cursor context are placed in Zone 3 (the tail).
+- **Credit:** This approach is adapted from [The Architecture of Prompt Sequencing](https://atlassc.net/2026/03/30/the-architecture-of-prompt-sequencing).
 
-### 🏛️ Three Pillar MCP Architecture (via mcpx)
-The CLI achieves "functional consciousness" and architectural awareness entirely through its integration with core MCP servers routed via `mcpx`:
-- **`spec`**: Drives rigorous, specification-based workflows (Requirements -> Design -> Tasks -> Implementation -> Testing).
-- **`project-map-cli`**: Provides structural awareness. The agent can query symbols and explore relationships without reading massive files directly.
-- **`ground-truth-cli`**: Scans the project to enforce codebase-specific rules and conventions via TOON (Token-Oriented Object Notation).
+### Tool Management (MCPX)
+Instead of sending every available tool definition with every request, the CLI uses an adapted version of **MCPX**. This provides a single tool interface that the model uses to discover and execute other tools on demand, reducing the number of tokens used by the "tools" array.
+- **Credit:** Adapted from [lydakis/mcpx](https://github.com/lydakis/mcpx).
 
-### 💾 Positional Prompting & Fact Anchoring
-Epoch CLI utilizes a refined **Positional Prompt Architecture** to exploit the transformer's U-shaped attention curve, anchoring critical context at both ends of the window:
-- **Zone 1 (Head - System Prompt)**: Anchors high-priority **Operational Facts** (context limits, mcpx syntax, environment) at the absolute beginning of the request.
-- **Zone 2 (Middle - History Offloading)**: Static behavioral rules, style guides, and engineering tasks are offloaded to a **one-time `assistant` initialization message** in the conversation history. This saves ~1,000 tokens per turn.
-- **Zone 3 (Tail - Reinforcement)**: Operational facts are reinforced in a dedicated `operationalFacts` field at the **absolute end of the JSON payload** (after the message history), ensuring critical rules are always in the model's immediate context.
-- **Managed Cold Starts**: Maintains an `.epoch-context.md` file via the `mcpx spec` bridge to allow the system to wipe conversation history (Purge) without losing task continuity.
+### Specification Workflow
+The CLI enforces a deterministic development sequence: **Requirements -> Design -> Tasks -> Implementation**. This ensures the agent has a verified plan before it begins writing code.
+- **Credit:** Adapted from [kingkongshot/specs-workflow-mcp](https://github.com/kingkongshot/specs-workflow-mcp).
 
-### 📊 Advanced Telemetry & E2E Testing
-Includes a robust E2E variance testing harness that monitors:
-- **Performance Metrics**: Real-time tracking of Tokens Per Second (TPS) and Time-To-First-Token (TTFT).
-- **Architectural Validation**: Detailed logging of `activeAgent` transitions, `toolCount` reduction, and full `tools` definition payloads.
-- **Stability Monitoring**: Automated tracking of JSON repair rates, loop detection interventions, and "Doom Loop" test aborts.
+### TOON Data Format
+For large datasets like file trees or linter logs, the CLI uses **TOON (Token-Oriented Object Notation)** instead of JSON. This format uses YAML-style indentation to reduce the number of tokens required to represent structured data.
+- **Credit:** [toon-format/toon](https://github.com/toon-format/toon).
 
-#### 1. Epoch Log Analyzer (Recommended)
-A robust, turn-aware diagnostic tool that audits intervention efficacy and composition failures from the test harness.
-- **Location**: `epoch-log-analyzer/`
-- **Features**: Detects Streaming Loop abortions, Phase Stagnation nudges, and MCPX Composition failures (invalid params, unknown arguments).
-- **Usage**:
-  ```bash
-  cd epoch-log-analyzer
-  bun run src/index.ts <path_to_run.log>
-  ```
+### Session Continuity
+When a model reaches its context limit, the supervisor model generates a dense summary of the current state (`.epoch-continuity.toon`) and archives the detailed history in a `.history/` directory. This allows a new session to start with a clear understanding of the project's progress.
+- **Details:** See [continuity.md](docs/continuity.md).
+
+### Loop Protection
+The system tracks "stall scores" for agent actions. If an agent repeats the same tool call, fails multiple times, or generates repetitive text, the supervisor model interrupts the loop and provides a technical directive to change strategy.
+- **Details:** See [doom_protection.md](docs/doom_protection.md).
+
+### Code Manipulation
+The system uses a streamlined version of **opencode** for reading and editing files.
+- **Credit:** [anomalyco/opencode](https://github.com/anomalyco/opencode).
+
+## Integrated Tools
+The system relies on several Rust-based MCP servers for project awareness and task management:
+- [mcpx-rust](https://crates.io/crates/mcpx-rust): Unified tool routing.
+- [project-map-cli-rust](https://crates.io/crates/project-map-cli-rust): Architectural mapping and symbol discovery.
+- [ground-truth-cli-rust](https://crates.io/crates/ground-truth-cli-rust): Project-specific rule enforcement.
+- [deliver-cli](https://crates.io/crates/deliver-cli): Specification and task tracking.
 
 ## Getting Started
 
-### Prerequisites
-- [Bun](https://bun.sh/) runtime installed.
-- [mcpx](https://github.com/lydakis/mcpx) installed globally (`npm install -g mcpx-go`).
-- Local LLM inference servers running (e.g., via vLLM or `llama.cpp`) on ports `8085` (main) and `8086` (side).
+Epoch CLI requires a few core components to be fully functional, including the TypeScript-based CLI and several Rust-based MCP servers for architectural mapping and rule enforcement.
 
-### Configuration
-Epoch CLI is configured via the `.epochcli/epochcli.jsonc` file. External MCP servers should be configured in `~/.config/mcpx/config.toml`.
+### 1. Prerequisites
+- **Bun**: The runtime for Epoch CLI. [Install Bun](https://bun.sh/).
+- **Rust/Cargo**: Required to install the essential MCP servers. [Install Rust](https://www.rust-lang.org/tools/install).
 
-```jsonc
-{
-  "provider": {
-    "local-main": {
-      "npm": "@ai-sdk/openai-compatible",
-      "options": { "baseURL": "http://localhost:8085/v1" }
-    },
-    "local-side": {
-      "npm": "@ai-sdk/openai-compatible",
-      "options": { "baseURL": "http://localhost:8086/v1" }
-    }
-  },
-  "mcpx": {
-    "enabled": true,
-    "binaryPath": "/usr/local/bin/mcpx" // Optional: defaults to global 'mcpx'
-  }
-}
-```
-
-### Usage
-
-Start the interactive TUI:
+### 2. Install Essential MCP Components
+Run the following commands to install the necessary Rust-based tools:
 ```bash
-bun packages/epochcli/src/index.ts
+# Unified MCP routing engine
+cargo install mcpx-rust
+
+# Essential servers for mapping, rules, and specifications
+cargo install project-map-cli-rust
+cargo install ground-truth-cli-rust
+cargo install deliver-cli
 ```
 
-## Documentation
-- [Epoch Spec](docs/Epoch_spec.md) - Deep dive into the orchestration specification.
-- [MCP Configuration Guide](docs/MCP_config_guide.md) - Detailed setup for tool servers via `mcpx`.
+### 3. Install Epoch CLI
+You can install Epoch CLI globally using Bun:
+```bash
+bun install -g epochcli
+```
+
+### 4. Configuration
+Epoch CLI is configured via `.epochcli/epochcli.jsonc`. You also need to configure your MCP servers in `~/.config/mcpx/config.toml` so `mcpx-rust` knows how to call them.
+
+Example `config.toml` for essential servers:
+```toml
+[mcp_servers.map]
+command = "project-map-cli-rust"
+args = ["mcp"]
+
+[mcp_servers.ground]
+command = "ground-truth-cli-rust"
+args = ["mcp"]
+
+[mcp_servers.spec]
+command = "deliver-cli"
+args = ["mcp"]
+```
+
+### 5. Usage
+Once installed and configured, you can start the interactive TUI by running:
+```bash
+epochcli
+```
 
 ## License
 MIT

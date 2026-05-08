@@ -8,6 +8,7 @@ import { Global } from "@/global"
 import { iife } from "@/util/iife"
 import { createSimpleContext } from "./helper"
 import { useToast } from "../ui/toast"
+import { useRoute } from "./route"
 import { Provider } from "@/provider/provider"
 import { useArgs } from "./args"
 import { useSDK } from "./sdk"
@@ -384,6 +385,48 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       },
     }
 
+    const yolo = iife(() => {
+      const route = useRoute()
+      const [yoloStore, setYoloStore] = createStore({
+        enabled: false,
+      })
+
+      const currentSessionID = createMemo(() => {
+        if (route.data.type === "session") return route.data.sessionID
+        return undefined
+      })
+
+      // Sync with current session state
+      createEffect(() => {
+        const id = currentSessionID()
+        if (!id) return
+        const session = sync.data.session.find((x) => x.id === id)
+        if (session) {
+          setYoloStore("enabled", !!session.yolo)
+        }
+      })
+
+      return {
+        current() {
+          return yoloStore.enabled
+        },
+        async toggle() {
+          const next = !yoloStore.enabled
+          setYoloStore("enabled", next)
+
+          const id = currentSessionID()
+          if (id) {
+            await sdk.client.session.update({ sessionID: id, yolo: next })
+          }
+
+          toast.show({
+            variant: next ? "success" : "info",
+            message: `YOLO Mode ${next ? "Enabled" : "Disabled"}`,
+          })
+        },
+      }
+    })
+
     // Automatically update model when agent changes
     createEffect(() => {
       const value = agent.current()
@@ -406,6 +449,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       model,
       agent,
       mcp,
+      yolo,
     }
     return result
   },

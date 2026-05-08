@@ -10,7 +10,7 @@ export class SanitizerMiddleware {
   static repair(input: string): string {
     let cleaned = input.trim()
     cleaned = cleaned.replace(/^```json\s*/i, "").replace(/\s*```$/i, "")
-    cleaned = cleaned.replace(/<\|\s*tool_call\s*>/ig, "").replace(/<\/\s*tool_call\s*>/ig, "")
+    cleaned = cleaned.replace(/<\|\s*tool_call\s*>/gi, "").replace(/<\/\s*tool_call\s*>/gi, "")
     cleaned = cleaned.trim()
 
     let openBraces = (cleaned.match(/\{/g) || []).length
@@ -18,7 +18,7 @@ export class SanitizerMiddleware {
     if (openBraces > closeBraces) {
       cleaned += "}".repeat(openBraces - closeBraces)
     }
-    
+
     let openBrackets = (cleaned.match(/\[/g) || []).length
     let closeBrackets = (cleaned.match(/\]/g) || []).length
     if (openBrackets > closeBrackets) {
@@ -57,7 +57,7 @@ export class SanitizerMiddleware {
           delete msg.providerOptions
         }
       }
-      
+
       if (Array.isArray(msg.content)) {
         for (const part of msg.content) {
           if (part.providerOptions) {
@@ -96,14 +96,17 @@ export class SanitizerMiddleware {
             inToolCall = true
             return Stream.succeed(event)
           } else if (inToolCall) {
-            if (SanitizerMiddleware.TOOL_CALL_END_REGEX.test(buffer) || (buffer.includes("}") && buffer.trim().endsWith("}"))) {
+            if (
+              SanitizerMiddleware.TOOL_CALL_END_REGEX.test(buffer) ||
+              (buffer.includes("}") && buffer.trim().endsWith("}"))
+            ) {
               inToolCall = false
               const repaired = SanitizerMiddleware.repair(buffer)
-              buffer = "" 
+              buffer = ""
               return Stream.succeed({
                 type: "text-delta",
                 textDelta: repaired,
-                delta: repaired
+                delta: repaired,
               } as unknown as LLM.Event)
             } else {
               // Buffer

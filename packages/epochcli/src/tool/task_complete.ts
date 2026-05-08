@@ -6,7 +6,8 @@ const parameters = z.object({
 })
 
 export const TaskCompleteTool = Tool.define("task_complete", {
-  description: "Signals that you have completely finished all requested tasks and are ready to stop execution. Call this tool ONLY when there is absolutely no more work to do.",
+  description:
+    "Signals that you have completely finished all requested tasks and are ready to stop execution. Call this tool ONLY when there is absolutely no more work to do.",
   parameters,
   async execute(params) {
     return {

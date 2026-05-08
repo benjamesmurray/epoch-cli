@@ -1447,7 +1447,7 @@ export namespace Provider {
           }
 
           if (!model.api.npm) {
-             throw new Error(`Provider ${model.providerID} has no npm package specified`)
+            throw new Error(`Provider ${model.providerID} has no npm package specified`)
           }
 
           let installedPath: string
@@ -1470,7 +1470,11 @@ export namespace Provider {
           s.sdk.set(key, loaded)
           return loaded as SDK
         } catch (e) {
-          log.error("Provider initialization failed", { providerID: model.providerID, error: String(e), cause: (e as any)?.cause });
+          log.error("Provider initialization failed", {
+            providerID: model.providerID,
+            error: String(e),
+            cause: (e as any)?.cause,
+          })
           throw new InitError({ providerID: model.providerID }, { cause: e })
         }
       }
@@ -1649,28 +1653,37 @@ export namespace Provider {
         }
 
         const s = yield* InstanceState.get(state)
-        
+
         // 2. Fall back strictly to the 'local-side' provider if it exists in the config
         const sideProviderID = ProviderID.make("local-side")
         const sideProvider = s.providers[sideProviderID]
         if (sideProvider) {
-            // Prioritize known 4B models within THIS specific provider
-            const priorityList = ["nemotron", "phi-3.5", "gemma-2-2b", "llama-3.2-3b", "qwen-2.5-3b"]
-            for (const priority of priorityList) {
-                const match = Object.keys(sideProvider.models).find(m => m.toLowerCase().includes(priority))
-                if (match) return yield* getModel(ProviderID.make("local-side"), ModelID.make(match))
-            }
+          // Prioritize known 4B models within THIS specific provider
+          const priorityList = ["nemotron", "phi-3.5", "gemma-2-2b", "llama-3.2-3b", "qwen-2.5-3b"]
+          for (const priority of priorityList) {
+            const match = Object.keys(sideProvider.models).find((m) => m.toLowerCase().includes(priority))
+            if (match) return yield* getModel(ProviderID.make("local-side"), ModelID.make(match))
+          }
 
-            // Otherwise take the first model defined in this provider
-            const firstModel = Object.keys(sideProvider.models)[0]
-            if (firstModel) return yield* getModel(ProviderID.make("local-side"), ModelID.make(firstModel))
+          // Otherwise take the first model defined in this provider
+          const firstModel = Object.keys(sideProvider.models)[0]
+          if (firstModel) return yield* getModel(ProviderID.make("local-side"), ModelID.make(firstModel))
         }
 
         // 3. Absolute fallback to generic small model (bounded by provider)
         return yield* getSmallModel(ProviderID.make("local-side"))
       })
 
-      return Service.of({ list, getProvider, getModel, getLanguage, closest, getSmallModel, getSideModel, defaultModel })
+      return Service.of({
+        list,
+        getProvider,
+        getModel,
+        getLanguage,
+        closest,
+        getSmallModel,
+        getSideModel,
+        defaultModel,
+      })
     }),
   )
 

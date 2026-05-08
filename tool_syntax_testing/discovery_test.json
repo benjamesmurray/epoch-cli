@@ -1,0 +1,30 @@
+[
+  {
+    "id": "mcpx-discovery-list",
+    "iterations": 1,
+    "timeoutMs": 300000,
+    "prompt": "You are unsure what tools the 'map' server provides. Use the 'mcpx' tool to discover all available tools for the 'map' server. Once you have the list, call task_complete.",
+    "expectedTools": ["mcpx"],
+    "runTargetDir": ".",
+    "docker": {
+      "imageName": "epochcli-eval-env:latest",
+      "network": "host",
+      "memoryLimit": "4g",
+      "model": "local-main/qwen-27b"
+    }
+  },
+  {
+    "id": "mcpx-discovery-inspect",
+    "iterations": 1,
+    "timeoutMs": 300000,
+    "prompt": "You want to use the 'pm_query' tool from the 'map' server but you don't know the parameters. Use the 'mcpx' tool to inspect the help/schema for 'pm_query'. Once you have the information, call task_complete.",
+    "expectedTools": ["mcpx"],
+    "runTargetDir": ".",
+    "docker": {
+      "imageName": "epochcli-eval-env:latest",
+      "network": "host",
+      "memoryLimit": "4g",
+      "model": "local-main/qwen-27b"
+    }
+  }
+]

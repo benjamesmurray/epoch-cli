@@ -1,11 +1,4 @@
-Launch a new agent to handle complex, multistep tasks autonomously.
-
+Launch a subagent.
 Available agents:
 {agents}
-
-Usage notes:
-1. Use for complex, multi-step tasks (e.g., large refactors, deep research). Do NOT use for simple bash commands, or when searching/reading specific files (use Glob/Read instead).
-2. Launch multiple agents concurrently in a single turn to maximize performance.
-3. Provide a highly detailed `prompt`. The subagent is unaware of your context unless you explain it.
-4. The subagent returns a single result. You must summarize this result for the user.
-5. If `task_id` is provided, the subagent resumes its previous session; otherwise, it starts fresh.
+Resumes if task_id provided.

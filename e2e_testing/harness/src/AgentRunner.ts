@@ -42,21 +42,25 @@ export class AgentRunner {
         const modelArg = docker.model ? `--model ${docker.model}` : "";
         const yoloArg = yolo ? "--yolo" : "";
         
-        const internalCommand = `mkdir -p /workspace/.epochcli; cp -an /etc/epochcli/. /workspace/.epochcli/ 2>/dev/null || true; git config --global --add safe.directory /workspace; HOME=/workspace LOG_LEVEL=DEBUG EPOCHCLI_DEBUG_FULL_PROMPT=true bun /cli/packages/epochcli/src/index.ts run --thinking --print-logs --log-level=DEBUG ${modelArg} ${yoloArg} "${cleanArgs}"`;
-        
+        const escapedArgs = cleanArgs.replace(/'/g, "'\\''");
+        const internalCommand = `mkdir -p /workspace/.epochcli; cp -an /etc/epochcli/. /workspace/.epochcli/ 2>/dev/null || true; git config --global --add safe.directory /workspace; HOME=/workspace LOG_LEVEL=DEBUG EPOCHCLI_DEBUG_FULL_PROMPT=true bun /cli/packages/epochcli/src/index.ts run --thinking --print-logs --log-level=DEBUG ${modelArg} ${yoloArg} '${escapedArgs}'`;
+
         this.command = [
             "docker", "run", "--rm", 
             "--network", docker.network,
             "--add-host", "host.docker.internal:host-gateway",
-            "-v", `/home/benmurray/Projects/cli:/cli:ro`,
+            "-v", "/home/benmurray/Projects/cli:/cli:ro",
+            "-v", "/home/benmurray/Projects/cli/e2e_testing/harness/spec-workflow.openapi.yaml:/etc/epochcli/spec-workflow.openapi.yaml",
+            "-v", `${cwd}/.config/mcpx:/root/.config/mcpx`,
             "-v", `${cwd}:/workspace`,
             "-w", "/workspace",
             "-e", "GITHUB_TOKEN=mock-token-for-docker",
             "-e", "GITHUB_MODELS_TOKEN=mock-token-for-docker",
+            "-e", "SPEC_PATH=/etc/epochcli/spec-workflow.openapi.yaml",
             "-e", "XDG_DATA_HOME=/workspace/.local/share",
             "-e", "XDG_CONFIG_HOME=/workspace/.config",
             "-e", "EPOCHCLI_TEST_MANAGED_CONFIG_DIR=/workspace/.managed-config-empty",
-            "-e", "PATH=/workspace/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "-e", "PATH=/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
             "-e", "EPOCHCLI_LIBC=glibc",
             "-e", "EPOCHCLI_DEBUG_FULL_PROMPT=true",
             "-e", "LOG_LEVEL=DEBUG"
@@ -99,7 +103,7 @@ export class AgentRunner {
     let errorMessage: string | undefined;
 
     const controller = new AbortController();
-    const logFilePath = path.join(this.cwd, "run.log");
+    const logFilePath = path.join(path.dirname(this.cwd), `${this.runId}.log`);
     const logFile = await fs.open(logFilePath, "a");
     
     // Set up timeout
@@ -155,40 +159,65 @@ export class AgentRunner {
                 }
 
                 if (this.engine.lastContinuityWrite > prevWrites) {
-                    const continuityFile = path.join(this.cwd, ".epoch-continuity.md");
-                    const latestPath = path.join(this.cwd, `continuity_latest.md`);
+                    const toonFile = path.join(this.cwd, ".epoch-continuity.toon");
+                    const mdFile = path.join(this.cwd, ".epoch-continuity.md");
                     
-                    // Always update the latest summary
-                    fs.copyFile(continuityFile, latestPath).catch(() => {});
+                    let sourceFile: string | null = null;
+                    const maxWaitAttempts = 50;
+                    const waitDelay = 200;
 
-                    if (this.pendingEpochSnapshot !== null) {
-                        const epochNum = this.pendingEpochSnapshot;
-                        this.pendingEpochSnapshot = null; // Clear it
-
-                        // Transition detected, snapshot the file with retry
-                        const snapshotPath = path.join(this.cwd, `continuity_epoch_${epochNum}.md`);
-                        
-                        let attempts = 0;
-                        const maxAttempts = 5;
-                        const delay = 500;
-                        
-                        const trySnapshot = async () => {
+                    for (let i = 0; i < maxWaitAttempts; i++) {
+                        try {
+                            await fs.access(toonFile);
+                            sourceFile = toonFile;
+                            break;
+                        } catch {
                             try {
-                                const content = await fs.readFile(continuityFile, "utf-8");
-                                await fs.writeFile(snapshotPath, content);
-                                console.log(`    [${this.runId}] 💾 Snapshotted Epoch ${epochNum} report to ${snapshotPath}`);
-                                return true;
-                            } catch (err) {
-                                attempts++;
-                                if (attempts < maxAttempts) {
-                                    await new Promise(resolve => setTimeout(resolve, delay));
-                                    return trySnapshot();
+                                await fs.access(mdFile);
+                                sourceFile = mdFile;
+                                break;
+                            } catch {}
+                        }
+                        await new Promise(resolve => setTimeout(resolve, waitDelay));
+                    }
+
+                    if (sourceFile) {
+                        const ext = path.extname(sourceFile);
+                        const primaryPath = path.join(this.cwd, `continuity_epoch${ext}`);
+                        
+                        // Always update the visible summary
+                        fs.copyFile(sourceFile, primaryPath).catch(() => {});
+
+                        if (this.pendingEpochSnapshot !== null) {
+                            const epochNum = this.pendingEpochSnapshot;
+                            this.pendingEpochSnapshot = null; // Clear it
+
+                            // Transition detected, snapshot the file with retry
+                            const snapshotPath = path.join(this.cwd, `continuity_epoch_${epochNum}${ext}`);
+                            const currentSource = sourceFile; 
+                            
+                            let attempts = 0;
+                            const maxAttempts = 5;
+                            const delay = 500;
+                            
+                            const trySnapshot = async () => {
+                                try {
+                                    const content = await fs.readFile(currentSource, "utf-8");
+                                    await fs.writeFile(snapshotPath, content);
+                                    console.log(`    [${this.runId}] 💾 Snapshotted Epoch ${epochNum} report to ${snapshotPath}`);
+                                    return true;
+                                } catch (err) {
+                                    attempts++;
+                                    if (attempts < maxAttempts) {
+                                        await new Promise(resolve => setTimeout(resolve, delay));
+                                        return trySnapshot();
+                                    }
+                                    console.log(`    [${this.runId}] ⚠️ Could not snapshot continuity report after ${maxAttempts} attempts: ${err}`);
+                                    return false;
                                 }
-                                console.log(`    [${this.runId}] ⚠️ Could not snapshot continuity report after ${maxAttempts} attempts: ${err}`);
-                                return false;
-                            }
-                        };
-                        trySnapshot();
+                            };
+                            trySnapshot();
+                        }
                     }
                 }
 

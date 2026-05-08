@@ -1,8 +1,9 @@
 import { describe, expect, beforeAll, afterAll } from "bun:test"
 import { Effect, Layer, Scope } from "effect"
+import { Session } from "../../../src/session"
+import { Instance } from "../../../src/project/instance"
 import { InputResolver } from "../../../src/session/prompt/resolver"
 import { AppFileSystem } from "../../../src/filesystem"
-import { Session } from "../../../src/session"
 import { Agent } from "../../../src/agent/agent"
 import { Provider } from "../../../src/provider/provider"
 import { Bus } from "../../../src/bus"
@@ -17,7 +18,7 @@ import { testEffect } from "../../lib/effect"
 import { SessionID, MessageID } from "../../../src/session/schema"
 import { ProviderID, ModelID } from "../../../src/provider/schema"
 import { Flag } from "../../../src/flag/flag"
-import { Instance } from "../../../src/project/instance"
+import { InstanceState } from "../../../src/effect/instance-state"
 
 const mockFsys = Layer.succeed(
   AppFileSystem.Service,
@@ -36,7 +37,8 @@ const mockFsys = Layer.succeed(
 const mockAgents = Layer.succeed(
   Agent.Service,
   Agent.Service.of({
-    get: (name: string) => (["coder", "build", "plan"].includes(name) ? Effect.succeed({ name } as any) : Effect.succeed(undefined)),
+    get: (name: string) =>
+      ["coder", "build", "plan"].includes(name) ? Effect.succeed({ name } as any) : Effect.succeed(undefined),
     list: () => Effect.succeed([]),
     defaultAgent: () => Effect.succeed("build"),
   } as any),
@@ -55,15 +57,27 @@ const mockSessions = Layer.succeed(
 )
 
 const mockBus = Layer.succeed(Bus.Service, Bus.Service.of({ publish: () => Effect.void } as any))
-const mockProvider = Layer.succeed(Provider.Service, Provider.Service.of({ getModel: () => Effect.succeed({} as any) } as any))
-const mockPlugin = Layer.succeed(Plugin.Service, Plugin.Service.of({ trigger: (name: string, payload: any, state: any) => Effect.succeed(state) } as any))
+const mockProvider = Layer.succeed(
+  Provider.Service,
+  Provider.Service.of({ getModel: () => Effect.succeed({} as any) } as any),
+)
+const mockPlugin = Layer.succeed(
+  Plugin.Service,
+  Plugin.Service.of({ trigger: (name: string, payload: any, state: any) => Effect.succeed(state) } as any),
+)
 const mockMcp = Layer.succeed(MCP.Service, MCP.Service.of({ tools: () => Effect.succeed({}) } as any))
 const mockLsp = Layer.succeed(LSP.Service, LSP.Service.of({ tools: () => Effect.succeed({}) } as any))
 const mockFileTime = Layer.succeed(FileTime.Service, FileTime.Service.of({} as any))
-const mockRegistry = Layer.succeed(ToolRegistry.Service, ToolRegistry.Service.of({ tools: () => Effect.succeed([]) } as any))
-const mockInstruction = Layer.succeed(Instruction.Service, Instruction.Service.of({ 
-  clear: () => Effect.void 
-} as any))
+const mockRegistry = Layer.succeed(
+  ToolRegistry.Service,
+  ToolRegistry.Service.of({ tools: () => Effect.succeed([]) } as any),
+)
+const mockInstruction = Layer.succeed(
+  Instruction.Service,
+  Instruction.Service.of({
+    clear: () => Effect.void,
+  } as any),
+)
 
 const mockDeps = Layer.mergeAll(
   mockFsys,
@@ -87,16 +101,22 @@ const testContext = { worktree: "/tmp", directory: "/tmp", project: { directory:
 
 describe("InputResolver", () => {
   let originalPlanMode: boolean
+  let originalSessionPlan: any
 
   beforeAll(() => {
     originalPlanMode = Flag.EPOCHCLI_EXPERIMENTAL_PLAN_MODE
     // @ts-ignore
     Flag.EPOCHCLI_EXPERIMENTAL_PLAN_MODE = true
+    originalSessionPlan = Session.plan
+    // @ts-ignore
+    Session.plan = () => "/tmp/plan.md"
   })
 
   afterAll(() => {
     // @ts-ignore
     Flag.EPOCHCLI_EXPERIMENTAL_PLAN_MODE = originalPlanMode
+    // @ts-ignore
+    Session.plan = originalSessionPlan
   })
 
   it("resolvePromptParts - resolves existing file", () =>
@@ -110,8 +130,7 @@ describe("InputResolver", () => {
       if (parts[1].type === "file") {
         expect(parts[1].filename).toBe("exists.ts")
       }
-    }).pipe(Effect.provideService(InstanceRef, testContext)),
-  )
+    }).pipe(Effect.provideService(InstanceRef, testContext)))
 
   it("resolvePromptParts - falls back to agent if file not found", () =>
     Effect.gen(function* () {
@@ -121,8 +140,7 @@ describe("InputResolver", () => {
       expect(parts).toHaveLength(2)
       expect(parts[0]).toEqual({ type: "text", text: "ask @coder" })
       expect(parts[1]).toEqual({ type: "agent", name: "coder" })
-    }).pipe(Effect.provideService(InstanceRef, testContext)),
-  )
+    }).pipe(Effect.provideService(InstanceRef, testContext)))
 
   it("insertReminders - injects plan reminder in plan mode", () =>
     Effect.gen(function* () {
@@ -144,8 +162,7 @@ describe("InputResolver", () => {
 
       const userMsg = result.find((m: any) => m.info.role === "user")
       expect(userMsg!.parts.some((p: any) => p.synthetic && p.text.includes("Plan mode is active"))).toBe(true)
-    }).pipe(Effect.provideService(InstanceRef, testContext)),
-  )
+    }).pipe(Effect.provideService(InstanceRef, testContext as any)))
 
   it("createUserMessage - creates a user message with parts", () =>
     Effect.gen(function* () {
@@ -163,6 +180,5 @@ describe("InputResolver", () => {
       expect(result.info.sessionID).toBe(sessionID)
       expect(result.parts).toHaveLength(1)
       expect(result.parts[0].type).toBe("text")
-    }).pipe(Effect.provideService(InstanceRef, testContext)),
-  )
+    }).pipe(Effect.provideService(InstanceRef, testContext)))
 })

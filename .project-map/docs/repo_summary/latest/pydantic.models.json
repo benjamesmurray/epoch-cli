@@ -1,1 +1,1 @@
-{"models":[]}
+{"models":[{"fields":[{"default_present":false,"name":"id","required":true,"type":"int"},{"default_present":false,"name":"username","required":true,"type":"str"}],"hash":"sha256:84e011beca91bed9d01caab84a5bfa8e08e8bd2a4adc8868fe360e436659a916","module":"project-map-cli.tests.fixtures.repositories.full_stack_app.app.main","name":"User","truncated":false}]}

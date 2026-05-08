@@ -1,1 +1,1 @@
-{"routes":[]}
+{"routes":[{"deps":[],"handler":{"pid":1872,"qualname":"project-map-cli.tests.fixtures.repositories.full_stack_app.app.main.get_users"},"method":"GET","path":"/api/v1/users","request_model":null,"response_model":null,"tags":["users"]}]}

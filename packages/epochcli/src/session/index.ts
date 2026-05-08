@@ -225,6 +225,13 @@ export namespace Session {
         diff: Snapshot.FileDiff.array(),
       }),
     ),
+    EpochTransition: BusEvent.define(
+      "session.epoch_transition",
+      z.object({
+        sessionID: SessionID.zod.optional(),
+        reason: z.string(),
+      }),
+    ),
     Error: BusEvent.define(
       "session.error",
       z.object({
@@ -550,7 +557,8 @@ export namespace Session {
       const setInterventionHint = Effect.fn("Session.setInterventionHint")(function* (input: {
         sessionID: SessionID
         hint?: string
-      }) {        yield* patch(input.sessionID, { interventionHint: input.hint })
+      }) {
+        yield* patch(input.sessionID, { interventionHint: input.hint })
       })
 
       const setArchived = Effect.fn("Session.setArchived")(function* (input: { sessionID: SessionID; time?: number }) {
@@ -711,14 +719,12 @@ export namespace Session {
     runPromise((svc) => svc.setYolo(input)),
   )
 
-  export const setInterventionRequested = fn(
-    z.object({ sessionID: SessionID.zod, requested: z.boolean() }),
-    (input) => runPromise((svc) => svc.setInterventionRequested(input)),
+  export const setInterventionRequested = fn(z.object({ sessionID: SessionID.zod, requested: z.boolean() }), (input) =>
+    runPromise((svc) => svc.setInterventionRequested(input)),
   )
 
-  export const setInterventionHint = fn(
-    z.object({ sessionID: SessionID.zod, hint: z.string().optional() }),
-    (input) => runPromise((svc) => svc.setInterventionHint(input)),
+  export const setInterventionHint = fn(z.object({ sessionID: SessionID.zod, hint: z.string().optional() }), (input) =>
+    runPromise((svc) => svc.setInterventionHint(input)),
   )
 
   export const setArchived = fn(z.object({ sessionID: SessionID.zod, time: z.number().optional() }), (input) =>
