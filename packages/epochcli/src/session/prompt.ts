@@ -30,6 +30,7 @@ import { SessionStatus } from "./status"
 import { SessionCompaction } from "./compaction"
 import { SessionProcessor } from "./processor"
 import { LLM } from "./llm"
+import { Todo } from "./todo"
 import { Config } from "../config/config"
 import * as CrossSpawnSpawner from "@/effect/cross-spawn-spawner"
 import { tool, jsonSchema, type Tool as AITool } from "ai"
@@ -284,6 +285,7 @@ export namespace SessionPrompt {
       const l2 = l1.pipe(
         Layer.provide(FileTime.defaultLayer),
         Layer.provide(ToolRegistry.defaultLayer),
+        Layer.provide(Todo.defaultLayer),
         Layer.provide(Truncate.defaultLayer),
         Layer.provide(AppFileSystem.defaultLayer),
         Layer.provide(CrossSpawnSpawner.defaultLayer),

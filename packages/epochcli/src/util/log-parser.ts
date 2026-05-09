@@ -61,7 +61,7 @@ export namespace LogParserTool {
 
           const event = JSON.parse(match[0]) as Log.EnhancedModelExecutionEvent
 
-          if (event.metrics?.json_repaired || (event.metrics?.metrics as any)?.json_repaired) {
+          if ((event.metrics as any)?.json_repaired || ((event.metrics as any)?.metrics as any)?.json_repaired) {
             repairCount++
           }
 

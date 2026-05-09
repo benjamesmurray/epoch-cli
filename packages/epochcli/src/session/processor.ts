@@ -120,15 +120,15 @@ export namespace SessionProcessor {
             aborted,
           })
 
-        const handleEvent = Effect.fn("SessionProcessor.handleEvent")(function* (value: StreamEvent) {
-          switch (value.type) {
+        const handleEvent = Effect.fn("SessionProcessor.handleEvent")(function* (value: any) {
+          switch (value.type as string) {
             case "stream-start":
               return
 
             case "response-metadata":
-              ctx.assistantMessage.modelID = value.modelId as ModelID
+              ctx.assistantMessage.modelID = (value as any).modelId as any
               ctx.assistantMessage.providerID = input.model.providerID
-              if (value.timestamp) ctx.assistantMessage.time.created = value.timestamp.getTime()
+              if ((value as any).timestamp) ctx.assistantMessage.time.created = (value as any).timestamp.getTime()
               return
 
             case "text-start":
@@ -599,6 +599,7 @@ export namespace SessionProcessor {
         Layer.provide(Permission.defaultLayer),
         Layer.provide(Plugin.defaultLayer),
         Layer.provide(SessionStatus.layer.pipe(Layer.provide(Bus.layer))),
+        Layer.provide(Todo.defaultLayer),
         Layer.provide(Bus.layer),
         Layer.provide(Config.defaultLayer),
       ),

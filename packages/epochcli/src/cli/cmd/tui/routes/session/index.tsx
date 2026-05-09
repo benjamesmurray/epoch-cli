@@ -1159,7 +1159,7 @@ function UserMessage(props: {
   const queuedFg = createMemo(() => selectedForeground(theme, color()))
   const metadataVisible = createMemo(() => queued() || ctx.showTimestamps())
 
-  const compaction = createMemo(() => props.parts.find((x) => x.type === "compaction"))
+  const compaction = createMemo(() => props.parts.find((x) => (x as any).type === "compaction"))
 
   return (
     <>
@@ -1295,7 +1295,7 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
           customBorderChars={SplitBorder.customBorderChars}
           borderColor={theme.error}
         >
-          <text fg={theme.textMuted}>{props.message.error?.data.message}</text>
+          <text fg={theme.textMuted}>{(props.message.error as any)?.data?.message}</text>
         </box>
       </Show>
       <Switch>

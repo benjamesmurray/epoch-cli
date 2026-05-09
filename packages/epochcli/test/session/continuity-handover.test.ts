@@ -216,7 +216,7 @@ const usage = {
 describe("session.prompt.engine Continuity Handover", () => {
   const l = llm()
   const layer = liveLayer(l.layer)
-  const { live: it } = testEffect(layer)
+  const { live: it } = testEffect(layer as any)
 
   afterEach(() => {
     l.clear()
@@ -610,7 +610,7 @@ describe("session.prompt.engine Continuity Handover", () => {
           // Wait, the mock LanguageModel for test-side-model doesn't echo the prompt back. Let's verify the DB state instead.
           const msgWithError = msgs.find(m => m.info.role === "assistant" && m.parts.some(p => p.type === "tool" && p.state.status === "error"))
           expect(msgWithError).toBeDefined()
-          const toolPart = msgWithError?.parts.find(p => p.type === "tool") as MessageV2.ToolPart
+          const toolPart = msgWithError?.parts.find(p => p.type === "tool") as any
           expect(toolPart.state.status).toBe("error")
           expect((toolPart.state as any).raw).toBe('{"file":"large.json","content":')
         }),

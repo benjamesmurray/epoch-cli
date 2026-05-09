@@ -970,7 +970,7 @@ export const GithubRunCommand = cmd({
             throw new Error(formatPromptTooLargeError(files))
           }
 
-          const errorMsg = err.data?.message || ""
+          const errorMsg = (err.data as any)?.message || ""
           throw new Error(`${err.name}: ${errorMsg}`)
         }
 
@@ -1005,7 +1005,7 @@ export const GithubRunCommand = cmd({
             throw new Error(formatPromptTooLargeError(files))
           }
 
-          const errorMsg = err.data?.message || ""
+          const errorMsg = (err.data as any)?.message || ""
           throw new Error(`${err.name}: ${errorMsg}`)
         }
 

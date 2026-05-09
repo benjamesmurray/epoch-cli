@@ -951,6 +951,11 @@ export namespace MessageV2 {
     e: unknown,
     ctx: { providerID: ProviderID; aborted?: boolean },
   ): NonNullable<Assistant["error"]> {
+    // 0. Unwrap RetryError envelopes from the AI SDK
+    if (typeof e === "object" && e !== null && (e as any).name === "AI_RetryError" && "lastError" in e && (e as any).lastError) {
+      e = (e as any).lastError
+    }
+
     // 1. Hoist the specific string/provider parsing to the top.
     try {
       const parsed = ProviderError.parseStreamError(e)

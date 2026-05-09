@@ -301,6 +301,164 @@ export namespace SessionEngine {
 
           if (!lastUser) throw new Error("No user message found in stream. This should never happen.")
 
+          const model = yield* resolver.getModel(lastUser.model.providerID, lastUser.model.modelID, sessionID)
+
+          let currentTokensEstimate = 0
+          for (const m of msgs) {
+            if (m.info.role === "assistant" && m.info.tokens) {
+              // Only count output and reasoning tokens to avoid double-counting the history (input tokens)
+              currentTokensEstimate += (m.info.tokens.output || 0) + (m.info.tokens.reasoning || 0)
+            }
+
+            // For all messages (including assistant and user), we must account for the overhead
+            // of tool outputs and text parts that might not be fully reflected in the API's 'output' tokens
+            // (e.g. if tokens aren't reported or for user/system messages)
+            for (const p of m.parts) {
+              if (p.type === "text" && p.text) {
+                // Only add text length if it's a user message or assistant tokens weren't reported
+                if (m.info.role === "user" || !m.info.tokens?.output) {
+                  currentTokensEstimate += Math.ceil(p.text.length / 4)
+                }
+              }
+              if (p.type === "reasoning" && p.text && !(m.info.role === "assistant" && m.info.tokens?.reasoning)) {
+                currentTokensEstimate += Math.ceil(p.text.length / 4)
+              }
+              if (p.type === "tool" && "state" in p) {
+                // Tool inputs and outputs are always part of the context
+                currentTokensEstimate += Math.ceil(JSON.stringify(p.state.input).length / 4)
+                if (p.state.status === "completed" && p.state.output) {
+                  currentTokensEstimate += Math.ceil(p.state.output.length / 4)
+                } else if (p.state.status === "completed" && p.state.metadata?.output) {
+                  currentTokensEstimate += Math.ceil(p.state.metadata.output.length / 4)
+                }
+              }
+            }
+          }
+
+          const isHardOverflow =
+            lastFinished &&
+            lastFinished.summary !== true &&
+            (yield* compaction.isOverflow({ tokens: lastFinished.tokens, model }))
+          const isInputOverflow =
+            currentTokensEstimate > 0 &&
+            (yield* compaction.isOverflow({
+              tokens: {
+                input: currentTokensEstimate,
+                output: 0,
+                reasoning: 0,
+                cache: { read: 0, write: 0 },
+              },
+              model,
+            }))
+
+          if (forceTransition || isHardOverflow || isInputOverflow) {
+            const reason = isInputOverflow
+              ? "Input Overflow"
+              : forceTransition
+                ? "Emergency Handshake"
+                : "Hard Overflow"
+            forceTransition = false
+            log.info("Context limit reached. Initiating automatic Epoch transition.", {
+              sessionID,
+              reason,
+              tokens: isInputOverflow ? currentTokensEstimate : lastFinished ? lastFinished.tokens.total : 0,
+            })
+            yield* status.set(sessionID, { type: "busy" })
+
+            // Refetch chat history to ensure any partial tool calls/thoughts saved during the overflow turn are included
+            const latestMsgs = yield* MessageV2.filterByEpochEffect(sessionID)
+
+            yield* PostGenerationWorker.execute({
+              sessionID,
+              chatHistory: latestMsgs,
+              abortSignal: new AbortController().signal,
+              isTransition: true,
+            })
+
+            const fsNode = yield* Effect.promise(() => import("fs/promises"))
+            const continuityPath = path.join(Instance.directory, ".epoch-continuity.toon")
+            const interruptedPath = path.join(Instance.directory, ".history", "interrupted_state.toon")
+
+            let continuityReport = ""
+            let interruptedState = ""
+
+            try {
+              continuityReport = yield* Effect.promise(() => fsNode.readFile(continuityPath, "utf-8"))
+            } catch (e) {
+              log.warn("Failed to read continuity report for auto-transition injection", { error: String(e) })
+            }
+
+            try {
+              interruptedState = yield* Effect.promise(() => fsNode.readFile(interruptedPath, "utf-8"))
+            } catch (e) {
+              // Might not exist if no interruption occurred
+            }
+
+            let rationale = "Context limit reached. Transitioning to new epoch."
+            let nextCall = ""
+            if (continuityReport) {
+              const rationaleMatch = continuityReport.match(/rationale: '([\s\S]+?)'/)
+              const exampleMatch = continuityReport.match(/example_input: (\{[\s\S]+?\})/)
+              const toolMatch = continuityReport.match(/tool: '(\w+)'/)
+
+              if (rationaleMatch) rationale = rationaleMatch[1]
+              if (toolMatch && exampleMatch) {
+                nextCall = `Suggested next call: \`${toolMatch[1]}(${exampleMatch[1]})\``
+              }
+            }
+
+            const conversationalMsg = `Hi, we are continuing a project as the context window ran out and we are starting a new chat to resume from before. 
+
+The following detailed history resources are available in the \`.history/\` directory to support your orientation:
+- \`.history/interrupted_state.toon\`: Your exact mental state, partial drafts, and intended next tool call right before the transition. READ THIS FIRST.
+- \`.history/timeline.toon\`: Detailed chronological log of all tool calls and outputs from the previous epoch.
+- \`.history/intent.toon\`: The longitudinal architectural roadmap and decisions established so far.
+
+Based on the continuity report, you were in the middle of: ${rationale}.
+${nextCall ? `NEXT ACTION: ${nextCall}. Proceed directly to this action.` : ""}
+
+CRITICAL: Do NOT use discovery tools (read, ls, pm_query, sc_status) for your first 3 turns of this new epoch. Trust the provided reports and proceed directly to implementation.
+
+Lets get straight on with continuing our work`
+
+            const newParentId = MessageID.ascending()
+            yield* sessions.updateMessage({
+              id: newParentId,
+              sessionID,
+              role: "user",
+              time: { created: Date.now() },
+              agent: lastUser.agent,
+              model: lastUser.model,
+            })
+            yield* sessions.updatePart({
+              id: PartID.ascending(),
+              sessionID,
+              messageID: newParentId,
+              type: "transition",
+              auto: true,
+            })
+
+            const nextTurnId = MessageID.ascending()
+            yield* sessions.updateMessage({
+              id: nextTurnId,
+              sessionID,
+              role: "user",
+              time: { created: Date.now() },
+              agent: lastUser.agent,
+              model: lastUser.model,
+            })
+            yield* sessions.updatePart({
+              id: PartID.ascending(),
+              sessionID,
+              messageID: nextTurnId,
+              type: "text",
+              synthetic: true,
+              text: conversationalMsg,
+            })
+
+            continue
+          }
+
           const lastAssistantMsg = msgs.findLast(
             (msg) => msg.info.role === "assistant" && msg.info.id === lastAssistantMsgObj?.id,
           )
@@ -324,7 +482,7 @@ export namespace SessionEngine {
             JSON.stringify(toolParts.map((p) => ({ t: p.tool, i: p.state.input }))) ===
               JSON.stringify(lastTurnTools.map((p) => ({ t: p.tool, i: p.input })))
 
-          let stallReason: "repetition" | "neutral" | "invalid_args" | "orientation_loop" | undefined
+          let stallReason: "repetition" | "neutral" | "invalid_args" | "orientation_loop" | "empty_turn" | "rambling_hallucination" | "text_loop" | undefined
           const offendingTools = toolParts.map((p) => p.tool)
 
           if (isAdvancing) {
@@ -359,7 +517,7 @@ export namespace SessionEngine {
           if (lastAssistantMsgObj?.error && MessageV2.RamblingError.isInstance(lastAssistantMsgObj.error)) {
             stallScore = 15 // Force immediate intervention
             stallReason =
-              lastAssistantMsgObj.error.reason === "STREAM_ABORT_RAMBLING"
+              (lastAssistantMsgObj.error as any).data?.reason === "STREAM_ABORT_RAMBLING"
                 ? "rambling_hallucination"
                 : "text_loop"
           }
@@ -512,7 +670,6 @@ export namespace SessionEngine {
               })
               .pipe(Effect.ignore, Effect.forkIn(scope))
 
-          const model = yield* resolver.getModel(lastUser.model.providerID, lastUser.model.modelID, sessionID)
           const task = tasks.pop()
 
           if (task?.type === "subtask") {
@@ -743,160 +900,6 @@ Lets get straight on with continuing our work`
                   msgs = yield* MessageV2.filterByEpochEffect(sessionID)
                   modelMsgs = yield* Effect.promise(() => MessageV2.toModelMessages(msgs, model))
                 }
-              }
-
-              let currentTokensEstimate = 0
-              for (const m of msgs) {
-                if (m.info.role === "assistant" && m.info.tokens) {
-                  // Only count output and reasoning tokens to avoid double-counting the history (input tokens)
-                  currentTokensEstimate += (m.info.tokens.output || 0) + (m.info.tokens.reasoning || 0)
-                }
-
-                // For all messages (including assistant and user), we must account for the overhead
-                // of tool outputs and text parts that might not be fully reflected in the API's 'output' tokens
-                // (e.g. if tokens aren't reported or for user/system messages)
-                for (const p of m.parts) {
-                  if (p.type === "text" && p.text) {
-                    // Only add text length if it's a user message or assistant tokens weren't reported
-                    if (m.info.role === "user" || !m.info.tokens?.output) {
-                      currentTokensEstimate += Math.ceil(p.text.length / 4)
-                    }
-                  }
-                  if (p.type === "reasoning" && p.text && !m.info.tokens?.reasoning) {
-                    currentTokensEstimate += Math.ceil(p.text.length / 4)
-                  }
-                  if (p.type === "tool" && "state" in p) {
-                    // Tool inputs and outputs are always part of the context
-                    currentTokensEstimate += Math.ceil(JSON.stringify(p.state.input).length / 4)
-                    if (p.state.status === "completed" && p.state.output) {
-                      currentTokensEstimate += Math.ceil(p.state.output.length / 4)
-                    } else if (p.state.status === "completed" && p.state.metadata?.output) {
-                      currentTokensEstimate += Math.ceil(p.state.metadata.output.length / 4)
-                    }
-                  }
-                }
-              }
-
-              const isHardOverflow =
-                lastFinished &&
-                lastFinished.summary !== true &&
-                (yield* compaction.isOverflow({ tokens: lastFinished.tokens, model }))
-              const isInputOverflow =
-                currentTokensEstimate > 0 &&
-                (yield* compaction.isOverflow({
-                  tokens: {
-                    input: currentTokensEstimate,
-                    output: 0,
-                    reasoning: 0,
-                    cache: { read: 0, write: 0 },
-                  },
-                  model,
-                }))
-
-              if (forceTransition || isHardOverflow || isInputOverflow) {
-                forceTransition = false
-                log.info("Context limit reached. Initiating automatic Epoch transition.", {
-                  sessionID,
-                  reason: isInputOverflow
-                    ? "Input Overflow"
-                    : forceTransition
-                      ? "Emergency Handshake"
-                      : "Hard Overflow",
-                  tokens: isInputOverflow ? currentTokensEstimate : lastFinished ? lastFinished.tokens.total : 0,
-                })
-                yield* status.set(sessionID, { type: "busy" })
-
-                // Refetch chat history to ensure any partial tool calls/thoughts saved during the overflow turn are included
-                const latestMsgs = yield* MessageV2.filterByEpochEffect(sessionID)
-
-                yield* PostGenerationWorker.execute({
-                  sessionID,
-                  chatHistory: latestMsgs,
-                  abortSignal: new AbortController().signal,
-                  isTransition: true,
-                })
-
-                const fsNode = yield* Effect.promise(() => import("fs/promises"))
-                const continuityPath = path.join(Instance.directory, ".epoch-continuity.toon")
-                const interruptedPath = path.join(Instance.directory, ".history", "interrupted_state.toon")
-
-                let continuityReport = ""
-                let interruptedState = ""
-
-                try {
-                  continuityReport = yield* Effect.promise(() => fsNode.readFile(continuityPath, "utf-8"))
-                } catch (e) {
-                  log.warn("Failed to read continuity report for conversational injection", { error: String(e) })
-                }
-
-                try {
-                  interruptedState = yield* Effect.promise(() => fsNode.readFile(interruptedPath, "utf-8"))
-                } catch (e) {
-                  // Might not exist if no interruption occurred
-                }
-
-                // Extract rationale and next action for immediate momentum
-                let rationale = "Continuing previous task."
-                let nextCall = ""
-                const rationaleMatch = continuityReport.match(/rationale: '([\s\S]+?)'/)
-                const exampleMatch = continuityReport.match(/example_input: (\{[\s\S]+?\})/)
-                const toolMatch = continuityReport.match(/tool: '(\w+)'/)
-
-                if (rationaleMatch) rationale = rationaleMatch[1]
-                if (toolMatch && exampleMatch) {
-                  nextCall = `Suggested next call: \`${toolMatch[1]}(${exampleMatch[1]})\``
-                }
-
-                const conversationalMsg = `Hi, we are continuing a project as the context window ran out and we are starting a new chat to resume from before. 
-
-The following detailed history resources are available in the \`.history/\` directory to support your orientation:
-- \`.history/interrupted_state.toon\`: Your exact mental state, partial drafts, and intended next tool call right before the transition. READ THIS FIRST.
-- \`.history/timeline.toon\`: Detailed chronological log of all tool calls and outputs from the previous epoch.
-- \`.history/intent.toon\`: The longitudinal architectural roadmap and decisions established so far.
-
-Based on the continuity report, you were in the middle of: ${rationale}.
-${nextCall ? `NEXT ACTION: ${nextCall}. Proceed directly to this action.` : ""}
-
-CRITICAL: Do NOT use discovery tools (read, ls, pm_query, sc_status) for your first 3 turns of this new epoch. Trust the provided reports and proceed directly to implementation.
-
-Lets get straight on with continuing our work`
-
-                const newParentId = MessageID.ascending()
-                yield* sessions.updateMessage({
-                  id: newParentId,
-                  sessionID,
-                  role: "user",
-                  time: { created: Date.now() },
-                  agent: lastUser.agent,
-                  model: lastUser.model,
-                })
-                yield* sessions.updatePart({
-                  id: PartID.ascending(),
-                  sessionID,
-                  messageID: newParentId,
-                  type: "transition",
-                  auto: true,
-                })
-
-                const nextTurnId = MessageID.ascending()
-                yield* sessions.updateMessage({
-                  id: nextTurnId,
-                  sessionID,
-                  role: "user",
-                  time: { created: Date.now() },
-                  agent: lastUser.agent,
-                  model: lastUser.model,
-                })
-                yield* sessions.updatePart({
-                  id: PartID.ascending(),
-                  sessionID,
-                  messageID: nextTurnId,
-                  type: "text",
-                  synthetic: true,
-                  text: conversationalMsg,
-                })
-
-                return "continue" as const
               }
 
               const CONTEXT_LIMIT = model.limit.context ?? 32000

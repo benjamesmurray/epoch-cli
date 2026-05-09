@@ -53,7 +53,7 @@ const mockDeps = Layer.mergeAll(
   Layer.succeed(ToolOrchestrator.Service, ToolOrchestrator.Service.of({} as any)),
 )
 
-const { effect: it } = testEffect(SessionEngine.layer.pipe(Layer.provideMerge(mockDeps)))
+const { effect: it } = testEffect(SessionEngine.layer.pipe(Layer.provideMerge(mockDeps)) as any)
 
 const testContext = { worktree: "/tmp", directory: "/tmp", project: { directory: "/tmp" } as any }
 
