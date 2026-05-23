@@ -802,25 +802,25 @@ Ready to process user request strictly under these parameters.
 
           if (isError) {
             // Task: Reactive Help Injection for mcpx syntax errors
-            if (toolName === "mcpx" && input.args.server && input.args.tool) {
+            if (toolName === "mcpx" && args.server && args.tool) {
               try {
                 const resultText = typeof result === "string" ? result : (result?.message || JSON.stringify(result))
                 if (resultText.includes("Error (Exit") || resultText.includes("missing field") || resultText.includes("invalid type")) {
-                  log.info("mcpx syntax error detected, fetching help output", { server: input.args.server, tool: input.args.tool })
+                  log.info("mcpx syntax error detected, fetching help output", { server: args.server, tool: args.tool })
                   const allTools = resolveTools(input)
                   if (allTools["mcpx"] && allTools["mcpx"].execute) {
                     const helpResult = await allTools["mcpx"].execute!({ 
-                      server: input.args.server, 
-                      tool: input.args.tool, 
+                      server: args.server, 
+                      tool: args.tool, 
                       args: ["--help"] 
                     }, options)
                     
                     const helpOutput = typeof helpResult === "string" ? helpResult : (helpResult?.output ?? JSON.stringify(helpResult))
                     
                     let guidance = "The command failed with a syntax error. Review the correct schema below and retry with fixed arguments."
-                    if (resultText.includes("missing field title") && input.args.server === "spec") {
+                    if (resultText.includes("missing field title") && args.server === "spec") {
                       guidance = "The 'spec' tool failed because Tasks.json is invalid. Specifically, it is missing the 'title' field in one or more task objects. Review your Tasks.json file, ensure 'title' is used instead of (or in addition to) 'description', and retry."
-                    } else if (resultText.includes("missing field id") && input.args.server === "spec" && input.args.tool === "sc_todo_start") {
+                    } else if (resultText.includes("missing field id") && args.server === "spec" && args.tool === "sc_todo_start") {
                       guidance = "The 'sc_todo_start' tool requires an '--id' flag. Additionally, ensure that the ID you are passing exactly matches the ID in Tasks.json, and that all IDs in Tasks.json follow a numeric-style format (e.g., '1', '1.1')."
                     }
 
@@ -1303,7 +1303,7 @@ Ready to process user request strictly under these parameters.
   /**
    * Normalizes mcpx tool arguments (pos/flags) into a single object for validation.
    */
-  function normalizeMcpxArguments(args: any): Record<string, any> {
+  export function normalizeMcpxArguments(args: any): Record<string, any> {
     const normalized: Record<string, any> = {}
 
     // Extract from flags

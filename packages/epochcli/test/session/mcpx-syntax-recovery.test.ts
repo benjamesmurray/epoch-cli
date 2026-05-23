@@ -5,7 +5,7 @@ import { Config } from "../../src/config/config"
 import { Provider } from "../../src/provider/provider"
 import { Agent } from "../../src/agent/agent"
 import { MessageV2 } from "../../src/session/message-v2"
-import { SessionID, MessageID } from "../../src/schema"
+import { SessionID, MessageID } from "../../src/session/schema"
 import { MCP } from "../../src/mcp/index"
 
 describe("mcpx syntax recovery", () => {

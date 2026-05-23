@@ -488,9 +488,8 @@ test("ask - resolves immediately when action is allow", async () => {
         permission: "bash",
         patterns: ["ls"],
         metadata: {},
-        always: [],
-        ruleset: [{ permission: "bash", pattern: "*", action: "allow" }],
-      })
+        always: []
+      }, [{ permission: "bash", pattern: "*", action: "allow" }])
       expect(result).toBeUndefined()
     },
   })
@@ -503,13 +502,12 @@ test("ask - throws RejectedError when action is deny", async () => {
     fn: async () => {
       await expect(
         Permission.ask({
-          sessionID: SessionID.make("session_test"),
+        sessionID: SessionID.make("session_test"),
           permission: "bash",
           patterns: ["rm -rf /"],
           metadata: {},
-          always: [],
-          ruleset: [{ permission: "bash", pattern: "*", action: "deny" }],
-        }),
+          always: []
+      }, [{ permission: "bash", pattern: "*", action: "deny" }]),
       ).rejects.toBeInstanceOf(Permission.DeniedError)
     },
   })
@@ -525,9 +523,8 @@ test("ask - returns pending promise when action is ask", async () => {
         permission: "bash",
         patterns: ["ls"],
         metadata: {},
-        always: [],
-        ruleset: [{ permission: "bash", pattern: "*", action: "ask" }],
-      })
+        always: []
+      }, [{ permission: "bash", pattern: "*", action: "ask" }])
       // Promise should be pending, not resolved
       expect(promise).toBeInstanceOf(Promise)
       // Don't await - just verify it returns a promise
@@ -551,9 +548,8 @@ test("ask - adds request to pending list", async () => {
         tool: {
           messageID: MessageID.make("msg_test"),
           callID: "call_test",
-        },
-        ruleset: [],
-      })
+        }
+      }, [])
 
       const list = await Permission.list()
       expect(list).toHaveLength(1)
@@ -594,9 +590,8 @@ test("ask - publishes asked event", async () => {
         tool: {
           messageID: MessageID.make("msg_test"),
           callID: "call_test",
-        },
-        ruleset: [],
-      })
+        }
+      }, [])
 
       expect(await Permission.list()).toHaveLength(1)
       expect(seen).toBeDefined()
@@ -626,9 +621,8 @@ test("reply - once resolves the pending ask", async () => {
         permission: "bash",
         patterns: ["ls"],
         metadata: {},
-        always: [],
-        ruleset: [],
-      })
+        always: []
+      }, [])
 
       await waitForPending(1)
 
@@ -653,9 +647,8 @@ test("reply - reject throws RejectedError", async () => {
         permission: "bash",
         patterns: ["ls"],
         metadata: {},
-        always: [],
-        ruleset: [],
-      })
+        always: []
+      }, [])
 
       await waitForPending(1)
 
@@ -680,9 +673,8 @@ test("reply - reject with message throws CorrectedError", async () => {
         permission: "bash",
         patterns: ["ls"],
         metadata: {},
-        always: [],
-        ruleset: [],
-      })
+        always: []
+      }, [])
 
       await waitForPending(1)
 
@@ -710,9 +702,8 @@ test("reply - always persists approval and resolves", async () => {
         permission: "bash",
         patterns: ["ls"],
         metadata: {},
-        always: ["ls"],
-        ruleset: [],
-      })
+        always: ["ls"]
+      }, [])
 
       await waitForPending(1)
 
@@ -734,9 +725,8 @@ test("reply - always persists approval and resolves", async () => {
         permission: "bash",
         patterns: ["ls"],
         metadata: {},
-        always: [],
-        ruleset: [],
-      })
+        always: []
+      }, [])
       expect(result).toBeUndefined()
     },
   })
@@ -753,9 +743,8 @@ test("reply - reject cancels all pending for same session", async () => {
         permission: "bash",
         patterns: ["ls"],
         metadata: {},
-        always: [],
-        ruleset: [],
-      })
+        always: []
+      }, [])
 
       const askPromise2 = Permission.ask({
         id: PermissionID.make("per_test4b"),
@@ -763,9 +752,8 @@ test("reply - reject cancels all pending for same session", async () => {
         permission: "edit",
         patterns: ["foo.ts"],
         metadata: {},
-        always: [],
-        ruleset: [],
-      })
+        always: []
+      }, [])
 
       await waitForPending(2)
 
@@ -797,9 +785,8 @@ test("reply - always resolves matching pending requests in same session", async 
         permission: "bash",
         patterns: ["ls"],
         metadata: {},
-        always: ["ls"],
-        ruleset: [],
-      })
+        always: ["ls"]
+      }, [])
 
       const b = Permission.ask({
         id: PermissionID.make("per_test5b"),
@@ -807,9 +794,8 @@ test("reply - always resolves matching pending requests in same session", async 
         permission: "bash",
         patterns: ["ls"],
         metadata: {},
-        always: [],
-        ruleset: [],
-      })
+        always: []
+      }, [])
 
       await waitForPending(2)
 
@@ -836,9 +822,8 @@ test("reply - always keeps other session pending", async () => {
         permission: "bash",
         patterns: ["ls"],
         metadata: {},
-        always: ["ls"],
-        ruleset: [],
-      })
+        always: ["ls"]
+      }, [])
 
       const b = Permission.ask({
         id: PermissionID.make("per_test6b"),
@@ -846,9 +831,8 @@ test("reply - always keeps other session pending", async () => {
         permission: "bash",
         patterns: ["ls"],
         metadata: {},
-        always: [],
-        ruleset: [],
-      })
+        always: []
+      }, [])
 
       await waitForPending(2)
 
@@ -877,9 +861,8 @@ test("reply - publishes replied event", async () => {
         permission: "bash",
         patterns: ["ls"],
         metadata: {},
-        always: [],
-        ruleset: [],
-      })
+        always: []
+      }, [])
 
       await waitForPending(1)
 
@@ -923,9 +906,8 @@ test("permission requests stay isolated by directory", async () => {
         permission: "bash",
         patterns: ["ls"],
         metadata: {},
-        always: [],
-        ruleset: [],
-      }),
+        always: []
+      }, []),
   })
 
   const b = Instance.provide({
@@ -937,9 +919,8 @@ test("permission requests stay isolated by directory", async () => {
         permission: "bash",
         patterns: ["pwd"],
         metadata: {},
-        always: [],
-        ruleset: [],
-      }),
+        always: []
+      }, []),
   })
 
   const onePending = await Instance.provide({
@@ -981,9 +962,8 @@ test("pending permission rejects on instance dispose", async () => {
         permission: "bash",
         patterns: ["ls"],
         metadata: {},
-        always: [],
-        ruleset: [],
-      }),
+        always: []
+      }, []),
   })
   const result = ask.then(
     () => "resolved" as const,
@@ -1014,9 +994,8 @@ test("pending permission rejects on instance reload", async () => {
         permission: "bash",
         patterns: ["ls"],
         metadata: {},
-        always: [],
-        ruleset: [],
-      }),
+        always: []
+      }, []),
   })
   const result = ask.then(
     () => "resolved" as const,
@@ -1056,16 +1035,15 @@ test("ask - checks all patterns and stops on first deny", async () => {
     fn: async () => {
       await expect(
         Permission.ask({
-          sessionID: SessionID.make("session_test"),
+        sessionID: SessionID.make("session_test"),
           permission: "bash",
           patterns: ["echo hello", "rm -rf /"],
           metadata: {},
-          always: [],
-          ruleset: [
+          always: []
+      }, [
             { permission: "bash", pattern: "*", action: "allow" },
             { permission: "bash", pattern: "rm *", action: "deny" },
-          ],
-        }),
+          ]),
       ).rejects.toBeInstanceOf(Permission.DeniedError)
     },
   })
@@ -1081,9 +1059,8 @@ test("ask - allows all patterns when all match allow rules", async () => {
         permission: "bash",
         patterns: ["echo hello", "ls -la", "pwd"],
         metadata: {},
-        always: [],
-        ruleset: [{ permission: "bash", pattern: "*", action: "allow" }],
-      })
+        always: []
+      }, [{ permission: "bash", pattern: "*", action: "allow" }])
       expect(result).toBeUndefined()
     },
   })
@@ -1099,12 +1076,11 @@ test("ask - should deny even when an earlier pattern is ask", async () => {
         permission: "bash",
         patterns: ["echo hello", "rm -rf /"],
         metadata: {},
-        always: [],
-        ruleset: [
+        always: []
+      }, [
           { permission: "bash", pattern: "echo *", action: "ask" },
           { permission: "bash", pattern: "rm *", action: "deny" },
-        ],
-      }).then(
+        ]).then(
         () => undefined,
         (err) => err,
       )
@@ -1128,9 +1104,8 @@ test("ask - abort should clear pending request", async () => {
             permission: "bash",
             patterns: ["ls"],
             metadata: {},
-            always: [],
-            ruleset: [{ permission: "bash", pattern: "*", action: "ask" }],
-          }),
+            always: []
+          }, [{ permission: "bash", pattern: "*", action: "ask" }]),
         { signal: ctl.signal },
       )
 

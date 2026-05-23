@@ -15,7 +15,7 @@ import { Permission } from "../../src/permission"
 import { Plugin } from "../../src/plugin"
 import { provideTmpdirInstance } from "../fixture/fixture"
 import { Session } from "../../src/session"
-import { MessageID, PartID } from "../../src/session/schema"
+import { MessageID, PartID, SessionID } from "../../src/session/schema"
 import { ModelID, ProviderID } from "../../src/provider/schema"
 import { SessionEngine } from "../../src/session/prompt/engine"
 import { InputResolver } from "../../src/session/prompt/resolver"
@@ -26,6 +26,7 @@ import { Snapshot } from "../../src/snapshot"
 import { Todo } from "../../src/session/todo"
 import * as CrossSpawnSpawner from "../../src/effect/cross-spawn-spawner"
 import { MCP } from "../../src/mcp"
+import { ChildProcessSpawner } from "effect/unstable/process"
 import { ToolRegistry } from "../../src/tool/registry"
 import { Truncate } from "../../src/tool/truncate"
 import { AppFileSystem } from "../../src/filesystem"
@@ -77,7 +78,7 @@ function createModel(opts: { context: number; output: number; input?: number }):
 }
 
 // Implementation of the sc_approve transition logic for mocking
-async function handleScApproveTransition(output: string, sessionID: string) {
+async function handleScApproveTransition(output: string, sessionID: SessionID) {
   const phaseMatch = output.match(/^[ \t]+phase:\s*(\w+)/m)
   const phase = phaseMatch?.[1]
 
@@ -172,49 +173,50 @@ function liveLayer(mcpMock: any) {
 describe("Deterministic Handover Mechanics", () => {
   test(
     "Immediate Shift: sc_approve writes semaphore and updates agent persona",
-    () =>
-      provideTmpdirInstance((tmpPath) => {
-        const mcpMock = MCP.Service.of({
-          mcpx: () => Effect.succeed({
-            execute: async (input: any, ctx: any) => {
-              if (input.server === "spec" && input.tool === "sc_approve") {
-                const featureId = "test-feature"
-                const activePath = path.join(tmpPath, "projects/active")
-                
-                // Real implementation: Scan for template tags
-                const mdFiles = await fs.readdir(path.join(activePath, featureId))
-                for (const f of mdFiles) {
-                  if (f.endsWith(".md")) {
-                    const content = await fs.readFile(path.join(activePath, featureId, f), "utf-8")
-                    if (content.includes("<template")) {
-                      return {
-                        output: "Error: PROGRAMMATIC SCAN DETECTED <template> TAGS.",
-                        isError: true,
-                        metadata: {}
-                      }
+    () => {
+      const mcpMock = MCP.Service.of({
+        mcpx: () => Effect.succeed({
+          execute: async (input: any, ctx: any) => {
+            if (input.server === "spec" && input.tool === "sc_approve") {
+              const featureId = "test-feature"
+              const activePath = path.join(tmpPath, "projects/active")
+              
+              // Real implementation: Scan for template tags
+              const mdFiles = await fs.readdir(path.join(activePath, featureId))
+              for (const f of mdFiles) {
+                if (f.endsWith(".md")) {
+                  const content = await fs.readFile(path.join(activePath, featureId, f), "utf-8")
+                  if (content.includes("<template")) {
+                    return {
+                      output: "Error: PROGRAMMATIC SCAN DETECTED <template> TAGS.",
+                      isError: true,
+                      metadata: {}
                     }
                   }
                 }
-
-                const output = `phase: implementation\nstatus: active\nfeature: projects/active/${featureId}`
-                const res = await handleScApproveTransition(output, ctx.sessionID)
-                return {
-                  output,
-                  isError: false,
-                  metadata: { transition: res.transition }
-                }
               }
-              return { output: "", isError: false }
+
+              const output = `phase: implementation\nstatus: active\nfeature: projects/active/${featureId}`
+              const res = await handleScApproveTransition(output, ctx.sessionID)
+              return {
+                output,
+                isError: false,
+                metadata: { transition: res.transition }
+              }
             }
-          } as any)
+            return { output: "", isError: false }
+          }
         } as any)
+      } as any)
 
-        const { live: itEffect } = testEffect(liveLayer(mcpMock) as any)
-
-        return itEffect("run", Effect.gen(function* () {
+      let tmpPath: string
+      return provideTmpdirInstance((p) => {
+        tmpPath = p
+        return Effect.gen(function* () {
           const sessions = yield* Session.Service
           const mcp = yield* MCP.Service
           const mcpxTool = yield* mcp.mcpx()
+          if (!mcpxTool) throw new Error("mcpxTool not found")
 
           const featureId = "test-feature"
           const projectPath = path.join(tmpPath, "projects/active", featureId)
@@ -232,7 +234,7 @@ describe("Deterministic Handover Mechanics", () => {
             time: { created: Date.now() },
           })
 
-          const result = yield* Effect.promise(() =>
+          const result: any = yield* Effect.promise(() =>
             mcpxTool.execute!({ server: "spec", tool: "sc_approve" }, { sessionID } as any),
           )
 
@@ -247,42 +249,44 @@ describe("Deterministic Handover Mechanics", () => {
           const msgs = yield* sessions.messages({ sessionID })
           const lastMsg = msgs[msgs.length - 1]
           expect(lastMsg.info.agent).toBe("build")
-        }))
-      }),
+        })
+      }).pipe(Effect.provide(liveLayer(mcpMock)), Effect.scoped, (e) => Effect.runPromise(e as any))
+    },
     30000,
   )
 
   test(
     "Drafting Wall: sc_approve fails if template tags are present",
-    () =>
-      provideTmpdirInstance((tmpPath) => {
-        const mcpMock = MCP.Service.of({
-          mcpx: () => Effect.succeed({
-            execute: async (input: any) => {
-              if (input.server === "spec" && input.tool === "sc_approve") {
-                const featureId = "template-feature"
-                const activePath = path.join(tmpPath, "projects/active", featureId)
-                const content = await fs.readFile(path.join(activePath, "Specification.md"), "utf-8")
-                if (content.includes("<template")) {
-                  return {
-                    output: "Error: PROGRAMMATIC SCAN DETECTED <template> TAGS.",
-                    isError: true,
-                    metadata: {}
-                  }
+    () => {
+      const mcpMock = MCP.Service.of({
+        mcpx: () => Effect.succeed({
+          execute: async (input: any) => {
+            if (input.server === "spec" && input.tool === "sc_approve") {
+              const featureId = "template-feature"
+              const activePath = path.join(tmpPath, "projects/active", featureId)
+              const content = await fs.readFile(path.join(activePath, "Specification.md"), "utf-8")
+              if (content.includes("<template")) {
+                return {
+                  output: "Error: PROGRAMMATIC SCAN DETECTED <template> TAGS.",
+                  isError: true,
+                  metadata: {}
                 }
-                return { output: "Success", isError: false, metadata: {} }
               }
-              return { output: "", isError: false }
+              return { output: "Success", isError: false, metadata: {} }
             }
-          } as any)
+            return { output: "", isError: false }
+          }
         } as any)
+      } as any)
 
-        const { live: itEffect } = testEffect(liveLayer(mcpMock) as any)
-
-        return itEffect("run", Effect.gen(function* () {
+      let tmpPath: string
+      return provideTmpdirInstance((p) => {
+        tmpPath = p
+        return Effect.gen(function* () {
           const sessions = yield* Session.Service
           const mcp = yield* MCP.Service
           const mcpxTool = yield* mcp.mcpx()
+          if (!mcpxTool) throw new Error("mcpxTool not found")
 
           const featureId = "template-feature"
           const projectPath = path.join(tmpPath, "projects/active", featureId)
@@ -292,33 +296,33 @@ describe("Deterministic Handover Mechanics", () => {
           const session = yield* sessions.create({})
           const sessionID = session.id
 
-          const result = yield* Effect.promise(() =>
+          const result: any = yield* Effect.promise(() =>
             mcpxTool.execute!({ server: "spec", tool: "sc_approve" }, { sessionID } as any),
           )
 
           expect(result.isError).toBe(true)
           expect(result.output).toContain("PROGRAMMATIC SCAN DETECTED <template> TAGS")
-        }))
-      }),
+        })
+      }).pipe(Effect.provide(liveLayer(mcpMock)), Effect.scoped, (e) => Effect.runPromise(e as any))
+    },
     30000,
   )
 
   test(
     "Clerk Discovery Placeholder",
-    () =>
-      provideTmpdirInstance((tmpPath) => {
-        const mcpMock = MCP.Service.of({
-          mcpx: () => Effect.succeed({
-            execute: async () => ({ output: "", isError: false })
-          } as any)
+    () => {
+      const mcpMock = MCP.Service.of({
+        mcpx: () => Effect.succeed({
+          execute: async () => ({ output: "", isError: false })
         } as any)
+      } as any)
 
-        const { live: itEffect } = testEffect(liveLayer(mcpMock) as any)
-
-        return itEffect("run", Effect.gen(function* () {
+      return provideTmpdirInstance(() => {
+        return Effect.gen(function* () {
           expect(true).toBe(true)
-        }))
-      }),
+        })
+      }).pipe(Effect.provide(liveLayer(mcpMock)), Effect.scoped, (e) => Effect.runPromise(e as any))
+    },
     30000,
   )
 })

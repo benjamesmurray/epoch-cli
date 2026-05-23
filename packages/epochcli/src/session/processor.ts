@@ -561,7 +561,7 @@ export namespace SessionProcessor {
               yield* stream.pipe(
                 SanitizerMiddleware.transform(),
                 Stream.tap((event) => {
-                  if (event.type === "text-delta" && event.textDelta === "[CONTEXT_OVERFLOW_DETECTED]") {
+                  if (event.type === "text-delta" && event.text === "[CONTEXT_OVERFLOW_DETECTED]") {
                     ctx.needsCompaction = true
                   }
                   return handleEvent(event)
