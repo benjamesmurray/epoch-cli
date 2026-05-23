@@ -104,8 +104,8 @@ export namespace Todo {
             const mtime = Option.getOrElse(stats.mtime, () => new Date(0)).getTime()
 
             if (mtime > latestTime) {
-              const tasksFile = path.join(pPath, "Tasks.md")
-              const tasksFileLower = path.join(pPath, "tasks.md")
+              const tasksFile = path.join(pPath, "Tasks.json")
+              const tasksFileLower = path.join(pPath, "tasks.json")
 
               if (yield* fs.exists(tasksFile)) {
                 latestFile = tasksFile
@@ -121,29 +121,25 @@ export namespace Todo {
         if (!latestFile) return
 
         const content = yield* fs.readFileString(latestFile)
-        const lines = content.split("\n")
         const todos: Info[] = []
 
-        const taskRegex = /^-\s+\[( |\/|-|~|x|X)\]\s+(.*)$/
-        for (const line of lines) {
-          const match = line.trim().match(taskRegex)
-          if (match) {
-            const statusChar = match[1]
-            const taskContent = match[2].trim()
-
-            let status: Info["status"] = "pending"
-            if (statusChar === "/" || statusChar === "-" || statusChar === "~") {
-              status = "in_progress"
-            } else if (statusChar === "x" || statusChar === "X") {
-              status = "completed"
+        try {
+          const parsed = JSON.parse(content)
+          const taskList = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.tasks) ? parsed.tasks : [])
+          
+          for (const task of taskList) {
+            const title = task.title || task.description
+            if (title) {
+              const displayTitle = task.id ? `${task.id} ${title}` : title
+              todos.push({
+                content: displayTitle,
+                status: task.status || "pending",
+                priority: "medium",
+              })
             }
-
-            todos.push({
-              content: taskContent,
-              status,
-              priority: "medium",
-            })
           }
+        } catch (e) {
+          // Ignore parse errors from partial writes or legacy markdown files
         }
 
         yield* update({ sessionID, todos })

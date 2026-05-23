@@ -254,7 +254,7 @@ export namespace SessionEngine {
         const toolHistory: { tool: string; input: any }[] = []
 
         // Tools that move the project state forward
-        const ADVANCING_TOOLS = ["edit", "write", "task_complete", "sc_todo_complete", "sc_archive"]
+        const ADVANCING_TOOLS = ["edit", "write", "task_complete", "sc_todo_complete", "sc_archive", "sc_approve"]
         // Tools that are neutral (read-only or state setup)
         const NEUTRAL_TOOLS = [
           "read",
@@ -268,7 +268,6 @@ export namespace SessionEngine {
           "gt_status",
           "sc_init",
           "sc_plan",
-          "sc_approve",
         ]
         // Tools that indicate a failure or stuck state
         const INVALID_TOOLS = ["invalid"]
@@ -382,17 +381,8 @@ export namespace SessionEngine {
             let continuityReport = ""
             let interruptedState = ""
 
-            try {
-              continuityReport = yield* Effect.promise(() => fsNode.readFile(continuityPath, "utf-8"))
-            } catch (e) {
-              log.warn("Failed to read continuity report for auto-transition injection", { error: String(e) })
-            }
-
-            try {
-              interruptedState = yield* Effect.promise(() => fsNode.readFile(interruptedPath, "utf-8"))
-            } catch (e) {
-              // Might not exist if no interruption occurred
-            }
+            continuityReport = yield* Effect.promise(() => fsNode.readFile(continuityPath, "utf-8").catch(() => ""))
+            interruptedState = yield* Effect.promise(() => fsNode.readFile(interruptedPath, "utf-8").catch(() => ""))
 
             let rationale = "Context limit reached. Transitioning to new epoch."
             let nextCall = ""
@@ -407,7 +397,40 @@ export namespace SessionEngine {
               }
             }
 
-            const conversationalMsg = `Hi, we are continuing a project as the context window ran out and we are starting a new chat to resume from before. 
+            // Extract dynamic task ID
+            let firstPendingTaskId = ""
+            try {
+              const activeProjectsDir = path.join(Instance.directory, "projects", "active")
+              const projects = yield* Effect.promise(() => fsNode.readdir(activeProjectsDir).catch(() => []))
+              if (projects.length > 0) {
+                const tasksPath = path.join(activeProjectsDir, projects[0], "Tasks.json")
+                const tasksContent = yield* Effect.promise(() => fsNode.readFile(tasksPath, "utf-8").catch(() => ""))
+                if (tasksContent) {
+                  const tasksJson = JSON.parse(tasksContent)
+                  if (tasksJson.tasks && Array.isArray(tasksJson.tasks)) {
+                    const pendingTask = tasksJson.tasks.find((t: any) => t.status !== "completed")
+                    if (pendingTask && pendingTask.id) {
+                      firstPendingTaskId = String(pendingTask.id)
+                    } else if (tasksJson.tasks[0]?.id) {
+                      firstPendingTaskId = String(tasksJson.tasks[0].id)
+                    }
+                  }
+                }
+              }
+            } catch (e) {
+              log.debug("Failed to extract dynamic task ID for handover", { error: String(e) })
+            }
+
+            const actualLastUserMsg = latestMsgs.findLast((m) => m.info.role === "user")
+            const currentAgent = actualLastUserMsg?.info.agent ?? lastUser.agent
+
+            let conversationalMsg = ""
+            const firstTaskNote = firstPendingTaskId ? `id="${firstPendingTaskId}"` : `id="1.1"`
+            const activeTaskNote = firstPendingTaskId ? `Your current or next task ID is ${firstPendingTaskId}.` : ""
+
+            if (currentAgent === "plan") {
+              // Type 1: Planning Phase
+              conversationalMsg = `Hi, we are continuing the planning phase of the project as the context window ran out and we are starting a new chat to resume from before. 
 
 The following detailed history resources are available in the \`.history/\` directory to support your orientation:
 - \`.history/interrupted_state.toon\`: Your exact mental state, partial drafts, and intended next tool call right before the transition. READ THIS FIRST.
@@ -417,9 +440,40 @@ The following detailed history resources are available in the \`.history/\` dire
 Based on the continuity report, you were in the middle of: ${rationale}.
 ${nextCall ? `NEXT ACTION: ${nextCall}. Proceed directly to this action.` : ""}
 
-CRITICAL: Do NOT use discovery tools (read, ls, pm_query, sc_status) for your first 3 turns of this new epoch. Trust the provided reports and proceed directly to implementation.
+CRITICAL: Continue focusing on discovery, architecture mapping, and drafting specifications or tasks. You MUST conclude this phase with 'mcpx spec sc_approve'.`
+            } else if (currentAgent === "build" && reason === "Emergency Handshake") {
+              // Type 2: First Handover to Build Phase (The Kickoff)
+              conversationalMsg = `ORIENTATION_REQUIREMENTS: SATISFIED. Deep Inception applied. You are in the Build Phase.
 
-Lets get straight on with continuing our work`
+The following detailed history resources are available in the \`.history/\` directory to support your orientation:
+- \`.history/timeline.toon\`: Detailed chronological log of all tool calls and outputs from the previous epoch.
+- \`.history/intent.toon\`: The longitudinal architectural roadmap and decisions established so far.
+
+Based on the continuity report, you were in the middle of: ${rationale}.
+
+CRITICAL: Your IMMEDIATE first action MUST be to execute \`mcpx spec sc_todo_start\` for the first task (e.g., ${firstTaskNote}). 
+You are EXPRESSLY FORBIDDEN from executing redundant reads of \`Specification.md\` or \`Tasks.json\`. DO NOT repeat discovery.
+
+Lets get straight on with implementation work`
+            } else {
+              // Type 3: Continue the Build Phase
+              conversationalMsg = `Hi, we are continuing the build phase of the project as the context window ran out and we are starting a new chat to resume from before.
+
+              The following detailed history resources are available in the \`.history/\` directory to support your orientation:
+              - \`.history/interrupted_state.toon\`: Your exact mental state, partial drafts, and intended next tool call right before the transition. READ THIS FIRST.
+              - \`.history/timeline.toon\`: Detailed chronological log of all tool calls and outputs from the previous epoch.
+              - \`.history/intent.toon\`: The longitudinal architectural roadmap and decisions established so far.
+
+              Based on the continuity report, you were in the middle of: ${rationale}.
+              ${nextCall ? `NEXT ACTION: ${nextCall}. Proceed directly to this action.` : ""}
+
+              CRITICAL: ORIENTATION_REQUIREMENTS: SATISFIED.
+              ${activeTaskNote}
+              - If you need to review the specification, use \`read\` on \`projects/active/<feature>/Specification.md\` or \`Tasks.json\`.
+              - If you need codebase context, ALWAYS prefer using \`mcpx map context\` or \`mcpx map fetch\` instead of repetitive \`read\` loops on large files.
+              - If you are unsure of your current task, use \`mcpx spec sc_status\`.
+
+              Let's get straight on with continuing our work.`            }
 
             const newParentId = MessageID.ascending()
             yield* sessions.updateMessage({
@@ -522,60 +576,70 @@ Lets get straight on with continuing our work`
                 : "text_loop"
           }
 
-          if (stallScore >= 15) {
-            log.error("Terminal stagnation detected - triggering intervention", {
-              sessionID,
-              stallScore,
-              stallReason,
-              offendingTools,
-              toolHistory,
-            })
-            const hintStr = `Stall Reason: ${stallReason}.${offendingTools.length > 0 ? ` Offending Tools: ${offendingTools.join(", ")}` : ""}`
-            yield* sessions.setInterventionHint({ sessionID, hint: hintStr })
-            yield* sessions.setInterventionRequested({ sessionID, requested: true })
-            stallScore = 0 // Reset to allow recovery turn
-            continue // Loop back to pick up the intervention in Phase 1
+          if (stallScore >= 20 && (session.yolo || yolo)) {
+            log.error("Terminal stagnation (Score 20+) - triggering Hard Reset", { sessionID, stallScore })
+            forceTransition = true
+            stallScore = 0
           }
 
-          if (stallScore >= 10 && yolo) {
-            log.warn("Stall detected - injecting nudge", { sessionID, stallScore, stallReason, offendingTools })
-            stallScore = 0 // Reset to allow recovery turn
-            let nudgeText =
-              "[System: You appear to be stalling or repeating operations without making progress. Please reconsider your strategy or attempt a more direct action to advance the project state.]"
-
-            if (
-              stallReason === "invalid_args" &&
-              toolParts.some((p) => (p.state as any).input?.tool === "mcpx" || p.tool === "mcpx")
-            ) {
-              nudgeText =
-                "[System: Your last mcpx tool calls failed due to invalid syntax. REMINDER: positional flags like '--name' MUST be passed as an array of strings in the 'args' parameter, NOT as keys in the 'flags' object. Please run 'mcpx spec --help' to verify the interface.]"
-            } else if (stallReason === "orientation_loop") {
-              nudgeText =
-                "[System: You are using manual file exploration tools for codebase navigation. The workspace map is active. Please use 'mcpx' with server='map' and tool='pm_query' for context-aware discovery. ('glob' may still be used for mass edits).]"
+          if (!forceTransition && stallScore >= 15) {
+            const isAlreadyIntervened = msgs.some(m => m.info.role === "user" && m.parts.some(p => p.type === "text" && p.text.includes("Stall Reason:")))
+            if (!isAlreadyIntervened) {
+              log.error("Terminal stagnation detected - triggering intervention", {
+                sessionID,
+                stallScore,
+                stallReason,
+                offendingTools,
+                toolHistory,
+              })
+              const hintStr = `Stall Reason: ${stallReason}.${offendingTools.length > 0 ? ` Offending Tools: ${offendingTools.join(", ")}` : ""}`
+              yield* sessions.setInterventionHint({ sessionID, hint: hintStr })
+              yield* sessions.setInterventionRequested({ sessionID, requested: true })
+              // Note: We no longer reset stallScore here to allow it to climb to 20 if the intervention is ignored
+              continue // Loop back to pick up the intervention in Phase 1
             }
+          }
 
-            const newMsgId = MessageID.ascending()
-            const newUserMsg: MessageV2.User = {
-              id: newMsgId,
-              sessionID,
-              role: "user",
-              time: { created: Date.now() },
-              model: lastUser.model,
-              agent: lastUser.agent,
+          if (!forceTransition && stallScore >= 10 && (session.yolo || yolo)) {
+            const isAlreadyNudged = msgs.some(m => m.info.role === "user" && m.parts.some(p => p.type === "text" && p.text.includes("[System: You appear to be stalling")))
+            if (!isAlreadyNudged) {
+              log.warn("Stall detected - injecting nudge", { sessionID, stallScore, stallReason, offendingTools })
+              let nudgeText =
+                "[System: You appear to be stalling or repeating operations without making progress. Please reconsider your strategy or attempt a more direct action to advance the project state.]"
+
+              if (
+                stallReason === "invalid_args" &&
+                toolParts.some((p) => (p.state as any).input?.tool === "mcpx" || p.tool === "mcpx")
+              ) {
+                nudgeText =
+                  "[System: Your last mcpx tool calls failed due to invalid syntax. REMINDER: positional flags like '--name' MUST be passed as an array of strings in the 'args' parameter, NOT as keys in the 'flags' object. Please run 'mcpx spec --help' to verify the interface.]"
+              } else if (stallReason === "orientation_loop") {
+                nudgeText =
+                  "[System: You are using manual file exploration tools for codebase navigation. The workspace map is active. Please use 'mcpx' with server='map' and tool='pm_query' for context-aware discovery. ('glob' may still be used for mass edits).]"
+              }
+
+              const newMsgId = MessageID.ascending()
+              const newUserMsg: MessageV2.User = {
+                id: newMsgId,
+                sessionID,
+                role: "user",
+                time: { created: Date.now() },
+                model: lastUser.model,
+                agent: lastUser.agent,
+              }
+              yield* sessions.updateMessage(newUserMsg)
+              yield* sessions.updatePart({
+                id: PartID.ascending(),
+                sessionID,
+                messageID: newMsgId,
+                type: "text",
+                synthetic: true,
+                text: nudgeText,
+              })
+              lastUser = newUserMsg
+              // Note: We no longer reset stallScore here to allow it to climb to 15/20
+              continue
             }
-            yield* sessions.updateMessage(newUserMsg)
-            yield* sessions.updatePart({
-              id: PartID.ascending(),
-              sessionID,
-              messageID: newMsgId,
-              type: "text",
-              synthetic: true,
-              text: nudgeText,
-            })
-            lastUser = newUserMsg
-            // Reset and continue the loop to trigger a new generation with the nudge
-            stallScore = 0
-            continue
           }
 
           if (
@@ -940,12 +1004,14 @@ Lets get straight on with continuing our work`
                 toolChoice: format.type === "json_schema" ? "required" : undefined,
               })
 
-              // Maintain Epoch Continuity report in the background
-              yield* PostGenerationWorker.execute({
-                sessionID,
-                chatHistory: msgs,
-                abortSignal: new AbortController().signal,
-              }).pipe(Effect.ignore, Effect.forkIn(scope))
+              // Maintain Epoch Continuity report in the background (unless compacting, which handles it synchronously)
+              if (result !== "compact") {
+                yield* PostGenerationWorker.execute({
+                  sessionID,
+                  chatHistory: msgs,
+                  abortSignal: new AbortController().signal,
+                }).pipe(Effect.ignore, Effect.forkIn(scope))
+              }
 
               if (structured !== undefined) {
                 handle.message.structured = structured

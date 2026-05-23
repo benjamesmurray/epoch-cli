@@ -40,7 +40,6 @@ e2e_testing/harness/*_config.json
 e2e_testing/results/
 .epochcli/tool/*/
 .project-map/docs/repo_summary/
-.assistant_rules.toon
 projects/
 .agent_logs/
 last_model_payload.json

@@ -70,7 +70,7 @@ export namespace Bus {
           )
 
           yield* Stream.fromPubSub(wildcard).pipe(
-            Stream.filter((evt) => evt.type === File.Event.Edited.type),
+            Stream.filter((evt) => evt.type === "session.created" || evt.type === File.Event.Edited.type),
             Stream.runForEach(() =>
               Effect.promise(async () => {
                 log.info("triggering project map refresh")
@@ -126,7 +126,12 @@ export namespace Bus {
         return Effect.gen(function* () {
           const s = yield* InstanceState.get(state)
           const payload: Payload = { type: def.type, properties }
-          log.info("publishing", { type: def.type, ...summarizeProperties(properties) })
+
+          if (def.type === "message.part.delta" || def.type === "message.part.updated") {
+            log.debug("publishing", { type: def.type, ...summarizeProperties(properties) })
+          } else {
+            log.info("publishing", { type: def.type, ...summarizeProperties(properties) })
+          }
 
           const ps = s.typed.get(def.type)
           if (ps) yield* PubSub.publish(ps, payload)

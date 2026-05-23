@@ -135,24 +135,18 @@ args = ["mcp"]
         "utf-8"
     );
 
-    // Inject guidelines for Zone 4 testing
-    await fs.writeFile(
-      path.join(hostRunDir, "AGENTS.md"),
-      `# Project Guidelines
-- **Senior Style:** Suppress conversational filler. Output ONLY context and code.
-- **Workflow:** Use the 'mcpx' tool with server='spec' and tool='sc_status' to track progress. Mark tasks with 'sc_todo_start' and 'sc_todo_complete'.
-- **Discovery:** Use the 'mcpx' tool with server='map' and tool='pm_query' for symbol and file exploration.
-- **One-Shot:** In one-shot mode, after running 'sc_init' (via mcpx: e.g., mcpx spec sc_init --name my-project), you MUST first use the 'read' tool to view the generated Specification.md template. Then, in a subsequent turn, use the 'write' tool to overwrite the file entirely with your technical specification, ensuring you remove all '<template-specification>' tags. This is a mandatory safety sequence. Finally, run 'sc_plan' and 'sc_approve' to proceed.
-- **Continuity:** When a new epoch begins, strictly follow the directives in .epoch-continuity.toon.
-- **Architecture:** Keep things flat and composable. Avoid 'any'.`,
-      "utf-8"
-    );
-
-    await fs.writeFile(
-      path.join(hostRunDir, ".cursorrules"),
-      "Preferred Style: Tailwind CSS for styling.",
-      "utf-8"
-    );
+    // Inject guidelines for Zone 4 testing by copying the real AGENTS.md from the project root
+    try {
+        const rootAgentsPath = path.join("/home/benmurray/Projects/cli", "AGENTS.md");
+        const agentsContent = await fs.readFile(rootAgentsPath, "utf-8");
+        await fs.writeFile(path.join(hostRunDir, "AGENTS.md"), agentsContent, "utf-8");
+    } catch (e) {
+        // Fallback for environment robustness
+        await fs.writeFile(
+            path.join(hostRunDir, "AGENTS.md"),
+            "# Project Guidelines\n- Follow standard architectural patterns.",
+            "utf-8"
+        );
+    }
   }
 }
-

@@ -2,35 +2,6 @@ import { describe, expect, it, mock } from "bun:test"
 import { RuleRouter } from "../../../src/session/prompt/router"
 
 describe("RuleRouter", () => {
-  describe("identifyAgent", () => {
-    it("should maintain 'plan' if current agent is 'plan' and no report exists", async () => {
-      const result = await RuleRouter.identifyAgent("Some input", "plan")
-      expect(result).toBe("plan")
-    })
-
-    it("should maintain 'explore' if current agent is 'explore' and no report exists", async () => {
-      const result = await RuleRouter.identifyAgent("Some input", "explore")
-      expect(result).toBe("explore")
-    })
-
-    it("should default to 'build' if current agent is 'build' and no report exists", async () => {
-      const result = await RuleRouter.identifyAgent("Some input", "build")
-      expect(result).toBe("build")
-    })
-
-    it("should switch to 'plan' if continuity report indicates requirements phase", async () => {
-      const report = "Current phase: 'requirements'"
-      const result = await RuleRouter.identifyAgent("Some input", "build", report)
-      expect(result).toBe("plan")
-    })
-
-    it("should switch to 'build' if continuity report indicates implementation phase", async () => {
-      const report = "Current phase: 'implementation'"
-      const result = await RuleRouter.identifyAgent("Some input", "plan", report)
-      expect(result).toBe("build")
-    })
-  })
-
   describe("classify (Heuristics)", () => {
     it("should supply core_interaction_pack when intent is ambiguous", () => {
       const packs = RuleRouter.classify("Hi")

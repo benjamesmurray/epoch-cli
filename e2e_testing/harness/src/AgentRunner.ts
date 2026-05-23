@@ -26,12 +26,14 @@ export class AgentRunner {
   private pendingEpochSnapshot: number | null = null;
   private docker?: DockerConfig;
   private yolo: boolean;
+  private agent?: string;
 
-  constructor(command: string[], cwd: string, timeoutMs: number, docker?: DockerConfig, runId: string = "run", abortOnGenerate: boolean = false, yolo: boolean = false) {
+  constructor(command: string[], cwd: string, timeoutMs: number, docker?: DockerConfig, runId: string = "run", abortOnGenerate: boolean = false, yolo: boolean = false, agent?: string) {
     this.runId = runId;
     this.abortOnGenerate = abortOnGenerate;
     this.docker = docker;
     this.yolo = yolo;
+    this.agent = agent;
     if (docker) {
         // Extract the prompt assuming the format is `["epochcli", "run", "prompt"]`
         const promptString = command.slice(2).join(" ");
@@ -41,12 +43,14 @@ export class AgentRunner {
         // Note: the test config model is typically embedded in the epochcli.jsonc but the CLI prioritizes the flag
         const modelArg = docker.model ? `--model ${docker.model}` : "";
         const yoloArg = yolo ? "--yolo" : "";
+        const agentArg = agent ? `--agent ${agent}` : "";
         
         const escapedArgs = cleanArgs.replace(/'/g, "'\\''");
-        const internalCommand = `mkdir -p /workspace/.epochcli; cp -an /etc/epochcli/. /workspace/.epochcli/ 2>/dev/null || true; git config --global --add safe.directory /workspace; HOME=/workspace LOG_LEVEL=DEBUG EPOCHCLI_DEBUG_FULL_PROMPT=true bun /cli/packages/epochcli/src/index.ts run --thinking --print-logs --log-level=DEBUG ${modelArg} ${yoloArg} '${escapedArgs}'`;
+        const logLevel = docker.logLevel || "DEBUG";
+        const internalCommand = `mkdir -p /workspace/.epochcli; cp -an /etc/epochcli/. /workspace/.epochcli/ 2>/dev/null || true; git config --global --add safe.directory /workspace; HOME=/workspace LOG_LEVEL=${logLevel} EPOCHCLI_DEBUG_FULL_PROMPT=true bun /cli/packages/epochcli/src/index.ts run --thinking --print-logs --log-level=${logLevel} ${modelArg} ${yoloArg} ${agentArg} '${escapedArgs}'`;
 
         this.command = [
-            "docker", "run", "--rm", 
+            "docker", "run", "--rm",
             "--network", docker.network,
             "--add-host", "host.docker.internal:host-gateway",
             "-v", "/home/benmurray/Projects/cli:/cli:ro",
@@ -63,12 +67,11 @@ export class AgentRunner {
             "-e", "PATH=/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
             "-e", "EPOCHCLI_LIBC=glibc",
             "-e", "EPOCHCLI_DEBUG_FULL_PROMPT=true",
-            "-e", "LOG_LEVEL=DEBUG"
-        ];
-        if (docker.memoryLimit) {
+            "-e", `LOG_LEVEL=${logLevel}`
+        ];        if (docker.memoryLimit) {
             this.command.push("--memory", docker.memoryLimit);
         }
-        this.command.push(docker.imageName, "/bin/bash", "-c", `${internalCommand}; chmod -R 777 /workspace`);
+        this.command.push(docker.imageName, "/bin/bash", "-c", `${internalCommand}; EXIT_CODE=$?; chmod -R 777 /workspace; exit $EXIT_CODE`);
         
         this.cwd = cwd; 
     } else {

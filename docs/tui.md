@@ -10,7 +10,7 @@ These define the top-level layout and focus of the terminal interface:
 - **Session Mode**: The primary workspace. This is a multi-pane environment where the conversation history, tool outputs, and the active agent live. It supports:
     - **Timeline Mode**: An overlay that lets you jump back to any previous point in the conversation or "fork" the session to explore a different implementation path.
     - **Sidebar Mode**: A toggleable panel that shows project metadata, active MCP servers, and a real-time **Todo list**.
-        - **Automatic Synchronization**: ToDos are automatically parsed from the `Tasks.md` (or `tasks.md`) file of the most recently modified project in your `projects/` directory.
+        - **Automatic Synchronization**: ToDos are automatically parsed from the `Tasks.json` (or `tasks.json`) file of the most recently modified project in your `projects/` directory.
         - **Status Indicators**:
             - `[ ]`: **Pending**
             - `[/]`, `[-]`, `[~]`: **In Progress**

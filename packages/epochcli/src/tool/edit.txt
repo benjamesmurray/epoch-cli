@@ -1,7 +1,1 @@
-Exact string replacement in files.
-Usage:
-- Use `Read` first to get context and exact indentation.
-- Indentation in `oldString` must match exactly (everything after `line: ` prefix).
-- `oldString` must be unique in the file, or use `replaceAll` to update all instances.
-- Replaces first occurrence by default.
-- Failures occur if `oldString` is not found or is ambiguous.
+Replace a unique string in a file with new text. Use 'Read' first to get exact content and indentation.

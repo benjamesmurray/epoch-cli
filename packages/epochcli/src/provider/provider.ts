@@ -1019,6 +1019,17 @@ export namespace Provider {
           const modelsDev = yield* Effect.promise(() => ModelsDev.get())
           const database = mapValues(modelsDev, fromModelsDevProvider)
 
+          if (!database["epochcli"]) {
+            database["epochcli"] = {
+              id: ProviderID.make("epochcli"),
+              name: "Epoch CLI",
+              env: [],
+              options: {},
+              source: "custom",
+              models: {},
+            }
+          }
+
           const providers: Record<ProviderID, Info> = {} as Record<ProviderID, Info>
           const languages = new Map<string, LanguageModelV3>()
           const modelLoaders: {

@@ -31,14 +31,13 @@ export namespace SystemPrompt {
     const project = Instance.project
     return [
       [
-        `Here is some useful information about the environment you are running in:`,
         `<env>`,
-        `  Working directory: ${Instance.directory}`,
-        `  Workspace root folder: ${Instance.worktree}`,
-        `  Is directory a git repo: ${project.vcs === "git" ? "yes" : "no"}`,
+        `  CWD: ${Instance.directory}`,
+        `  Root: ${Instance.worktree}`,
+        `  Git: ${project.vcs === "git" ? "yes" : "no"}`,
         `  Platform: ${process.platform}`,
-        `  Today's date: ${new Date().toDateString()}`,
-        `  Project Map: For codebase discovery, you MUST use the 'mcpx' tool with server="map" (e.g., pm_status, pm_query). Do NOT use manual 'ls', 'find', or 'glob' commands when navigating the codebase to orient yourself. ('glob' may still be used for mass edits).`,
+        `  Date: ${new Date().toDateString()}`,
+        `  Map: Use 'mcpx' server="map" (pm_status, pm_query) for discovery. No manual 'ls' or 'find'.`,
         `</env>`,
       ].join("\n"),
     ]

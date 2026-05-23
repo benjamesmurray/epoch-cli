@@ -1,6 +1,6 @@
 import { spawn } from "bun";
 import * as fs from "fs/promises";
-import type { DockerConfig } from "./types";
+import type { DockerConfig, EvaluationConfig } from "./types";
 import * as path from "path";
 
 export class TestEvaluator {
@@ -90,7 +90,7 @@ export class TestEvaluator {
     return ["echo", "No tests generated"];
   }
 
-  public static async evaluate(cwd: string, docker?: DockerConfig, relativeTarget?: string): Promise<boolean> {
+  public static async evaluate(cwd: string, docker?: DockerConfig, relativeTarget?: string, evaluation?: EvaluationConfig): Promise<boolean> {
     try {
       // Ensure the directory exists on the host
       await fs.stat(cwd);
@@ -106,12 +106,115 @@ export class TestEvaluator {
           // Run test inside docker
           const containerTargetDir = path.posix.join("/workspace", relativeTarget);
           const hostTargetDir = path.join(cwd, relativeTarget);
-          
-          // Detect test framework
-          const testCmd = await TestEvaluator.determineTestCommand(hostTargetDir);
-
           const logPath = path.join(hostTargetDir, "test_output.log");
           const logFile = await fs.open(logPath, "w");
+
+          // --- ARCHITECTURAL SHIFT: Host-Driven Black-Box Testing ---
+          if (evaluation?.type === "host_blackbox") {
+              console.log(`    > 📦 Booting Black-Box environment for ${evaluation.startupCommand}...`);
+              
+              // 1. Start agent app in detached container with dynamic port mapping
+              const containerName = `eval-run-${Date.now()}`;
+              const startProc = spawn({
+                  cmd: [
+                      "docker", "run", "-d",
+                      "--name", containerName,
+                      "--network", docker.network,
+                      "-p", evaluation.port.toString(),
+                      "-v", `${cwd}:/workspace`,
+                      "-w", containerTargetDir,
+                      docker.imageName,
+                      ...evaluation.startupCommand.split(" ")
+                  ],
+                  stdout: "pipe"
+              });
+              
+              const containerId = (await new Response(startProc.stdout).text()).trim();
+              if (!containerId) {
+                  await logFile.appendFile("❌ Failed to start Docker container for evaluation.\n");
+                  await logFile.close();
+                  return false;
+              }
+
+              try {
+                  // 2. Discover host-side mapped port (Robust JSON parsing with retries)
+                  let mappedPort = "";
+                  for (let i = 0; i < 10; i++) {
+                      const inspectProc = spawn({
+                          cmd: ["docker", "inspect", containerId],
+                          stdout: "pipe"
+                      });
+                      const inspectOutput = await new Response(inspectProc.stdout).text();
+                      try {
+                          const metadata = JSON.parse(inspectOutput);
+                          if (metadata[0]?.State?.Status === "exited") {
+                              await logFile.appendFile("❌ Container exited prematurely.\n");
+                              break;
+                          }
+                          const portMapping = metadata[0]?.NetworkSettings?.Ports?.[`${evaluation.port}/tcp`];
+                          if (portMapping?.[0]?.HostPort) {
+                              mappedPort = portMapping[0].HostPort;
+                              break;
+                          }
+                      } catch (e) {}
+                      await new Promise(r => setTimeout(r, 1000));
+                  }
+
+                  if (!mappedPort) {
+                      await logFile.appendFile("❌ Could not discover mapped port. Check if application is exposing correctly.\n");
+                      throw new Error("Port discovery failed");
+                  }
+
+                  const targetUrl = `http://localhost:${mappedPort}`;
+                  await logFile.appendFile(`ℹ️ Application booting at ${targetUrl}\n`);
+
+                  // 3. Wait-For-It (Polling)
+                  let ready = false;
+                  for (let i = 0; i < 30; i++) {
+                      try {
+                          const res = await fetch(targetUrl);
+                          if (res.ok || res.status === 404) { // 404 is still "alive"
+                              ready = true;
+                              break;
+                          }
+                      } catch(e) {}
+                      await new Promise(r => setTimeout(r, 1000));
+                  }
+
+                  if (!ready) {
+                      await logFile.appendFile("❌ Timed out waiting for application to become healthy.\n");
+                      throw new Error("Health check timeout");
+                  }
+
+                  // 4. Execute Black-Box Tests on Host
+                  console.log(`    > 🧪 Executing Black-Box suite: ${evaluation.testScript}`);
+                  const testProc = spawn({
+                      cmd: ["bun", "test", evaluation.testScript],
+                      env: { ...process.env, TARGET_URL: targetUrl },
+                      stdout: "pipe",
+                      stderr: "pipe"
+                  });
+
+                  const testOut = await new Response(testProc.stdout).text();
+                  const testErr = await new Response(testProc.stderr).text();
+                  await logFile.appendFile("=== BLACK-BOX TEST RESULTS ===\n" + testOut + testErr + "\n");
+
+                  const exitCode = await testProc.exited;
+                  return exitCode === 0;
+
+              } finally {
+                  // 5. Cleanup
+                  const logsProc = spawn({ cmd: ["docker", "logs", containerId], stdout: "pipe" });
+                  const containerLogs = await new Response(logsProc.stdout).text();
+                  await logFile.appendFile("=== DOCKER RUNTIME LOGS ===\n" + containerLogs + "\n");
+                  
+                  spawn({ cmd: ["docker", "rm", "-f", containerId] });
+                  await logFile.close();
+              }
+          }
+
+          // Detect test framework (Legacy path)
+          const testCmd = await TestEvaluator.determineTestCommand(hostTargetDir);
 
           if (testCmd[0] === "echo" && testCmd[1] === "No tests generated") {
             await logFile.appendFile("=== TEST (No tests generated) ===\nAgent did not generate any detectable test files or configurations.\n");

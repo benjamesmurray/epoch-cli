@@ -4,6 +4,14 @@ export interface DockerConfig {
   memoryLimit?: string;
   model?: string;
   contextOverride?: number;
+  logLevel?: "DEBUG" | "INFO" | "WARN" | "ERROR";
+}
+
+export interface EvaluationConfig {
+  type: "host_blackbox" | "injected_script";
+  startupCommand: string;
+  port: number;
+  testScript: string;
 }
 
 export interface TestConfig {
@@ -15,6 +23,9 @@ export interface TestConfig {
   runTargetDir: string; // e.g., ".epochcli/tool/$RUN_ID"
   epochcli?: any;
   docker?: DockerConfig;
+  evaluation?: EvaluationConfig;
+  agent?: string;
+  yolo?: boolean;
 }
 
 export interface RunResult {

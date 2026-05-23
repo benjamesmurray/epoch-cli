@@ -2,7 +2,7 @@ import { Config } from "../config/config"
 import z from "zod"
 import { Provider } from "../provider/provider"
 import { ModelID, ProviderID } from "../provider/schema"
-import { generateObject, streamObject, type ModelMessage } from "ai"
+import { generateObject, streamObject, type ModelMessage } from "@/util/ai-sdk"
 import { Instance } from "../project/instance"
 import { Truncate } from "../tool/truncate"
 import { Auth } from "../auth"
@@ -171,7 +171,7 @@ export namespace Agent {
             },
             general: {
               name: "general",
-              description: `General-purpose agent for researching complex questions and executing multi-step tasks. Use this agent to execute multiple units of work in parallel.`,
+              description: `General-purpose subagent for multi-step tasks.`,
               permission: defaults,
               options: {},
               mode: "subagent",
@@ -204,7 +204,7 @@ export namespace Agent {
                 }),
                 user,
               ),
-              description: `Fast agent specialized for exploring codebases. Use this when you need to quickly find files by patterns (eg. "src/components/**/*.tsx"), search code for keywords (eg. "API endpoints"), or answer questions about the codebase (eg. "how do API endpoints work?"). When calling this agent, specify the desired thoroughness level: "quick" for basic searches, "medium" for moderate exploration, or "very thorough" for comprehensive analysis across multiple locations and naming conventions.`,
+              description: `Specialized subagent for codebase discovery and search.`,
               prompt: PROMPT_EXPLORE,
               options: {},
               mode: "subagent",

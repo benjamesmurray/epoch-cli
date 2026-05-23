@@ -12,21 +12,24 @@ export function isOverflow(input: {
   tokens: MessageV2.Assistant["tokens"] | number
   model: Provider.Model
 }) {
-  console.log(`Checking overflow: tokens=${typeof input.tokens === "number" ? input.tokens : input.tokens.total}`)
   if (input.cfg.compaction?.auto === false) return false
   const context = input.model.limit.context
   if (context === 0) return false
 
+  // Use a small safety margin to ensure we don't hit hard provider limits.
+  // This margin covers system prompts, mandatory tools, and the next model output.
+  const safetyMargin = Math.min(1024, Math.max(500, ProviderTransform.maxOutputTokens(input.model)))
+  const usable = input.model.limit.input ? input.model.limit.input : context - safetyMargin
+
   const count =
     typeof input.tokens === "number"
       ? input.tokens
-      : input.tokens.total ||
-        input.tokens.input + input.tokens.output + input.tokens.cache.read + input.tokens.cache.write
+      : (input.tokens.total ??
+        (input.tokens.input ?? 0) +
+          (input.tokens.output ?? 0) +
+          (input.tokens.reasoning ?? 0) +
+          ((input.tokens.cache?.read ?? 0) + (input.tokens.cache?.write ?? 0)))
 
-  // Use a small safety margin to ensure we don't hit hard provider limits.
-  // This margin covers system prompts, mandatory tools, and the next model output.
-  const safetyMargin = Math.max(1000, ProviderTransform.maxOutputTokens(input.model))
-  const usable = input.model.limit.input ? input.model.limit.input : context - safetyMargin
-
+  console.log(`[OverflowCheck] tokens=${count} usable=${usable} (limit=${context} margin=${safetyMargin})`)
   return count >= usable
 }

@@ -305,9 +305,10 @@ export namespace SessionAnalyzer {
       const uniqueTouched = Array.from(touchedFiles)
       await Promise.all(
         uniqueTouched.map(async (file) => {
-          const fullPath = path.isAbsolute(file) ? file : path.join(workspaceRoot, file)
+          // Robust path resolution to handle both relative and absolute paths in the container
+          const normalizedFile = file.startsWith(workspaceRoot) ? file : path.join(workspaceRoot, file)
           try {
-            await fs.stat(fullPath)
+            await fs.stat(normalizedFile)
             verifiedFiles.push(file)
           } catch (e) {
             missingFiles.push(file)

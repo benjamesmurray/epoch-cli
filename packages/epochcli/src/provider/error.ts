@@ -68,6 +68,7 @@ export namespace ProviderError {
         body.error?.message,
         body.error?.code,
         body.code,
+        body.responseBody,
       ]
       for (const c of candidates) {
         if (typeof c === "string" && isOverflow(c)) return true
@@ -150,23 +151,54 @@ export namespace ProviderError {
 
   export function parseStreamError(input: unknown): ParsedStreamError | undefined {
     const isErrorInstance = input instanceof Error
-    const body = json(input)
+    
+    // Unwrap AI_RetryError to extract the underlying cause
+    if (isErrorInstance && (input as any).name === "AI_RetryError" && Array.isArray((input as any).errors) && (input as any).errors.length > 0) {
+      const lastError = (input as any).errors[(input as any).errors.length - 1]
+      return parseStreamError(lastError)
+    }
 
-    if (isOverflow(input) || isOverflow(body)) {
+    let body = json(input)
+
+    // Handle case where input is an object with a responseBody string (like APICallError)
+    if (typeof input === "object" && input !== null && typeof (input as any).responseBody === "string") {
+      const parsedResponse = json((input as any).responseBody)
+      if (parsedResponse) {
+         body = { ...body, ...parsedResponse }
+      }
+    }
+
+    if (isOverflow(input) || isOverflow(body) || (typeof input === "object" && input !== null && isOverflow((input as any).responseBody))) {
       const errorString =
+        (body?.error?.code === "context_length_exceeded" ? "Input exceeds context window of this model" : undefined) ||
         (typeof body?.error === "string" ? body.error : undefined) ||
+        (typeof body?.error?.message === "string" ? body.error.message : undefined) ||
+        (typeof body?.message === "string" ? body.message : undefined) ||
         (isErrorInstance ? (input as Error).message : undefined) ||
         "Context overflow"
+
+      let responseBody: string
+      try {
+        responseBody = JSON.stringify(body || { error: errorString })
+      } catch {
+        responseBody = String(body || errorString)
+      }
 
       return {
         type: "context_overflow",
         message: errorString,
-        responseBody: JSON.stringify(body || { error: errorString }),
+        responseBody,
       }
     }
 
     if (!body) return
-    const responseBody = JSON.stringify(body)
+
+    let responseBody: string
+    try {
+      responseBody = JSON.stringify(body)
+    } catch {
+      responseBody = String(body)
+    }
 
     if (typeof body.error === "string") {
       // If it's a standard Error instance but wasn't an overflow, we should

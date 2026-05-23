@@ -163,7 +163,9 @@
     "vscode-languageserver-types": "3.17.5",
     "why-is-node-running": "3.2.2"
   },
-  "dependencies": {},
+  "dependencies": {
+    "ajv": "8.20.0"
+  },
   "optionalDependencies": {
     "epochcli-ai-darwin-arm64": "2.2.0",
     "epochcli-ai-darwin-x64": "2.2.0",

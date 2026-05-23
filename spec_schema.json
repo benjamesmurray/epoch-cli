@@ -1,0 +1,110 @@
+{
+  "tools": [
+    {
+      "description": "Get current workflow status",
+      "inputSchema": {
+        "properties": {
+          "feature": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "name": "sc_status"
+    },
+    {
+      "description": "Initialize a new feature",
+      "inputSchema": {
+        "properties": {
+          "description": {
+            "nullable": true,
+            "type": "string"
+          },
+          "extra": {
+            "nullable": true,
+            "type": "string"
+          },
+          "mode": {
+            "nullable": true,
+            "type": "string"
+          },
+          "name": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "name": "sc_init"
+    },
+    {
+      "description": "Advance workflow phase",
+      "inputSchema": {
+        "properties": {
+          "feature": {
+            "nullable": true,
+            "type": "string"
+          },
+          "instruction": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "name": "sc_plan"
+    },
+    {
+      "description": "Approve current phase",
+      "inputSchema": {
+        "properties": {
+          "feature": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "name": "sc_approve"
+    },
+    {
+      "description": "Mark a task as being actively worked on",
+      "inputSchema": {
+        "properties": {
+          "feature": {
+            "nullable": true,
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "sc_todo_start"
+    },
+    {
+      "description": "Complete a task",
+      "inputSchema": {
+        "properties": {
+          "feature": {
+            "nullable": true,
+            "type": "string"
+          },
+          "id": {
+            "type": ["string", "integer"]
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "sc_todo_complete"
+    }
+  ]
+}

@@ -164,6 +164,33 @@ describe("InputResolver", () => {
       expect(userMsg!.parts.some((p: any) => p.synthetic && p.text.includes("Plan mode is active"))).toBe(true)
     }).pipe(Effect.provideService(InstanceRef, testContext as any)))
 
+  it("insertReminders - does not inject plan reminder in build mode", () =>
+    Effect.gen(function* () {
+      const resolver = yield* InputResolver.Service
+      const sessionID = SessionID.descending()
+      const messageID = MessageID.ascending()
+      const messages = [
+        {
+          info: { role: "assistant", id: MessageID.ascending(), sessionID, agent: "plan" },
+          parts: [{ type: "text", text: "Here is the plan" }],
+        },
+        {
+          info: { role: "user", id: messageID, sessionID },
+          parts: [{ type: "text", text: "looks good, go" }],
+        },
+      ] as any
+
+      const result = yield* resolver.insertReminders({
+        messages,
+        agent: { name: "build" } as any,
+        session: { id: sessionID, slug: "test", time: { created: Date.now() } } as any,
+      })
+
+      const userMsg = result.find((m: any) => m.info.role === "user" && m.info.id === messageID)
+      expect(userMsg!.parts.some((p: any) => p.synthetic && p.text.includes("Plan mode is active"))).toBe(false)
+      expect(userMsg!.parts.some((p: any) => p.synthetic && p.text.includes("plan file exists"))).toBe(true)
+    }).pipe(Effect.provideService(InstanceRef, testContext as any)))
+
   it("createUserMessage - creates a user message with parts", () =>
     Effect.gen(function* () {
       const resolver = yield* InputResolver.Service

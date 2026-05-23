@@ -40,11 +40,11 @@ components:
           description: |
             Feature name for the specification (e.g., "用户认证", "order-management").
 
-            **Required for**: init, check, skip, confirm, complete_task operations.
+            **Required for**: sc_init, init, check, skip, confirm, complete_task operations.
 
             The system will automatically resolve this to: {specsPath}/{featureName}/
 
-            **For sc_init**: Not required - the system uses current working directory as project root.
+            **For sc_init**: REQUIRED - Providing a name ensures proper project organization.
         action:
           $ref: '#/components/schemas/Action'
     
@@ -196,7 +196,7 @@ components:
             📋 Created User Guidelines files:
             - user-guidelines-requirements.md - User preference guide for requirements documents
             - user-guidelines-design.md - User preference guide for design documents
-            - user-guidelines-tasks.md - User preference guide for task documents
+            - user-guidelines-tasks.json - User preference guide for task documents
 
             💡 Model: Please ask user to edit these User Guidelines files to guide the model's behavior. These contents will be automatically displayed when showing the corresponding stage writing guides.
 
@@ -440,18 +440,18 @@ components:
             type: not_edited
             reason: Tasks document not edited
           displayText: |
-            📝 tasks.md has not been written yet
+            📝 tasks.json has not been written yet
             
             📁 File directory: ${path}
-            📝 Created: tasks.md
+            📝 Created: tasks.json
             
             📊 Overall progress: ${progress}%
             🔄 Current status: Writing tasks document (current) → Next step: use check to verify format
             
             Model please continue with the following actions:
             1. Read the task writing guide below
-            2. First read ${path}/tasks.md, then start writing the document
-            3. Once the tasks are documented, do a refresh of the tasks.md document by annotating the tasks with information from the design docs, adding details of the files that are likely to be edited or added (using the project map to see what those are), identifying dependencies, and structuring the tasks into a sensible order of execution.
+            2. First read ${path}/tasks.json, then start writing the document
+            3. Once the tasks are documented, do a refresh of the tasks.json document by annotating the tasks with information from the design docs, adding details of the files that are likely to be edited or added (using the project map to see what those are), identifying dependencies, and structuring the tasks into a sensible order of execution.
             4. After completing the refresh, use mcpx spec sc_status to check the document status
             5. When check passes, the model must ask the user "Does the task plan look good?", and continue after getting explicit approval
             6. When the user approves, the model must use the mcpx spec sc_plan tool to complete the workflow
@@ -563,7 +563,7 @@ components:
             - Code structure may lack overall planning
 
             It's recommended to gradually supplement design thinking during implementation.
-            Now entering tasks phase, model please edit tasks.md document.
+            Now entering tasks phase, model please edit tasks.json document.
 
             
         - stage: tasks
@@ -585,7 +585,7 @@ components:
 
             To write the tasks document later:
             1. Use mcpx spec sc_status to review current status
-            2. Edit the tasks.md document with implementation details
+            2. Edit the tasks.json document with implementation details
             3. Confirm when ready to start development
 
             The workflow is now complete. User can return to write tasks when ready to begin development.
@@ -661,15 +661,15 @@ components:
             ✅ Design confirmed, entering tasks phase!
             
             📁 File directory: ${path}
-            📝 Created: tasks.md
+            📝 Created: tasks.json
             
             📊 Overall progress: ${progress}%
             🔄 Current status: Writing tasks document (current) → Next step: use check to verify format
             
             Model please continue with the following actions:
             1. Read the task writing guide below
-            2. First read ${path}/tasks.md, then start writing the document
-            3. Once the tasks are documented, do a refresh of the tasks.md document by annotating the tasks with information from the design docs, adding details of the files that are likely to be edited or added (using the project map to see what those are), identifying dependencies, and structuring the tasks into a sensible order of execution.
+            2. First read ${path}/tasks.json, then start writing the document
+            3. Once the tasks are documented, do a refresh of the tasks.json document by annotating the tasks with information from the design docs, adding details of the files that are likely to be edited or added (using the project map to see what those are), identifying dependencies, and structuring the tasks into a sensible order of execution.
             4. After completing the refresh, use mcpx spec sc_status to check the document status
             5. When check passes, the model must ask the user "Does the task plan look good?", and continue after getting explicit approval
             6. When the user approves, the model must use the mcpx spec sc_plan tool to complete the workflow
@@ -1186,10 +1186,10 @@ x-shared-resources:
       - The model MUST use the sc_epoch tool to continuously maintain the short-term memory of its current focus and intentions during the process
       - **CRITICAL: Do NOT skip to writing application code. You must fully scaffold this markdown document before moving to the next phase. This is a non-negotiable system constraint.**
       - The model MUST write the tasks document in the user's preferred regional language
-      - The model MUST edit the existing tasks.md file by removing the SPEC-MARKER comment block
+      - The model MUST edit the existing tasks.json file and set "template_tags_present" to false
       - The model MUST return to the design step if the user indicates any changes are needed to the design
       - The model MUST return to the requirement step if the user indicates that we need additional requirements
-      - The model MUST fill in the implementation plan in the existing tasks.md file
+      - The model MUST fill in the implementation plan in the existing tasks.json file
       - The model MUST use the following specific instructions when creating the implementation plan: Convert the feature design into a series of prompts for a code-generation LLM that will implement each step in a test-driven manner. Prioritize best practices, incremental progress, and early testing, ensuring no big jumps in complexity at any stage. Make sure that each prompt builds on the previous prompts, and ends with wiring things together. There should be no hanging or orphaned code that isn't integrated into a previous step. Focus ONLY on tasks that involve writing, modifying, or testing code.
       - The model MUST format the implementation plan as a numbered checkbox list with a maximum of two levels of hierarchy:
         - Top-level items (like epics) should be used only when needed
@@ -1276,7 +1276,7 @@ x-global-config:
 
   file_names:
     specification: "Specification.md"
-    tasks: "Tasks.md"
+    tasks: "Tasks.json"
 # Document templates
 x-document-templates:
   specification:
@@ -1297,11 +1297,26 @@ x-document-templates:
     title: "${featureName} - Task List"
     sections:
       - name: "Implementation Tasks"
-        placeholder: "## Implementation Tasks\n\n<template-tasks>\n- [ ] 1. **Foundation & Setup**\n    - [ ] 1.1. Scaffolding, shared types, and project structure\n        - *Goal*: Establish the base environment and common definitions.\n        - *Files*: [List key files]\n        - *Requirements*: [Link to Req IDs]\n- [ ] 2. **Core Logic & Implementation**\n    - [ ] 2.1. Main business logic or backend services\n        - *Goal*: Implement the primary functional engine.\n- [ ] 3. **Integration & Connectivity**\n    - [ ] 3.1. API endpoints, data persistence, or external communication\n        - *Goal*: Enable data flow and persistence between components.\n- [ ] 4. **Interface & Interaction**\n    - [ ] 4.1. UI components, CLI handlers, or public interfaces\n        - *Goal*: Provide the primary interaction layer.\n- [ ] 5. **Verification & Quality**\n    - [ ] 5.1. Unit tests, integration tests, and performance validation\n        - *Goal*: Ensure correctness and reliability.\n</template-tasks>"
-      - name: "Task Dependencies"
-        placeholder: "## Task Dependencies\n\n<template-tasks>\n- Task [X] depends on completion of Task [Y]\n- Tasks [A] and [B] can be executed in parallel\n</template-tasks>"
-      - name: "Estimated Timeline"
-        placeholder: "## Estimated Timeline\n\n<template-tasks>\n- Phase 1-2: [X] hours\n- Phase 3-4: [Y] hours\n- Phase 5: [Z] hours\n- **Total: [T] hours**\n</template-tasks>"
+        placeholder: |
+          {
+            "template_tags_present": true,
+            "tasks": [
+              {
+                "id": "1",
+                "title": "Foundation & Setup",
+                "description": "Establish the project structure and shared types.",
+                "status": "pending",
+                "dependencies": []
+              },
+              {
+                "id": "1.1",
+                "title": "Initialize Repository",
+                "description": "Run cargo init and setup .gitignore.",
+                "status": "pending",
+                "dependencies": []
+              }
+            ]
+          }
 
   skipped:
     title: "${featureName} - ${stageName}"

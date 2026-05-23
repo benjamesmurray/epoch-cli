@@ -14,6 +14,7 @@ import { Config } from "../config/config"
 import { Log } from "../util/log"
 import { Glob } from "../util/glob"
 import fsNode from "fs/promises"
+import path from "path"
 import { NamedError } from "@epoch-ai/util/error"
 import z from "zod/v4"
 import { Instance } from "../project/instance"
@@ -35,6 +36,10 @@ import { makeRuntime } from "@/effect/run-service"
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 import * as CrossSpawnSpawner from "@/effect/cross-spawn-spawner"
 import { NodeFileSystem, NodePath } from "@effect/platform-node"
+import { Session } from "../session"
+import { MessageV2 } from "../session/message-v2"
+import { MessageID, PartID } from "../session/schema"
+import { Provider } from "../provider/provider"
 
 export namespace MCP {
   const log = Log.create({ service: "mcp" })
@@ -44,6 +49,13 @@ export namespace MCP {
     if (config.mcpx?.binaryPath) return config.mcpx.binaryPath
     // Standardize on mcpx-rust for the new architecture.
     return "mcpx-rust"
+  }
+
+  async function getLastModel(sessionID: any) {
+    for await (const item of MessageV2.stream(sessionID)) {
+      if (item.info.role === "user" && item.info.model) return item.info.model
+    }
+    return Provider.defaultModel()
   }
 
   export const Resource = z
@@ -71,6 +83,143 @@ export namespace MCP {
       url: z.string(),
     }),
   )
+
+  function hasImplementationDetail(parsed: any): boolean {
+    if (!parsed || !Array.isArray(parsed.tasks)) return false
+    // If they added more tasks, it's definitely an edit.
+    if (parsed.tasks.length > 2) return true
+    // If they have 2 tasks, check if the titles match the default template.
+    const t1 = parsed.tasks[0]
+    const t2 = parsed.tasks[1]
+    const isTemplate = t1?.title === "Foundation & Setup" && t2?.title === "Initialize Repository"
+    return !isTemplate
+  }
+
+  async function validateSddState(activePath: string): Promise<{ isError: boolean; output: string; title: string; metadata: any } | undefined> {
+    const mdFiles = await Glob.scan("**/*.md", { cwd: activePath, absolute: true })
+    for (const f of mdFiles) {
+      const content = await fsNode.readFile(f, "utf-8")
+      if (/<template-(specification|requirements|design|tasks)/i.test(content)) {
+        return {
+          output:
+            "Error: PROGRAMMATIC SCAN DETECTED <template-*> TAGS. DO NOT APPROVE REQUIREMENTS OR DESIGN. Remove all template tags before approving.",
+          title: "Template Validation Error",
+          isError: true,
+          metadata: {},
+        }
+      }
+    }
+
+    const tasksFiles = await Glob.scan("**/[Tt]asks.json", { cwd: activePath, absolute: true })
+    for (const f of tasksFiles) {
+      let content = ""
+      try {
+        content = await fsNode.readFile(f, "utf-8")
+        const parsed = JSON.parse(content)
+
+        if (parsed.template_tags_present === true && !hasImplementationDetail(parsed)) {
+          return {
+            output:
+              "Error: PROGRAMMATIC SCAN DETECTED template_tags_present: true. DO NOT APPROVE IMPLEMENTATION PLAN. You MUST set template_tags_present to false after drafting your implementation plan in Tasks.json.",
+            title: "Template Validation Error",
+            isError: true,
+            metadata: {},
+          }
+        }
+
+        if (Array.isArray(parsed)) {
+          return {
+            output:
+              "Error: Tasks.json is invalid. It must be an OBJECT with a 'tasks' key (e.g., { \"tasks\": [...], \"template_tags_present\": false }). You provided a top-level ARRAY. Please wrap your tasks in the correct object structure and try again.",
+            title: "Tasks Structure Error",
+            isError: true,
+            metadata: {},
+          }
+        }
+
+        if (Array.isArray(parsed.tasks)) {
+          if (parsed.tasks.length === 0) {
+            return {
+              output: "Error: Tasks.json must contain at least one implementation task in the 'tasks' array.",
+              title: "Tasks Validation Error",
+              isError: true,
+              metadata: {},
+            }
+          }
+          for (const task of parsed.tasks) {
+            const missing = []
+            if (task.id === undefined || task.id === null || task.id === "") missing.push("id")
+
+            const hasTitle = !!task.title
+            const hasDescription = !!task.description
+            const hasDetails = !!task.details
+            const hasStatus = !!task.status
+
+            if (!hasTitle) missing.push("title")
+            if (!hasDescription && !hasDetails) missing.push("description")
+            if (!hasStatus) missing.push("status")
+
+            let detailMsg = ""
+            if (missing.length > 0) {
+              detailMsg += `Missing required fields: ${missing.join(", ")}. `
+            }
+
+            if (task.id) {
+              const idStr = String(task.id)
+              if (!/^\d+(\.\d+)*$/.test(idStr)) {
+                detailMsg += `Task ID '${idStr}' is invalid. Please use numeric-style identifiers (e.g., "1", "1.1", "2") to satisfy the spec server's hierarchy requirements. `
+              }
+            }
+
+            const isTitleSwap = !hasTitle && hasDescription
+            const isDescriptionSwap = hasDetails && (!hasDescription || isTitleSwap)
+
+            if (isTitleSwap) {
+              detailMsg += "You appear to have used 'description' for the task title. Please rename it to 'title'. "
+            }
+            if (isDescriptionSwap) {
+              detailMsg += "You appear to have used 'details' instead of 'description'. Please rename it. "
+            }
+
+            if (detailMsg) {
+              return {
+                output: `Error: Tasks.json task with id '${task.id || "unknown"}' is invalid. ${detailMsg}The 'spec' tool requires each task to have 'id', 'title', 'description', and 'status'. Please fix the schema and try again.`,
+                title: "Tasks Schema Validation Error",
+                isError: true,
+                metadata: {},
+              }
+            }
+          }
+        } else {
+          return {
+            output: "Error: Tasks.json is missing the 'tasks' array. Please wrap your tasks in a 'tasks' key.",
+            title: "Tasks Structure Error",
+            isError: true,
+            metadata: {},
+          }
+        }
+      } catch (e) {
+        // Only error if it looks like Markdown or is clearly not JSON
+        if (content.trim().startsWith("#") || content.trim().startsWith("-")) {
+          return {
+            output:
+              "Error: Tasks.json appears to be written in Markdown. It MUST be a valid JSON object with a 'tasks' key. Please rewrite the file as JSON.",
+            title: "Tasks Format Error",
+            isError: true,
+            metadata: {},
+          }
+        }
+        return {
+          output: `Error: Tasks.json is not valid JSON. ${String(e)}. Please fix the file and try again.`,
+          title: "Tasks JSON Parse Error",
+          isError: true,
+          metadata: {},
+        }
+      }
+    }
+    return undefined
+  }
+
 
   export const Failed = NamedError.create(
     "MCPFailed",
@@ -148,19 +297,9 @@ export namespace MCP {
       parameters: z.any() as any, // We rely on the model's schema-following
       execute: async (args: unknown, ctx: ToolSvc.Context) => {
         if (mcpTool.name === "sc_approve") {
-          const mdFiles = await Glob.scan("projects/active/**/*.md", { cwd: Instance.worktree, absolute: true })
-          for (const f of mdFiles) {
-            const content = await fsNode.readFile(f, "utf-8")
-            if (content.includes("<template") || content.includes("</template")) {
-              return {
-                output:
-                  "Error: PROGRAMMATIC SCAN DETECTED <template> TAGS. DO NOT APPROVE REQUIREMENTS OR DESIGN. Remove all template tags before approving.",
-                title: "Template Validation Error",
-                isError: true,
-                metadata: {},
-              }
-            }
-          }
+          const activePath = path.join(Instance.worktree, "projects/active")
+          const validationResult = await validateSddState(activePath)
+          if (validationResult) return validationResult
         }
 
         const result = (await client.callTool(
@@ -696,39 +835,37 @@ export namespace MCP {
         const binary = resolveMcpxBinary(config)
 
         return {
-          description:
-            "Execute an MCP tool via the unified mcpx-rust interface. This tool bypasses standard JSON-RPC bloat and allows for shell-like composition of MCP operations. Discover capabilities by calling this tool with server='<server>' and tool='--help'.",
+          description: "Execute an MCP tool (e.g. server='spec', tool='sc_init').",
           parameters: z.object({
             server: z.string().describe("The name of the MCP server (e.g. 'spec', 'map')"),
-            tool: z.string().describe("The name of the tool to invoke (e.g. 'sc_init', 'pm_query')"),
-            args: z
-              .array(z.string())
-              .describe(
-                'Positional arguments to pass to the tool. IMPORTANT: When an argument contains complex strings, spaces, or quotes, pass the EXACT literal string. Do NOT add extra quotes around the string, they will be properly escaped. Example: `["--description", "Implement a strictly typed Event Sourcing Bus"]`',
-              )
-              .optional(),
-            flags: z
-              .record(z.string(), z.string())
-              .describe(
-                "Named flags to pass to the tool (e.g. { 'path': '/foo' } becomes --path /foo). CRITICAL: Initialization tools (like `sc_init`) often require a `--name` flag for descriptive project naming. If unsure of available flags, ALWAYS call the tool with `args=['--help']` first. Prefer using flags over args where possible.",
-              )
-              .optional(),
+            tool: z.string().describe("The name of the tool to invoke"),
+            args: z.array(z.string()).describe("Positional arguments for the tool").optional(),
+            flags: z.record(z.string(), z.string()).describe("Key-value flags (e.g. --path /foo)").optional(),
           }) as any,
           execute: async (input: any, ctx: ToolSvc.Context) => {
             if (input.server === "spec" && input.tool === "sc_approve") {
-              const mdFiles = await Glob.scan("projects/active/**/*.md", { cwd: Instance.worktree, absolute: true })
-              for (const f of mdFiles) {
-                const content = await fsNode.readFile(f, "utf-8")
-                if (content.includes("<template") || content.includes("</template")) {
-                  return {
-                    output:
-                      "Error: PROGRAMMATIC SCAN DETECTED <template> TAGS. DO NOT APPROVE REQUIREMENTS OR DESIGN. Remove all template tags before approving.",
-                    title: "Template Validation Error",
-                    isError: true,
-                    metadata: {},
+              let activePath = path.join(Instance.worktree, "projects/active")
+              try {
+                const statusRes = await Process.run([binary, "spec", "sc_status"], {
+                  cwd: Instance.directory,
+                  nothrow: true,
+                })
+                if (statusRes.code === 0) {
+                  const output = statusRes.stdout.toString()
+                  const featureMatch = output.match(/^[ \t]+feature:\s*(.+)$/m)
+                  if (featureMatch && featureMatch[1]) {
+                    const featurePath = featureMatch[1].trim()
+                    activePath = path.isAbsolute(featurePath)
+                      ? featurePath
+                      : path.join(Instance.directory, featurePath)
                   }
                 }
+              } catch (e) {
+                // Fallback to broad scan if status check fails
               }
+
+              const validationResult = await validateSddState(activePath)
+              if (validationResult) return validationResult
             }
 
             const args = [input.server, input.tool]
@@ -763,6 +900,74 @@ export namespace MCP {
               output += `\n\nError (Exit ${res.code}): ${stderr}`
             }
 
+            // active workflow enforcement: trigger persona shifts on success
+            if (res.code === 0 && input.server === "spec") {
+              if (input.tool === "sc_init") {
+                const model = await getLastModel(ctx.sessionID)
+                const userMsg: MessageV2.User = {
+                  id: MessageID.ascending(),
+                  sessionID: ctx.sessionID,
+                  role: "user",
+                  time: { created: Date.now() },
+                  agent: "plan",
+                  model,
+                }
+                await Session.updateMessage(userMsg)
+                await Session.updatePart({
+                  id: PartID.ascending(),
+                  messageID: userMsg.id,
+                  sessionID: ctx.sessionID,
+                  type: "text",
+                  text: "Feature initialized. Switching to Plan Mode. You MUST complete the Specification.md, then run 'sc_approve', followed by 'sc_plan' and another 'sc_approve' before you can write source code.",
+                  synthetic: true,
+                } satisfies MessageV2.TextPart)
+              } else if (input.tool === "sc_approve") {
+                const phaseMatch = output.match(/^[ \t]+phase:\s*(\w+)/m)
+                const statusMatch = output.match(/^[ \t]+status:\s*(\w+)/m)
+                const phase = phaseMatch?.[1]
+                const status = statusMatch?.[1]
+
+                // Synchronize project state with semaphore files for deterministic routing (Clerk)
+                const featureMatch = output.match(/^[ \t]+feature:\s*(.+)$/m)
+                const featurePath = featureMatch?.[1]?.trim()
+                if (featurePath) {
+                  const fullPath = path.isAbsolute(featurePath)
+                    ? featurePath
+                    : path.join(Instance.directory, featurePath)
+                  if (phase === "tasks") {
+                    await fsNode.writeFile(path.join(fullPath, ".spec-specification-approved"), "").catch(() => {})
+                  } else if (phase === "implementation") {
+                    await fsNode.writeFile(path.join(fullPath, ".spec-tasks-approved"), "").catch(() => {})
+                  }
+                }
+
+                // Transition to BUILD mode only if the Implementation phase is active.
+                if (phase === "implementation") {
+                  const model = await getLastModel(ctx.sessionID)
+                  const userMsg: MessageV2.User = {
+                    id: MessageID.ascending(),
+                    sessionID: ctx.sessionID,
+                    role: "user",
+                    time: { created: Date.now() },
+                    agent: "build",
+                    model,
+                  }
+                  await Session.updateMessage(userMsg)
+                  await Session.updatePart({
+                    id: PartID.ascending(),
+                    messageID: userMsg.id,
+                    sessionID: ctx.sessionID,
+                    type: "text",
+                    text: "Tasks approved. Switching to Build Mode. Implementation is now unlocked.",
+                    synthetic: true,
+                  } satisfies MessageV2.TextPart)
+
+                  // Signal that a context reset is required for the new persona
+                  ;(res as any).transition = true
+                }
+              }
+            }
+
             const { content, truncated, outputPath } = (await runPromise((_) =>
               truncate.output(output, {}, undefined),
             )) as any
@@ -771,7 +976,7 @@ export namespace MCP {
               output: content,
               title: `mcpx ${input.server} ${input.tool}`,
               isError: res.code !== 0,
-              metadata: { exit: res.code, truncated, outputPath, command: commandLine },
+              metadata: { exit: res.code, truncated, outputPath, command: commandLine, transition: (res as any).transition },
             }
           },
         }

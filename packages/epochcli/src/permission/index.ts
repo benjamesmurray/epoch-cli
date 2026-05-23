@@ -104,9 +104,7 @@ export namespace Permission {
 
   export type Error = DeniedError | RejectedError | CorrectedError
 
-  export const AskInput = Request.partial({ id: true }).extend({
-    ruleset: Ruleset,
-  })
+  export const AskInput = Request.partial({ id: true })
 
   export const ReplyInput = z.object({
     requestID: PermissionID.zod,
@@ -115,7 +113,7 @@ export namespace Permission {
   })
 
   export interface Interface {
-    readonly ask: (input: z.infer<typeof AskInput>) => Effect.Effect<void, Error>
+    readonly ask: (input: z.infer<typeof AskInput>, ruleset: Ruleset) => Effect.Effect<void, Error>
     readonly reply: (input: z.infer<typeof ReplyInput>) => Effect.Effect<void>
     readonly list: () => Effect.Effect<Request[]>
   }
@@ -131,7 +129,7 @@ export namespace Permission {
   }
 
   export function evaluate(permission: string, pattern: string, ...rulesets: Ruleset[]): Rule {
-    log.info("evaluate", { permission, pattern, ruleset: rulesets.flat() })
+    log.debug("evaluate", { permission, pattern, ruleset: rulesets.flat() })
     return evalRule(permission, pattern, ...rulesets)
   }
 
@@ -164,42 +162,42 @@ export namespace Permission {
         }),
       )
 
-      const ask = Effect.fn("Permission.ask")(function* (input: z.infer<typeof AskInput>) {
-        const { approved, pending } = yield* InstanceState.get(state)
-        const { ruleset, ...request } = input
-        let needsAsk = false
+      const ask = (input: z.infer<typeof AskInput>, ruleset: Ruleset) =>
+        Effect.fn("Permission.ask")(function* (request: z.infer<typeof AskInput>) {
+          const { approved, pending } = yield* InstanceState.get(state)
+          let needsAsk = false
 
-        for (const pattern of request.patterns) {
-          const rule = evaluate(request.permission, pattern, ruleset, approved)
-          log.info("evaluated", { permission: request.permission, pattern, action: rule })
-          if (rule.action === "deny") {
-            return yield* new DeniedError({
-              ruleset: ruleset.filter((rule) => Wildcard.match(request.permission, rule.permission)),
-            })
+          for (const pattern of request.patterns) {
+            const rule = evaluate(request.permission, pattern, ruleset, approved)
+            log.info("evaluated", { permission: request.permission, pattern, action: rule })
+            if (rule.action === "deny") {
+              return yield* new DeniedError({
+                ruleset: ruleset.filter((rule) => Wildcard.match(request.permission, rule.permission)),
+              })
+            }
+            if (rule.action === "allow") continue
+            needsAsk = true
           }
-          if (rule.action === "allow") continue
-          needsAsk = true
-        }
 
-        if (!needsAsk) return
+          if (!needsAsk) return
 
-        const id = request.id ?? PermissionID.ascending()
-        const info: Request = {
-          id,
-          ...request,
-        }
-        log.info("asking", { id, permission: info.permission, patterns: info.patterns })
+          const id = request.id ?? PermissionID.ascending()
+          const info: Request = {
+            id,
+            ...request,
+          }
+          log.info("asking", { id, permission: info.permission, patterns: info.patterns })
 
-        const deferred = yield* Deferred.make<void, RejectedError | CorrectedError>()
-        pending.set(id, { info, deferred })
-        yield* bus.publish(Event.Asked, info)
-        return yield* Effect.ensuring(
-          Deferred.await(deferred),
-          Effect.sync(() => {
-            pending.delete(id)
-          }),
-        )
-      })
+          const deferred = yield* Deferred.make<void, RejectedError | CorrectedError>()
+          pending.set(id, { info, deferred })
+          yield* bus.publish(Event.Asked, info)
+          return yield* Effect.ensuring(
+            Deferred.await(deferred),
+            Effect.sync(() => {
+              pending.delete(id)
+            }),
+          )
+        })(input)
 
       const reply = Effect.fn("Permission.reply")(function* (input: z.infer<typeof ReplyInput>) {
         const { approved, pending } = yield* InstanceState.get(state)
@@ -311,8 +309,8 @@ export namespace Permission {
 
   export const { runPromise } = makeRuntime(Service, defaultLayer)
 
-  export async function ask(input: z.infer<typeof AskInput>) {
-    return runPromise((s) => s.ask(input))
+  export async function ask(input: z.infer<typeof AskInput>, ruleset: Ruleset) {
+    return runPromise((s) => s.ask(input, ruleset))
   }
 
   export async function reply(input: z.infer<typeof ReplyInput>) {

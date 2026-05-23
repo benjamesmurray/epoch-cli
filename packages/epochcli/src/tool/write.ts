@@ -21,8 +21,8 @@ const MAX_PROJECT_DIAGNOSTICS_FILES = 5
 export const WriteTool = Tool.define("write", {
   description: DESCRIPTION,
   parameters: z.object({
-    content: z.string().describe("The content to write to the file"),
-    filePath: z.string().describe("The absolute path to the file to write (must be absolute, not relative)"),
+    content: z.string().describe("The content to write"),
+    filePath: z.string().describe("The absolute path to write"),
   }),
   async execute(params, ctx) {
     const filepath = path.isAbsolute(params.filePath) ? params.filePath : path.join(Instance.directory, params.filePath)
@@ -30,7 +30,23 @@ export const WriteTool = Tool.define("write", {
 
     const exists = await Filesystem.exists(filepath)
     const contentOld = exists ? await Filesystem.readText(filepath) : ""
-    if (exists) await FileTime.assert(ctx.sessionID, filepath)
+    if (exists) {
+      try {
+        await FileTime.assert(ctx.sessionID, filepath)
+      } catch (error: any) {
+        if (error.message.includes("You must read file")) {
+          await FileTime.read(ctx.sessionID, filepath)
+          const maxLines = 2000
+          const lines = contentOld.split("\n")
+          const truncated = lines.length > maxLines
+          const displayContent = lines.slice(0, maxLines).join("\n")
+          throw new Error(
+            `ERROR: Stale Write Protection. You cannot overwrite a file you have not read.\n\n[SYSTEM AUTO-READ]: To save you a turn, the system has automatically loaded the file content for you:\n\n--- CONTENT OF ${filepath} ---\n${displayContent}\n${truncated ? `\n... (truncated to ${maxLines} lines)` : ""}\n--------------------------------\n\nPlease review the contents above and issue your write/replace command again.`,
+          )
+        }
+        throw error
+      }
+    }
 
     const diff = trimDiff(createTwoFilesPatch(filepath, filepath, contentOld, params.content))
     await ctx.ask({

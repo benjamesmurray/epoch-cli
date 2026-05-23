@@ -54,6 +54,7 @@ export namespace SessionProcessor {
     snapshot: string | undefined
     blocked: boolean
     needsCompaction: boolean
+    pendingTransition: boolean
     streamingLoopDetected: boolean
     streamingLoopReason?: string
     currentText: MessageV2.TextPart | undefined
@@ -105,6 +106,7 @@ export namespace SessionProcessor {
           snapshot: initialSnapshot,
           blocked: false,
           needsCompaction: false,
+          pendingTransition: false,
           streamingLoopDetected: false,
           streamingLoopReason: undefined,
           currentText: undefined,
@@ -129,6 +131,19 @@ export namespace SessionProcessor {
               ctx.assistantMessage.modelID = (value as any).modelId as any
               ctx.assistantMessage.providerID = input.model.providerID
               if ((value as any).timestamp) ctx.assistantMessage.time.created = (value as any).timestamp.getTime()
+              return
+
+            case "reasoning-start":
+              ctx.reasoningMap[value.id] = {
+                id: PartID.ascending(),
+                messageID: ctx.assistantMessage.id,
+                sessionID: ctx.assistantMessage.sessionID,
+                type: "reasoning",
+                text: "",
+                time: { start: Date.now() },
+                metadata: value.providerMetadata,
+              }
+              yield* session.updatePart(ctx.reasoningMap[value.id])
               return
 
             case "text-start":
@@ -299,14 +314,16 @@ export namespace SessionProcessor {
               }
 
               const agent = yield* agents.get(ctx.assistantMessage.agent)
-              yield* permission.ask({
-                permission: "doom_loop",
-                patterns: [value.toolName],
-                sessionID: ctx.assistantMessage.sessionID,
-                metadata: { tool: value.toolName, input: value.input },
-                always: [value.toolName],
-                ruleset: agent.permission,
-              })
+              yield* permission.ask(
+                {
+                  permission: "doom_loop",
+                  patterns: [value.toolName],
+                  sessionID: ctx.assistantMessage.sessionID,
+                  metadata: { tool: value.toolName, input: value.input },
+                  always: [value.toolName],
+                },
+                agent.permission,
+              )
               return
             }
 
@@ -325,6 +342,11 @@ export namespace SessionProcessor {
                   attachments: value.output.attachments,
                 },
               })
+
+              if (value.output.metadata?.transition === true) {
+                ctx.pendingTransition = true
+              }
+
               delete ctx.toolcalls[value.toolCallId]
               return
             }
@@ -538,7 +560,12 @@ export namespace SessionProcessor {
 
               yield* stream.pipe(
                 SanitizerMiddleware.transform(),
-                Stream.tap((event) => handleEvent(event)),
+                Stream.tap((event) => {
+                  if (event.type === "text-delta" && event.textDelta === "[CONTEXT_OVERFLOW_DETECTED]") {
+                    ctx.needsCompaction = true
+                  }
+                  return handleEvent(event)
+                }),
                 Stream.takeUntil(() => ctx.needsCompaction || ctx.streamingLoopDetected),
                 Stream.runDrain,
               )
@@ -567,7 +594,7 @@ export namespace SessionProcessor {
             if (aborted && !ctx.assistantMessage.error) {
               yield* abort()
             }
-            if (ctx.needsCompaction) return "compact"
+            if (ctx.needsCompaction || ctx.pendingTransition) return "compact"
             if (ctx.blocked || ctx.assistantMessage.error || aborted || ctx.streamingLoopDetected) return "stop"
             return "continue"
           }).pipe(Effect.onInterrupt(() => abort().pipe(Effect.asVoid)))

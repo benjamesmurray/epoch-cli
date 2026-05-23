@@ -69,7 +69,7 @@ Persona assignment is **Deterministic**, driven by project state rather than pro
 
 *   **Personas:** `plan` (restricted to spec/tasks), `build` (code/bash/tests), `explore` (read-only).
 *   **State-Driven Shift:** The moment `sc_approve` is called via the `spec` tool, the orchestrator detects the phase change in the continuity report and automatically elevates the agent to the `build` persona.
-*   **Workflow Monotonicity:** Tightly coupled with the `spec` tool sequence: `sc_init` -> `Specification.md` -> `sc_approve` -> `sc_plan` -> `Tasks.md` -> `sc_approve` -> `Implementation`.
+*   **Workflow Monotonicity:** Tightly coupled with the `spec` tool sequence: `sc_init` -> `Specification.md` -> `sc_approve` -> `sc_plan` -> `Tasks.json` -> `sc_approve` -> `Implementation`.
 
 ## 7. Doom Loop Protection (Stall Scoring)
 

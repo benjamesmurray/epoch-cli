@@ -9,20 +9,20 @@ The prompt is divided into four distinct zones, each served by the **System Role
 ### **Zone 1: The Head (System Message 1)**
 *   **Purpose:** Immediate context, immutable engineering standards, and **Thinking Mode control**.
 *   **Content:**
-    *   **Thinking Control:** For supported models (e.g., Gemma-4), the `<|think|>` control token is injected here.
-    *   **Persona:** Standardized identity as "epochcli, a pragmatic software engineer."
+    *   **Thinking Control:** For supported models, the `<|think|>` control token is injected here.
+    *   **Persona:** Standardized identity as "Epoch CLI, a pragmatic software engineer."
     *   **Operational Facts:** Immutable truths about the environment (e.g., "The environment context limit is 32K tokens").
-    *   **Technical Stack:** Extracted via Ground Truth (e.g., Language: TypeScript, Framework: Vitest).
     *   **Current Phase:** Injected via the Spec CLI (e.g., `[PLAN]` or `[BUILD]`).
-    *   **Project Map:** A static reference to the location of the `.toon` formatted architectural map.
+    *   **Project Map:** A high-density reference to the map in the `<env>` block.
     *   **Effort Instruction:** Explicit directive (e.g., `THINKING EFFORT: HIGH/LOW`) based on Clerk classification.
+    *   **Silent Guardrails:** Behavioral constraints (YOLO, file-by-file) are enforced by the middleware/supervisor. YOLO mode nudges are **silent**; the engine auto-continues the loop after text responses without adding system text to the history, minimizing token overhead.
 *   **Header:** `=== ZONE 1: IMMEDIATE CONTEXT & PERSISTENCE ===`.
 
 ### **Zone 2: The Body (System Message 2)**
-*   **Purpose:** Behavioral discipline and general interaction context.
+*   **Purpose:** Behavioral discipline and tool operational guidance.
 *   **Content:**
-    *   **Behavioral Rules:** Specific "Trigger/Behaviour/Example" packs (e.g., Suppressing conversational filler, handling non-coding questions).
-    *   **General Context:** High-level project state or clerk-selected rule packs.
+    *   **Tool Operational Guide:** Centralized, high-density instructions for tool usage (e.g., "Prefer mcpx over glob", "Read before edit").
+    *   **Behavioral Rules:** Specific "Trigger/Behaviour/Example" packs.
 *   **Header:** `=== ZONE 2: BEHAVIORAL RULES & GENERAL CONTEXT ===`.
 
 ### **Zone 3: The Tail (System Message 3)**
@@ -42,11 +42,10 @@ The prompt is divided into four distinct zones, each served by the **System Role
 
 To maintain strict User/Assistant alternation and ensure compatibility with "Thinking" models (which forbid assistant pre-filling), the **Internal State Check** is injected as a hidden instruction within the final **User** message.
 
-*   **Placement:** Appended to the end of the user's prompt (or merged into the user message role).
-*   **Content:**
-    *   **Thinking Mode:** Explicit directive for adaptive thought efficiency (e.g. "LOW thinking active").
-    *   **Current Strategy:** Immediate next-step priorities (e.g., "mcpx pm_query first").
-    *   **Token Budget:** Reminder of the active context window constraints.
+*   **Placement:** Appended to the end of the user's prompt.
+*   **Content:** A high-density status string:
+    *   `[STATE] Phase: [PHASE] | Thought: [high/low] | Budget: [LIMIT]K`
+*   **Purpose:** Provides the model with its operational constraints and active phase without the overhead of natural language explanations.
 
 ## 3. Adaptive Thinking & Reasoning (Clerk-Driven)
 
@@ -66,7 +65,7 @@ The system utilizes a dual-model orchestration where a smaller "Clerk" model (lo
 
 ## 4. Ground Truth Integration
 
-The `ground` MCP server is the primary source of truth for project-specific rules (`.Model_rules.toon`).
+The `ground` MCP server is the primary source of truth for project-specific rules (`.assistant_rules.toon`).
 
 ### **Project Map Integration**
 The system seamlessly integrates architectural awareness by monitoring file changes via a global event bus (`packages/epochcli/src/bus/index.ts`).
@@ -75,19 +74,20 @@ The system seamlessly integrates architectural awareness by monitoring file chan
 3.  **Storage:** The output is saved to `.project-map/latest/map.toon`.
 4.  **Injection:** The static file path is injected into the `<env>` block of Zone 1, providing the model with real-time architectural context without requiring a dynamic, inline MCP call during the prompt building phase.
 
-### **Dynamic Session Initiation**
-To ensure a "zero-config" experience, the system performs an automatic scan if rules are missing:
-1.  **Check:** `LLM.stream` calls `gt_status`.
-2.  **Detection:** If the response is empty, indicates an `IDLE` state, or lacks `ZONE` markers, the system assumes no rules exist for the current workspace.
-3.  **Action:** It immediately triggers `gt_exec scan .` to synthesize a new `.Model_rules.toon` file.
-4.  **Result:** The very first prompt in a clean environment (like a fresh Docker container) is correctly populated with synthesized rules.
+### **Dynamic Session Initiation (Zero-Config)**
+To ensure a "zero-config" experience, the system performs an automatic scan if rules are missing or the environment is fresh:
+1.  **Check:** `LLM.stream` proactively calls `gt_status` via the Ground MCP server.
+2.  **Detection:** If the response is empty, indicates an `IDLE` state, or lacks language detection (e.g., `Language: None`), the system assumes no rules exist.
+3.  **Action:** It immediately triggers `gt_exec scan .` to synthesize a new `.assistant_rules.toon` file.
+4.  **Result:** The very first prompt in a clean environment (like a fresh Docker container) is correctly populated with synthesized, zoned rules.
 
-### **Rule Extraction, Synthesis, & Deduplication**
-`LLM.stream` parses context and rules using a prioritized extraction strategy:
-*   **Zone 1:** Standard regex-based extraction from `.Model_rules.toon` into the internal prompt payload (Operational Facts).
-*   **Zone 2:** Behavioral rule packs and interaction context.
-*   **Zone 3 Synthesis & Deduplication:** The `ground` dynamically detects the project's framework/language (e.g., via `package.json`) and conditionally synthesizes a "Stack Conventions" rule. If multiple `ZONE 3` blocks are found in the TOON file (e.g., due to template merging or stale baseline files), the system **prioritizes the last block found**. This ensures that the most recent dynamically synthesized rules take precedence over static defaults.
-*   **Zone 4 Extraction:** To guarantee guidelines are always present regardless of Ground Truth status, `AGENTS.md` and `.cursorrules` are explicitly fetched via the `Instruction` service and injected as a dedicated system message, bypassing the TOON rules entirely.
+### **Rule Extraction, Synthesis, & Decoupling**
+`LLM.stream` and the `PostGenerationWorker` manage rules using a tiered extraction strategy to preserve baseline integrity while preventing context overflow:
+*   **Zone 1 & 3 (Baseline Facts):** Standard regex-based extraction from the static baseline `.assistant_rules.toon` file. The parser supports both `ZONE 1` and `ZONE 1 & 3` headers, extracting high-priority operational facts (e.g., context limits) into the prompt head and project-specific rules into the tail.
+*   **Zone 2 (Behavioral Packs):** Dynamic injection of rule packs based on session intent (e.g., `debugging_pack`).
+*   **Zone 2 (Global History Rules):** To prevent corruption of the baseline rules and stop exponential context bloat, the CLI utilizes an end-of-epoch semantic merge. During an epoch transition, the `local-side` Clerk model extracts concrete architectural rules from the session's chat history. It then **semantically merges** these net-new rules with the existing rules located in `.history/project_rules.toon`.
+*   **Decoupled Integration:** The main prompt builder loads these compacted rules from the Global History Suite (`.history/project_rules.toon`) and injects them into Zone 2. The baseline `.assistant_rules.toon` remains strictly read-only for the Clerk, ensuring static codebase conventions are never overwritten by transient conversational shifts.
+*   **Zone 4 Extraction:** `AGENTS.md` and `.cursorrules` are explicitly fetched via the `Instruction` service and injected as a dedicated system message, bypassing the TOON rules entirely.
 
 ## 5. Tool Array Management
 
@@ -95,9 +95,17 @@ To prevent context window exhaustion (especially in strict environments like 16k
 
 *   **Dynamic Tool Pruning:** Tools that are unavailable or unnecessary for the current workspace are removed entirely from the payload. For example, if no custom skills are detected (`Skill.available`), the `skill` tool is dynamically filtered out before the request is made.
 *   **Internal Fallback Filtering:** Internal system tools (like the `invalid` tool, which is used locally by the middleware to gracefully catch schema parsing errors) are stripped from the AI SDK payload so their schemas do not consume valuable context tokens.
-*   **Strictly Mechanical Descriptions:** We take a decisive approach to streamlining tool schemas (e.g., `bash` and `task`). Verbose usage examples and broad behavioral constraints (such as Git/PR workflows or safety policies) are completely excluded from the tool descriptions. Tool schemas are treated strictly as mechanical API references, relying on the central System Prompt to dictate agent behavior and policy.
+*   **Strictly Mechanical Descriptions (Schema-Only Doctrine):** We take a decisive approach to streamlining tool schemas. Verbose usage examples and broad behavioral constraints are completely excluded. Tool schemas are treated strictly as mechanical API references, relying on the central System Prompt to dictate agent behavior. This "Schema-Only Doctrine" target is ~3,000 tokens for the entire array.
 
-## 6. Benefits of this Architecture
+## 6. Context Budgeting & Utilization
+
+To maximize the number of turns per epoch, the CLI employs aggressive context management:
+
+*   **Tightened Safety Margin:** The `safetyMargin` (buffer reserved for next output) is capped at **1024 tokens**. This is made possible by the CLI's **1.5x Paranoia Multiplier** in the tokenizer, which already provides a substantial implicit buffer.
+*   **Increased Watermark:** The `HIGH_WATERMARK` is set to **0.98** (98%). The agent is encouraged to continue implementation until it has nearly filled its usable space before receiving a "wrap-up" directive.
+*   **Continuity Condensation:** Project Map outputs in continuity reports are limited to a **depth of 2**, preventing massive directory trees from bloating the base load of the next epoch.
+
+## 7. Benefits of this Architecture
 
 1.  **Maximum Authority:** Using `system` messages for all rule zones ensures the model treats these constraints with the highest priority.
 2.  **Compatibility:** Removing the `assistant` pre-fill ensures full compatibility with models that have `thinking` or `reasoning` enabled (e.g., DeepSeek-R1, Gemini-2.0-Flash-Thinking).

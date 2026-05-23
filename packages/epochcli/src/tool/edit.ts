@@ -18,7 +18,7 @@ import { Filesystem } from "../util/filesystem"
 import { Instance } from "../project/instance"
 import { Snapshot } from "@/snapshot"
 import { assertExternalDirectory } from "./external-directory"
-import { generateText } from "ai"
+import { generateText } from "@/util/ai-sdk"
 import { Provider } from "../provider/provider"
 
 const MAX_DIAGNOSTICS_PER_FILE = 20
@@ -71,10 +71,10 @@ function convertToLineEnding(text: string, ending: "\n" | "\r\n"): string {
 export const EditTool = Tool.define("edit", {
   description: DESCRIPTION,
   parameters: z.object({
-    filePath: z.string().describe("The absolute path to the file to modify"),
+    filePath: z.string().describe("The absolute path to modify"),
     oldString: z.string().describe("The text to replace"),
-    newString: z.string().describe("The text to replace it with (must be different from oldString)"),
-    replaceAll: z.boolean().optional().describe("Replace all occurrences of oldString (default false)"),
+    newString: z.string().describe("The text to replace it with"),
+    replaceAll: z.boolean().optional().describe("Replace all occurrences (default false)"),
   }),
   async execute(params, ctx) {
     if (!params.filePath) {
@@ -119,7 +119,22 @@ export const EditTool = Tool.define("edit", {
       const stats = Filesystem.stat(filePath)
       if (!stats) throw new Error(`File ${filePath} not found`)
       if (stats.isDirectory()) throw new Error(`Path is a directory, not a file: ${filePath}`)
-      await FileTime.assert(ctx.sessionID, filePath)
+      try {
+        await FileTime.assert(ctx.sessionID, filePath)
+      } catch (error: any) {
+        if (error.message.includes("You must read file")) {
+          const content = await Filesystem.readText(filePath)
+          await FileTime.read(ctx.sessionID, filePath)
+          const maxLines = 2000
+          const lines = content.split("\n")
+          const truncated = lines.length > maxLines
+          const displayContent = lines.slice(0, maxLines).join("\n")
+          throw new Error(
+            `ERROR: Stale Write Protection. You cannot overwrite a file you have not read.\n\n[SYSTEM AUTO-READ]: To save you a turn, the system has automatically loaded the file content for you:\n\n--- CONTENT OF ${filePath} ---\n${displayContent}\n${truncated ? `\n... (truncated to ${maxLines} lines)` : ""}\n--------------------------------\n\nPlease review the contents above and issue your write/replace command again.`,
+          )
+        }
+        throw error
+      }
       contentOld = await Filesystem.readText(filePath)
 
       const ending = detectLineEnding(contentOld)

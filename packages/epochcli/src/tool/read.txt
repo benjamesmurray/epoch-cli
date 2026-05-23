@@ -1,8 +1,1 @@
-Read a file or directory.
-Usage:
-- Use absolute paths.
-- Returns up to 2000 lines. Use `offset` (1-indexed) for subsequent sections.
-- Format: `<line>: <content>`.
-- For directories, returns entries with trailing `/` for subdirectories.
-- Can attach image/PDF files.
-- Use `grep`/`glob` to locate content or files before reading.
+Read a file or directory. Returns up to 2000 lines. Use 'offset' (1-indexed) for subsequent sections.

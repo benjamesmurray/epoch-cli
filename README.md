@@ -12,7 +12,13 @@ The system uses two models:
 These models are managed by **llama-swap**, a proxy that automatically loads and unloads models in VRAM as the system switches between coding and supervision.
 
 ### Positional Prompting and Rules
-Prompts are structured into four zones to place information where models are most likely to attend to it (the beginning and end of the message). Immutable facts and thinking tokens are placed in Zone 1 (the head), while project-specific rules and cursor context are placed in Zone 3 (the tail).
+The system uses a **Positional Prompt Architecture** to organize information based on model attention curves. Prompts are structured into four zones:
+- **Zone 1 (Head)**: Immutable operational facts, environment constraints, and thinking control tokens.
+- **Zone 2 (Body)**: Behavioral rules and language-specific patterns (including code snippets) extracted from the **Ground Truth** server.
+- **Zone 3 (Tail)**: Project-specific anchors and active cursor context.
+- **Zone 4 (Guidelines)**: High-priority instructions from `AGENTS.md`.
+
+Architectural awareness is maintained by a background event bus that refreshes the project map index whenever files are modified, ensuring accurate discovery via tools.
 - **Credit:** This approach is adapted from [The Architecture of Prompt Sequencing](https://atlassc.net/2026/03/30/the-architecture-of-prompt-sequencing).
 
 ### Tool Management (MCPX)

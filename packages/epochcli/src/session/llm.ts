@@ -4,7 +4,14 @@ import { SessionTelemetry } from "@/util/session-telemetry"
 import { Cause, Effect, Layer, Record, ServiceMap } from "effect"
 import * as Queue from "effect/Queue"
 import * as Stream from "effect/Stream"
-import { streamText, wrapLanguageModel, type ModelMessage, type Tool, tool, jsonSchema, generateText } from "ai"
+import { streamText, wrapLanguageModel, type ModelMessage, type Tool, tool, jsonSchema, generateText } from "@/util/ai-sdk"
+import Ajv from "ajv"
+
+const ajv = new Ajv({
+  strict: false,
+  allErrors: true,
+})
+
 import { mergeDeep, pipe } from "remeda"
 import { GitLabWorkflowLanguageModel } from "gitlab-ai-provider"
 import { ProviderTransform } from "@/provider/transform"
@@ -82,6 +89,18 @@ export namespace LLM {
                 )
 
                 const result = yield* Effect.promise(() => LLM.stream({ ...input, abort: ctrl.signal }))
+
+                // Robustly suppress unhandled rejections on known background promises returned by the AI SDK
+                // Explicitly access getters because for...in misses non-enumerable properties on the prototype.
+                const promiseKeys = ["text", "usage", "finishReason", "toolCalls", "toolResults", "warnings", "providerMetadata", "steps", "response"]
+                for (const key of promiseKeys) {
+                  try {
+                    const value = (result as any)[key]
+                    if (value instanceof Promise) {
+                      value.catch(() => {})
+                    }
+                  } catch {}
+                }
 
                 return Stream.fromAsyncIterable(result.fullStream, (e) =>
                   e instanceof Error ? e : new Error(String(e)),
@@ -219,6 +238,18 @@ export namespace LLM {
       zone4_guidelines: [],
     }
 
+    try {
+      const fsNode = await import("fs/promises")
+      const pathNode = await import("path")
+      const lastUsedPath = pathNode.join(Instance.directory, ".spec_last_used")
+      const lastUsed = await fsNode.readFile(lastUsedPath, "utf-8").catch(() => null)
+      if (lastUsed) {
+        payload.zone1_critical_rules.push(`ACTIVE PROJECT CONTEXT:\n- Feature Path: ${lastUsed.trim()}\n- Note: Subagents MUST NOT run \`sc_init\` if an active feature path is already established. Use \`map\` tools to explore this path.`)
+      }
+    } catch (e) {
+      l.debug("Failed to fetch active project context for subagent", { error: String(e) })
+    }
+
     if (input.operationalFacts && input.operationalFacts.length > 0) {
       payload.zone1_critical_rules.push(...input.operationalFacts)
     }
@@ -307,10 +338,14 @@ export namespace LLM {
             let continuityReportContext = ""
             try {
               const fsNode = await import("fs/promises")
-              const rulesContext = await fsNode.readFile(".assistant_rules.toon", "utf-8")
+              const pathNode = await import("path")
+              const rulesPath = pathNode.join(".history", "project_rules.toon")
+              const rulesContext = await fsNode.readFile(rulesPath, "utf-8").catch(() => "")
               // Use an empty array for packs here since we just want operational facts for the Clerk
-              const parsedRules = parseGroundTruthRules(rulesContext, [], sideModel.limit.context)
-              if (parsedRules.operationalFacts) groundTruths = parsedRules.operationalFacts
+              if (rulesContext) {
+                const parsedRules = parseGroundTruthRules(rulesContext, [], sideModel.limit.context)
+                if (parsedRules.operationalFacts) groundTruths = parsedRules.operationalFacts
+              }
 
               // Load continuity report to help Clerk understand overarching state
               try {
@@ -378,6 +413,9 @@ export namespace LLM {
                 if (isOneShot && !planningFinished) {
                   l.debug("clerk", { message: "One-Shot planning in progress. Locking persona to: plan" })
                   return "plan"
+                } else if (planningFinished) {
+                  l.debug("clerk", { message: "Planning finished semaphore detected. Deterministic handover to: build" })
+                  return "build"
                 } else {
                   return RuleRouter.identifyAgent(conversationTail, input.agent.name, continuityReportContext)
                 }
@@ -428,7 +466,8 @@ export namespace LLM {
           // Fallback rule load
           try {
             const fsNode = await import("fs/promises")
-            rulesContext = await fsNode.readFile(".assistant_rules.toon", "utf-8")
+            const pathNode = await import("path")
+            rulesContext = await fsNode.readFile(pathNode.join(".history", "project_rules.toon"), "utf-8")
           } catch (e) {
             // ignore missing file
           }
@@ -740,7 +779,7 @@ Ready to process user request strictly under these parameters.
                     "Look at the last tool error and the chat history. Write a concise, commanding one-sentence instruction telling the main agent exactly which tool to use next to resolve the prerequisite."
                   const prompt = `History:\n${historyStr}\n\nTool Error:\n${resultStr}\n\nDirective:`
 
-                  const { generateText } = await import("ai")
+                  const { generateText } = await import("@/util/ai-sdk")
                   const res = await generateText({
                     model: sideLanguage,
                     system: systemPrompt,
@@ -762,6 +801,44 @@ Ready to process user request strictly under these parameters.
           }
 
           if (isError) {
+            // Task: Reactive Help Injection for mcpx syntax errors
+            if (toolName === "mcpx" && input.args.server && input.args.tool) {
+              try {
+                const resultText = typeof result === "string" ? result : (result?.message || JSON.stringify(result))
+                if (resultText.includes("Error (Exit") || resultText.includes("missing field") || resultText.includes("invalid type")) {
+                  log.info("mcpx syntax error detected, fetching help output", { server: input.args.server, tool: input.args.tool })
+                  const allTools = resolveTools(input)
+                  if (allTools["mcpx"] && allTools["mcpx"].execute) {
+                    const helpResult = await allTools["mcpx"].execute!({ 
+                      server: input.args.server, 
+                      tool: input.args.tool, 
+                      args: ["--help"] 
+                    }, options)
+                    
+                    const helpOutput = typeof helpResult === "string" ? helpResult : (helpResult?.output ?? JSON.stringify(helpResult))
+                    
+                    let guidance = "The command failed with a syntax error. Review the correct schema below and retry with fixed arguments."
+                    if (resultText.includes("missing field title") && input.args.server === "spec") {
+                      guidance = "The 'spec' tool failed because Tasks.json is invalid. Specifically, it is missing the 'title' field in one or more task objects. Review your Tasks.json file, ensure 'title' is used instead of (or in addition to) 'description', and retry."
+                    } else if (resultText.includes("missing field id") && input.args.server === "spec" && input.args.tool === "sc_todo_start") {
+                      guidance = "The 'sc_todo_start' tool requires an '--id' flag. Additionally, ensure that the ID you are passing exactly matches the ID in Tasks.json, and that all IDs in Tasks.json follow a numeric-style format (e.g., '1', '1.1')."
+                    }
+
+                    const augmentedError = `${resultText}\n\n[SYSTEM GUIDANCE: ${guidance}]\n\n${helpOutput}`
+                    
+                    if (result instanceof Error) {
+                      result.message = augmentedError
+                    } else if (typeof result === "object") {
+                      result.output = augmentedError
+                    } else {
+                      result = augmentedError
+                    }
+                  }
+                }
+              } catch (helpErr) {
+                log.warn("Failed to fetch reactive help for mcpx", { error: String(helpErr) })
+              }
+            }
             throw result
           }
           return result
@@ -1267,20 +1344,55 @@ Ready to process user request strictly under these parameters.
     l: any
   }): Promise<string | null> {
     try {
+      if (input.schema) {
+        // Attempt strict deterministic validation first to avoid LLM hallucinations
+        try {
+          const validate = ajv.compile(input.schema)
+          // For MCPX wrappers, the actual arguments to validate are nested
+          // The interceptToolLoop already attempts to unwrap them into validationArgs, 
+          // but we ensure we are validating the correct payload against the sub-tool schema.
+          const payloadToValidate = input.isMcpx ? normalizeMcpxArguments(input.args) : input.args
+          
+          if (validate(payloadToValidate)) {
+            input.l.info("Deterministic schema validation passed", { tool: input.toolName })
+            return null // Valid, bypass side-model
+          }
+          
+          input.l.info("Deterministic schema validation failed, falling back to side-model for explanation", { 
+            tool: input.toolName, 
+            errors: validate.errors 
+          })
+        } catch (e) {
+          input.l.warn("Failed to compile schema for deterministic validation", { error: String(e) })
+          // Fall through to side-model if we can't compile
+        }
+      }
+
       const sideModel = await Provider.getSideModel()
       if (!sideModel) return null
       const sideLanguage = await Provider.getLanguage(sideModel)
 
       const systemPrompt = input.isMcpx
-        ? `You are a tool argument validator. The user is attempting to call a sub-tool via the 'mcpx' tool wrapper. Compare the proposed SUB-TOOL arguments with the provided JSON schema. If they are valid, output 'VALID'. If they are invalid, output 'INVALID: <concise_reason> EXAMPLE: <strict_valid_json_example>'. You MUST explicitly explain what was missing or incorrect.
-        
-CRITICAL: Your JSON example MUST be formatted for the 'mcpx' wrapper tool. 
-- Servers like 'spec' and 'map' often use positional arguments.
-- Positional arguments (like 'sc_status', 'pm_query', or specific paths) MUST be passed in the 'args' array of strings.
+        ? `You are a tool argument validator. The user is attempting to call a sub-tool via the 'mcpx' tool wrapper. Compare the proposed SUB-TOOL arguments with the provided JSON schema. 
+
+CRITICAL CONSTRAINTS:
+1. You MUST ONLY validate against the properties explicitly defined in the provided JSON schema. 
+2. DO NOT invent new required properties or 'extra' fields. If a property is NOT in the schema, it is NOT required.
+3. If the proposed arguments satisfy the schema's 'required' array and property types, you MUST output 'VALID'.
+4. If they are invalid, output 'INVALID: <concise_reason> EXAMPLE: <strict_valid_json_example>'. You MUST explicitly explain what was missing or incorrect based SOLELY on the schema.
+
+TECHNICAL FORMATTING for 'mcpx' wrapper:
+- Positional arguments (like command names or paths) MUST be passed in the 'args' array of strings.
 - Named flags (like --path) should be in the 'flags' record.
-- EXAMPLE for 'spec sc_status': \`{ "server": "spec", "tool": "sc_status", "args": [] }\` (or with specific sub-args in the array).
-- Your output MUST be a JSON object containing "server", "tool", and "args" (and/or "flags").`
-        : `You are a tool argument validator. Compare the proposed arguments with the provided JSON schema. If they are valid, output 'VALID'. If they are invalid, output 'INVALID: <concise_reason> EXAMPLE: <strict_valid_json_example>'. You MUST explicitly explain what was missing or incorrect, and provide a strict, concrete JSON example of what the valid arguments should look like according to the schema.`
+- EXAMPLE for 'spec sc_status': \`{ "server": "spec", "tool": "sc_status", "args": [] }\`
+- Your output example MUST be a JSON object containing "server", "tool", and "args" (and/or "flags").`
+        : `You are a tool argument validator. Compare the proposed arguments with the provided JSON schema. 
+
+CRITICAL CONSTRAINTS:
+1. You MUST ONLY validate against the properties explicitly defined in the provided JSON schema.
+2. DO NOT invent new required properties, 'extra' fields, or metadata requirements. If a property is NOT in the schema, it is NOT required.
+3. If the proposed arguments satisfy the schema's 'required' array and property types, you MUST output 'VALID'.
+4. If they are invalid, output 'INVALID: <concise_reason> EXAMPLE: <strict_valid_json_example>'. You MUST explicitly explain what was missing or incorrect based SOLELY on the schema, and provide a strict, concrete JSON example of what the valid arguments should look like according to that schema.`
 
       const prompt = `Tool: ${input.toolName}\nProposed Args: ${JSON.stringify(input.args)}\nSchema: ${JSON.stringify(input.schema)}`
 

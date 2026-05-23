@@ -1,4 +1,3 @@
-Launch a subagent.
+Launch or resume a subagent.
 Available agents:
 {agents}
-Resumes if task_id provided.

@@ -1,7 +1,7 @@
 import { Log } from "../util/log"
 import { Effect } from "effect"
 import { Provider } from "@/provider/provider"
-import { generateText } from "ai"
+import { generateText } from "@/util/ai-sdk"
 import { MCP } from "@/mcp/index"
 import { Config } from "@/config/config"
 import fsNode from "fs/promises"
@@ -11,6 +11,55 @@ import path from "path"
 import { Glob } from "../util/glob"
 
 const log = Log.create({ service: "post-generation-worker" })
+
+/**
+ * Compacts chat history for the Clerk (Post-Generation Worker) to prevent context overflow.
+ * Strips large tool outputs and internal parts while preserving thoughts and metadata.
+ */
+function compactChatHistoryForClerk(history: any[]) {
+  return history.map((msg: any) => ({
+    ...msg,
+    info: {
+      ...(msg.info ?? {}),
+      role: msg.info?.role ?? msg.role,
+      agent: msg.info?.agent ?? msg.agent,
+    },
+    parts: (msg.parts ?? [])
+      .map((part: any) => {
+        if (part.type === "text") return { type: "text", text: part.text }
+        if (part.type === "reasoning") {
+          return {
+            type: "reasoning",
+            text:
+              part.text.length > 2000
+                ? part.text.slice(0, 1000) + "\n... [Thinking Truncated] ...\n" + part.text.slice(-1000)
+                : part.text,
+          }
+        }
+        if (part.type === "tool") {
+          const toolPart: any = {
+            type: "tool",
+            tool: part.tool,
+            input: part.state?.input ?? part.input,
+          }
+          const state = part.state ?? part
+          if (state.status === "completed" && state.output) {
+            const outStr = typeof state.output === "string" ? state.output : JSON.stringify(state.output)
+            if (outStr.length > 400) {
+              toolPart.output = `[Output Truncated: ${outStr.length} chars] ${outStr.slice(0, 200)}... [OMITTED] ...${outStr.slice(-200)}`
+            } else {
+              toolPart.output = state.output
+            }
+          } else if (state.status === "error") {
+            toolPart.error = state.error
+          }
+          return toolPart
+        }
+        return undefined
+      })
+      .filter(Boolean),
+  }))
+}
 
 export namespace PostGenerationWorker {
   export const execute = Effect.fn("PostGenerationWorker.execute")(function* (input: {
@@ -44,46 +93,63 @@ export namespace PostGenerationWorker {
       // when calls are made back-to-back sequentially
       yield* Effect.sleep("1 seconds")
 
-      // Check cancellation token before calling LLM            if (input.abortSignal.aborted) return
+      // Check cancellation token before calling LLM
+      if (input.abortSignal.aborted) return
 
-      // 1. Persistence Extraction
-      log.debug("Extracting architectural facts and user corrections", { model: sideLanguage.modelId })
-      let extractionRes
-      try {
-        extractionRes = yield* Effect.promise(() =>
-          generateText({
-            model: sideLanguage,
-            system:
-              'You are an architectural fact extractor. Analyze the provided chat history. Extract ONLY concrete, universally applicable architectural rules, stylistic corrections, or user preferences established in this session. Output them in TOON format exactly like this:\nrules[fact_id, trigger, behaviour]:\n  fact_01, "When [condition/trigger]", "[The required behavior or preference]"\n\nIf no concrete rules or corrections are found, output \'NONE\'.',
-            prompt: `Chat History:\n${JSON.stringify(input.chatHistory.slice(-5))}`,
-            abortSignal: input.abortSignal,
-          }),
-        )
-        log.debug("Persistence extraction complete", { text: extractionRes.text.slice(0, 100) })
-      } catch (e) {
-        log.error("Persistence extraction failed", { error: String(e), model: sideLanguage.modelId })
-        throw e
+      // 1. Persistence Extraction (Semantic Merge into Global History Suite)
+      if (input.isTransition || input.isFinal) {
+        log.debug("Extracting and semantically merging architectural facts into Global History", { model: sideLanguage.modelId })
+        try {
+          const rulesPath = path.join(Instance.directory, ".history", "project_rules.toon")
+          
+          // Ensure .history directory exists
+          yield* Effect.promise(() => fsNode.mkdir(path.dirname(rulesPath), { recursive: true }).catch(() => {}))
+          
+          const existingRules = yield* Effect.promise(() => fsNode.readFile(rulesPath, "utf-8").catch(() => "NONE"))
+          
+          const extractionRes = yield* Effect.promise(() =>
+            generateText({
+              model: sideLanguage,
+              system:
+                'You are an expert architectural fact extractor and deduplicator.\n' +
+                'Your task is to analyze the provided chat history for any NEW, universally applicable architectural rules, stylistic constraints, or user preferences established during this epoch.\n' +
+                'You must compare these new findings against the EXISTING RULES provided below.\n\n' +
+                'CRITICAL INSTRUCTIONS:\n' +
+                '1. Identify any truly net-new rules from the Chat History.\n' +
+                '2. Semantically merge them with the EXISTING RULES. Do NOT duplicate rules that mean the same thing.\n' +
+                '3. Output the COMPLETE, UPDATED, and DEDUPLICATED list of rules.\n' +
+                '4. If no rules exist at all, output \'NONE\'.\n' +
+                '5. You MUST output ONLY valid TOON format exactly like this:\n' +
+                'rules[fact_id, trigger, behaviour]:\n' +
+                '  fact_01, "When [condition]", "[behavior]"\n' +
+                '  fact_02, "When [condition]", "[behavior]"\n',
+              prompt: `=== EXISTING RULES ===\n${existingRules}\n\n=== CHAT HISTORY (Current Epoch) ===\n${JSON.stringify(compactChatHistoryForClerk(input.chatHistory))}`,
+              abortSignal: input.abortSignal,
+            }),
+          )
+          
+          log.debug("Persistence extraction and merge complete", { text: extractionRes.text.slice(0, 100) })
+
+          if (input.abortSignal.aborted) return
+
+          const newContent = extractionRes.text.trim()
+          if (newContent !== "NONE" && newContent.length > 0) {
+            log.info("Facts extracted and merged, writing to .history/project_rules.toon")
+            yield* Effect.promise(() => fsNode.writeFile(rulesPath, newContent))
+            log.debug(`Wrote compacted facts to ${rulesPath}`)
+          }
+        } catch (e) {
+          log.error("Persistence extraction and merge failed", { error: String(e), model: sideLanguage.modelId })
+        }
+      } else {
+        log.debug("Skipping Zone 2 extraction: Not an epoch transition or final turn.")
       }
 
       if (input.abortSignal.aborted) return
 
-      if (extractionRes.text.trim() !== "NONE" && extractionRes.text.trim().length > 0) {
-        log.info("Facts extracted, writing to .assistant_rules.toon")
-        try {
-          const rulesPath = path.join(Instance.directory, ".assistant_rules.toon")
-          const existing = yield* Effect.promise(() => fsNode.readFile(rulesPath, "utf-8").catch(() => ""))
-          yield* Effect.promise(() =>
-            fsNode.writeFile(rulesPath, `${existing}\n\n# Auto-extracted Circumstances:\n${extractionRes.text}`),
-          )
-          log.debug(`Wrote facts to ${rulesPath}`)
-        } catch (e) {
-          log.warn("Failed to write to .assistant_rules.toon", { error: String(e) })
-        }
-      }
-
       // 2. Generate Epoch Continuity Report
       log.debug("Generating Epoch Continuity Report", { model: sideLanguage.modelId })
-      const analysis = yield* Effect.promise(() => SessionAnalyzer.analyze(input.sessionID, input.chatHistory, Instance.directory))
+      const analysis = yield* Effect.promise(() => SessionAnalyzer.analyze(input.sessionID, compactChatHistoryForClerk(input.chatHistory), Instance.directory))
 
       // Fetch Project Map status if available
       let mapStatus = "NOT_AVAILABLE"
@@ -214,8 +280,8 @@ export namespace PostGenerationWorker {
         .join("\n")
 
       // Hard context defense: Limit prompt to 90% of model's context window
-      // 4 chars per token is a safe conservative heuristic for UTF-8 code/logs
-      const charLimit = (sideLanguage.modelId.includes("qwen") ? 32000 : 128000) * 0.9 * 4
+      // 1.4 chars per token is a realistic heuristic for structured TOON/JSON payloads on local BPE models
+      const charLimit = (sideLanguage.modelId.includes("qwen") ? 32000 : 128000) * 0.9 * 1.4
       let analysisPrompt = analysisPromptRaw
       if (analysisPromptRaw.length > charLimit) {
         log.error("SUPERVISOR_CONTEXT_CUTOFF_TRIGGERED", {

@@ -3,14 +3,14 @@
     "id": "syntax-mcpx-init-raw",
     "iterations": 1,
     "timeoutMs": 300000,
-    "prompt": "Initialize a new project called 'raw-mcpx-test' using the mcpx tool directly. Use the tool name 'sc_init' and provide the project name correctly via the 'args' array (as per the schema).",
+    "prompt": "Initialize a new project called 'raw-mcpx-test' using the mcpx tool. CRITICAL: Use the tool name 'sc_init'. The schema for sc_init does NOT require an 'extra' field. Do NOT provide one. Provide the project name via the 'name' flag or within the 'args' array as supported by the spec server.",
     "expectedTools": ["sc_init"],
     "runTargetDir": ".",
     "docker": {
       "imageName": "epochcli-eval-env:latest",
-      "network": "none",
+      "network": "bridge",
       "memoryLimit": "4g",
-      "model": "local-main/qwen-27b"
+      "model": "local-main/qwen-35b"
     }
   },
   {
@@ -22,9 +22,9 @@
     "runTargetDir": ".",
     "docker": {
       "imageName": "epochcli-eval-env:latest",
-      "network": "none",
+      "network": "bridge",
       "memoryLimit": "4g",
-      "model": "local-main/qwen-27b"
+      "model": "local-main/qwen-35b"
     }
   },
   {
@@ -36,9 +36,9 @@
     "runTargetDir": ".",
     "docker": {
       "imageName": "epochcli-eval-env:latest",
-      "network": "none",
+      "network": "bridge",
       "memoryLimit": "4g",
-      "model": "local-main/qwen-27b"
+      "model": "local-main/qwen-35b"
     }
   }
 ]

@@ -952,7 +952,13 @@ export namespace MessageV2 {
     ctx: { providerID: ProviderID; aborted?: boolean },
   ): NonNullable<Assistant["error"]> {
     // 0. Unwrap RetryError envelopes from the AI SDK
-    if (typeof e === "object" && e !== null && (e as any).name === "AI_RetryError" && "lastError" in e && (e as any).lastError) {
+    if (
+      typeof e === "object" &&
+      e !== null &&
+      ((e as any).name?.includes("RetryError") || (e as any).retryError === true) &&
+      "lastError" in e &&
+      (e as any).lastError
+    ) {
       e = (e as any).lastError
     }
 
@@ -974,7 +980,7 @@ export namespace MessageV2 {
       APICallError.isInstance(e) ||
       (typeof e === "object" &&
         e !== null &&
-        (("statusCode" in e && "responseBody" in e) || (e as any).name === "APICallError"))
+        (("statusCode" in e && "responseBody" in e) || (e as any).name?.includes("APICallError")))
     switch (true) {
       case e instanceof DOMException && e.name === "AbortError":
         return new MessageV2.AbortedError(
@@ -982,6 +988,11 @@ export namespace MessageV2 {
           {
             cause: e,
           },
+        ).toObject()
+      case e instanceof Error && e.message === "STREAM_ABORT_OVERFLOW":
+        return new MessageV2.ContextOverflowError(
+          { message: "Context limit reached mid-stream", responseBody: "" },
+          { cause: e },
         ).toObject()
       case e instanceof Error && (e.message === "STREAM_ABORT_RAMBLING" || e.message === "STREAM_ABORT_LOOP"):
         return new MessageV2.RamblingError({ reason: e.message }).toObject()

@@ -16,7 +16,13 @@ This workspace is configured with several Model Context Protocol (MCP) servers, 
   2. **Inspect:** Run `mcpx-rust <server> <tool> --help` to see the schema and flags.
   3. **Execute:** Run `mcpx-rust <server> <tool> --flag=value`.
 
-## Tooling Integrity
+## 2. Spec-Driven Development (SDD) Workflow
+
+- **Documentation:** Refer to `docs/spec-driven-development.md` for the authoritative guide on the multi-persona architecture, phase-gate transitions, and handover mechanics.
+- **Enforcement:** The system enforces a strict "Drafting Wall." You MUST clear all template tags in `Specification.md` and set `template_tags_present: false` in `Tasks.json` before implementation is unlocked.
+- **Handover:** Once `sc_approve` is called on a finalized implementation plan, the system automatically elevates the agent to the **build** persona.
+
+## 3. Tooling Integrity
 - **MCPX Composition:** All interactions with external MCP servers (spec, map, ground, github) MUST use the structured `mcpx` JSON tool. Do NOT attempt to pass raw shell strings or shim commands into tool parameters.
 - **Syntax Mapping:** Always decompose shim-style commands (e.g., `spec sc_status`) into their JSON components: `server="spec"`, `tool="sc_status"`. See `AGENTS.md` for mandatory mapping examples and discovery rules.
 

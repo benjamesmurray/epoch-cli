@@ -20,9 +20,9 @@ const MAX_BYTES = 50 * 1024
 const MAX_BYTES_LABEL = `${MAX_BYTES / 1024} KB`
 
 const parameters = z.object({
-  filePath: z.string().describe("The absolute path to the file or directory to read"),
+  filePath: z.string().describe("The absolute path to read"),
   offset: z.coerce.number().describe("The line number to start reading from (1-indexed)").optional(),
-  limit: z.coerce.number().describe("The maximum number of lines to read (defaults to 2000)").optional(),
+  limit: z.coerce.number().describe("Max lines to read (defaults to 2000)").optional(),
 })
 
 export const ReadTool = Tool.defineEffect(

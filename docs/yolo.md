@@ -39,3 +39,8 @@ To maintain clean boundaries, sub-agents spawned via the `task` tool do **not** 
 During autonomous execution, the TUI provides clear visual feedback to prevent the user from assuming the agent has hung or is waiting for input:
 - **Autonomous Mode Spinner**: Displays a specialized spinner in the prompt area when the agent is busy in YOLO mode.
 - **Status Label**: Replaces the standard "YOLO" indicator with "Autonomous Mode" during active processing.
+
+### 7. Task Archival and Human Handoff
+When YOLO mode is operating within a structured project environment, it handles project completion automatically but yields to the user before total termination:
+- **Automatic Archival**: Once all tasks in `Tasks.json` are marked as `[x]`, the agent calling `sc_plan()` will trigger the system to automatically move the project to `projects/completed/`.
+- **Human Handoff**: Following archival, the system suspends the autonomous runloop and explicitly asks the user for text input. This allows the human operator to verify the completed project, provide feedback, or issue a final `task_complete` command.

@@ -227,7 +227,7 @@ describe("tool.edit", () => {
               },
               ctx,
             ),
-          ).rejects.toThrow("You must read file")
+          ).rejects.toThrow("Stale Write Protection")
         },
       })
     })

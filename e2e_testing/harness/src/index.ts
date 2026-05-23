@@ -43,9 +43,11 @@ async function main() {
   for (const config of configs) {
     if (targetScenario && config.id !== targetScenario) continue;
     const iters = overrideIterations || config.iterations;
+    const isConfigYolo = config.yolo ?? isYolo;
     console.log(`\n==================================================`);
     console.log(`Starting Scenario: ${config.id} (${iters} iterations)`);
     console.log(`Docker Mode: ${config.docker ? "Enabled (" + config.docker.imageName + ")" : "Disabled"}`);
+    console.log(`YOLO Mode: ${isConfigYolo}`);
     console.log(`==================================================`);
 
     for (let i = 1; i <= iters; i++) {
@@ -67,10 +69,11 @@ async function main() {
           // Local execution path (Fallback)
           targetWorkspace = path.join(suiteDir, runId);
           await fs.mkdir(targetWorkspace, { recursive: true });
-          cmd = [LOCAL_EPOCHCLI_CMD, "run", isYolo ? "--yolo" : "", prompt].filter(Boolean);
+          const agentArg = config.agent ? `--agent ${config.agent}` : "";
+          cmd = [LOCAL_EPOCHCLI_CMD, "run", isConfigYolo ? "--yolo" : "", agentArg, prompt].filter(Boolean);
       }
 
-      const runner = new AgentRunner(cmd, targetWorkspace, config.timeoutMs, config.docker, runId, values["abort-on-generate"], isYolo);
+      const runner = new AgentRunner(cmd, targetWorkspace, config.timeoutMs, config.docker, runId, values["abort-on-generate"], isConfigYolo, config.agent);
       const res = await runner.run();
       console.log(`  > Agent Execution finished: ${res.status} (${(res.durationMs / 1000).toFixed(1)}s)`);
       const logPath = path.join(targetWorkspace, "run.log");
@@ -144,13 +147,12 @@ async function main() {
         
         if (config.docker) {
             console.log(`  > Evaluating tests inside Docker (${relativeTargetDir})...`);
-            testsPassed = await TestEvaluator.evaluate(targetWorkspace, config.docker, relativeTargetDir);
+            testsPassed = await TestEvaluator.evaluate(targetWorkspace, config.docker, relativeTargetDir, config.evaluation);
         } else {
             const targetDir = path.resolve(targetWorkspace, relativeTargetDir);
             console.log(`  > Evaluating tests locally in ${targetDir}...`);
-            testsPassed = await TestEvaluator.evaluate(targetDir);
-        }
-        
+            testsPassed = await TestEvaluator.evaluate(targetDir, undefined, undefined, config.evaluation);
+        }        
         if (!testsPassed) {
           finalStatus = "Failed_Tests";
           errorMessage = "Test harness failed or workspace not found.";

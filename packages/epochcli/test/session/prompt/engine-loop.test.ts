@@ -12,6 +12,7 @@ import { SessionProcessor } from "../../../src/session/processor"
 import { Instruction } from "../../../src/session/instruction"
 import { InputResolver } from "../../../src/session/prompt/resolver"
 import { ToolOrchestrator } from "../../../src/session/prompt/orchestrator"
+import { AppFileSystem } from "../../../src/filesystem"
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
 import { InstanceRef } from "@/effect/instance-ref"
 import { testEffect } from "../../lib/effect"
@@ -44,6 +45,7 @@ const mockDeps = Layer.mergeAll(
   Layer.succeed(SessionCompaction.Service, SessionCompaction.Service.of({} as any)),
   Layer.succeed(SessionProcessor.Service, SessionProcessor.Service.of({} as any)),
   Layer.succeed(Instruction.Service, Instruction.Service.of({} as any)),
+  Layer.succeed(AppFileSystem.Service, AppFileSystem.Service.of({} as any)),
   Layer.succeed(
     InputResolver.Service,
     InputResolver.Service.of({
