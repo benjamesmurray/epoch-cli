@@ -26,7 +26,7 @@
     },
     "packages/epochcli": {
       "name": "epochcli-ai",
-      "version": "2.2.2",
+      "version": "2.2.3",
       "bin": {
         "epochcli": "bin/epochcli",
       },
@@ -172,7 +172,7 @@
     },
     "packages/plugin": {
       "name": "@epoch-ai/plugin",
-      "version": "2.2.2",
+      "version": "2.2.3",
       "dependencies": {
         "@epoch-ai/sdk": "2.2.0",
         "zod": "catalog:",
@@ -196,7 +196,7 @@
     },
     "packages/script": {
       "name": "@epoch-ai/script",
-      "version": "2.2.2",
+      "version": "2.2.3",
       "dependencies": {
         "semver": "^7.6.3",
       },
@@ -207,7 +207,7 @@
     },
     "packages/sdk/js": {
       "name": "@epoch-ai/sdk",
-      "version": "2.2.2",
+      "version": "2.2.3",
       "dependencies": {
         "cross-spawn": "catalog:",
       },
@@ -222,7 +222,7 @@
     },
     "packages/util": {
       "name": "@epoch-ai/util",
-      "version": "2.2.2",
+      "version": "2.2.3",
       "dependencies": {
         "picocolors": "^1.1.1",
         "zod": "catalog:",
