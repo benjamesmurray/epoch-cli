@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "name": "epochcli",
-  "version": "2.2.3",
+  "version": "0.0.0-dev-202605311739",
   "description": "AI-powered development tool",
   "private": true,
   "type": "module",
@@ -85,7 +85,7 @@
     "@epoch-ai/plugin": "workspace:*",
     "@epoch-ai/script": "workspace:*",
     "@epoch-ai/sdk": "workspace:*",
-    "epochcli-ai": "workspace:*",
+    "@epoch-ai/cli": "workspace:*",
     "typescript": "catalog:"
   },
   "repository": {

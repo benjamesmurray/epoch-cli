@@ -49,7 +49,7 @@ function detectPlatformAndArch() {
 
 function findBinary() {
   const { platform, arch } = detectPlatformAndArch()
-  const packageName = `epochcli-ai-${platform}-${arch}`
+  const packageName = `@epoch-ai/cli-${platform}-${arch}`
   const binaryName = platform === "windows" ? "epochcli.exe" : "epochcli"
 
   try {

@@ -195,8 +195,8 @@ console.log(`\nFetched ${releases.length} releases total\n`)
 
 const { total: githubTotal, stats } = calculate(releases)
 
-console.log("Fetching npm all-time downloads for epochcli-ai...\n")
-const npmDownloads = await fetchNpmDownloads("epochcli-ai")
+console.log("Fetching npm all-time downloads for @epoch-ai/cli...\n")
+const npmDownloads = await fetchNpmDownloads("@epoch-ai/cli")
 console.log(`Fetched npm all-time downloads: ${npmDownloads.toLocaleString()}\n`)
 
 await save(githubTotal, npmDownloads)

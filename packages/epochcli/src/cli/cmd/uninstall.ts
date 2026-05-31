@@ -129,10 +129,10 @@ async function showRemovalSummary(targets: RemovalTargets, method: Installation.
 
   if (method !== "curl" && method !== "unknown") {
     const cmds: Record<string, string> = {
-      npm: "npm uninstall -g epochcli-ai",
-      pnpm: "pnpm uninstall -g epochcli-ai",
-      bun: "bun remove -g epochcli-ai",
-      yarn: "yarn global remove epochcli-ai",
+      npm: "npm uninstall -g @epoch-ai/cli",
+      pnpm: "pnpm uninstall -g @epoch-ai/cli",
+      bun: "bun remove -g @epoch-ai/cli",
+      yarn: "yarn global remove @epoch-ai/cli",
       brew: "brew uninstall epochcli",
       choco: "choco uninstall epochcli",
       scoop: "scoop uninstall epochcli",
@@ -180,10 +180,10 @@ async function executeUninstall(method: Installation.Method, targets: RemovalTar
 
   if (method !== "curl" && method !== "unknown") {
     const cmds: Record<string, string[]> = {
-      npm: ["npm", "uninstall", "-g", "epochcli-ai"],
-      pnpm: ["pnpm", "uninstall", "-g", "epochcli-ai"],
-      bun: ["bun", "remove", "-g", "epochcli-ai"],
-      yarn: ["yarn", "global", "remove", "epochcli-ai"],
+      npm: ["npm", "uninstall", "-g", "@epoch-ai/cli"],
+      pnpm: ["pnpm", "uninstall", "-g", "@epoch-ai/cli"],
+      bun: ["bun", "remove", "-g", "@epoch-ai/cli"],
+      yarn: ["yarn", "global", "remove", "@epoch-ai/cli"],
       brew: ["brew", "uninstall", "epochcli"],
       choco: ["choco", "uninstall", "epochcli"],
       scoop: ["scoop", "uninstall", "epochcli"],

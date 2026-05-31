@@ -50,7 +50,7 @@ let arch = archMap[os.arch()]
 if (!arch) {
   arch = os.arch()
 }
-const base = "epochcli-ai-" + platform + "-" + arch
+const base = "@epoch-ai/cli-" + platform + "-" + arch
 const binary = platform === "windows" ? "epochcli.exe" : "epochcli"
 
 function supportsAvx2() {

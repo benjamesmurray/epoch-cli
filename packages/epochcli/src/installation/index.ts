@@ -192,7 +192,7 @@ export namespace Installation {
           for (const check of checks) {
             const output = yield* check.command()
             const installedName =
-              check.name === "brew" || check.name === "choco" || check.name === "scoop" ? "epochcli" : "epochcli-ai"
+              check.name === "brew" || check.name === "choco" || check.name === "scoop" ? "epochcli" : "@epoch-ai/cli"
             if (output.includes(installedName)) {
               return check.name
             }
@@ -226,7 +226,7 @@ export namespace Installation {
             const registry = reg.endsWith("/") ? reg.slice(0, -1) : reg
             const channel = CHANNEL
             const response = yield* httpOk.execute(
-              HttpClientRequest.get(`${registry}/epochcli-ai/${channel}`).pipe(HttpClientRequest.acceptJson),
+              HttpClientRequest.get(`${registry}/@epoch-ai/cli/${channel}`).pipe(HttpClientRequest.acceptJson),
             )
             const data = yield* HttpClientResponse.schemaBodyJson(NpmPackage)(response)
             return data.version
@@ -268,13 +268,13 @@ export namespace Installation {
               result = yield* upgradeCurl(target)
               break
             case "npm":
-              result = yield* run(["npm", "install", "-g", `epochcli-ai@${target}`])
+              result = yield* run(["npm", "install", "-g", `@epoch-ai/cli@${target}`])
               break
             case "pnpm":
-              result = yield* run(["pnpm", "install", "-g", `epochcli-ai@${target}`])
+              result = yield* run(["pnpm", "install", "-g", `@epoch-ai/cli@${target}`])
               break
             case "bun":
-              result = yield* run(["bun", "install", "-g", `epochcli-ai@${target}`])
+              result = yield* run(["bun", "install", "-g", `@epoch-ai/cli@${target}`])
               break
             case "brew": {
               const formula = yield* getBrewFormula()

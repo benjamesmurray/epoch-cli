@@ -27,5 +27,5 @@ function transformExports(exports: Record<string, string | object>) {
 transformExports(pkg.exports)
 await Bun.write("package.json", JSON.stringify(pkg, null, 2))
 await $`bun pm pack`
-await $`npm publish *.tgz --tag ${Script.channel} --access public`.nothrow()
+await $`npm publish *.tgz --tag latest --access public`.nothrow()
 await Bun.write("package.json", JSON.stringify(original, null, 2))

@@ -82,7 +82,7 @@ cargo install deliver-cli
 ### 3. Install Epoch CLI
 You can install Epoch CLI globally using Bun:
 ```bash
-bun install -g epochcli
+bun install -g @epoch-ai/cli
 ```
 
 ### 4. Configuration
