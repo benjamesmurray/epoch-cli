@@ -24,7 +24,7 @@ The engine maintains a `stallScore` that increments based on the "advancing" nat
 
 | Action Type | Score Adjustment | Description |
 | :--- | :--- | :--- |
-| **Advancing** | `Reset to 0` | File writes (`edit`, `write`), `task_complete`, `sc_todo_complete`. Also resets the terminal `MAX_TURNS` counter. |
+| **Advancing** | `Reset to 0` | Productive actions (`edit`, `write`, `task_complete`, `sc_todo_complete`, etc.) that target a **new file** or use a **different tool** than the previous advancing action. Resets the terminal `MAX_TURNS` counter. |
 | **Orientation** | `+3` | Exploratory operations that don't advance state (`read`, `glob`, `pm_query`, `sc_status`, `sc_todo_list`, or `ls`/`find` bash commands). |
 | **Neutral** | `+1` | Other non-advancing tool calls. |
 | **Empty Action** | `+10` | YOLO mode turn completed with zero tool calls (internal debate/rambling). |
@@ -34,8 +34,8 @@ The engine maintains a `stallScore` that increments based on the "advancing" nat
 ### Terminal Turn Limit (`MAX_TURNS`)
 In addition to the dynamic stall score, the engine enforces a hard safety ceiling of **50 turns**.
 
-*   **Reset on Progress:** This counter is reset to **0** whenever the agent performs an **Advancing** action.
-*   **Terminal Stall:** If the agent takes 50 consecutive turns without making concrete progress (e.g., spending 50 turns exclusively exploring or reviewing), the session is forcefully terminated as a "terminal stall."
+*   **Reset on Progress:** This counter is reset to **0** whenever the agent performs an **Advancing** action (defined as a productive action targeting a new file or using a different tool).
+*   **Terminal Stall:** If the agent takes 50 consecutive turns without making concrete progress (e.g., spending 50 turns exclusively exploring or repeatedly editing the same file), the session is forcefully terminated as a "terminal stall."
 
 This ensures that while the agent has unlimited turns to complete complex implementation tasks, it cannot wander indefinitely in an exploratory loop.
 

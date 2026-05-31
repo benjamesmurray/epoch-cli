@@ -1,7 +1,7 @@
 [
   {
     "id": "iot-controller-full-stack",
-    "iterations": 1,
+    "iterations": 10,
     "timeoutMs": 7200000,
     "prompt": "Build a self-contained 'Smart Home IoT Controller' system. The system must include:\n\n1. **Device Simulator**: A background process that simulates a thermostat (fluctuating temperature), lights (on/off state), and motion sensors. It should 'tick' every second to update states.\n2. **Rule Engine**: A module that evaluates user-defined rules, such as 'If motion is detected and current time is between 6 PM and 6 AM, turn on the lights'.\n3. **Storage**: A local SQLite database to log all device state changes and rule triggers.\n4. **API & Real-time Updates**: A backend (Node.js/Express or Python/FastAPI) providing REST endpoints for device status and a WebSocket server to broadcast live state changes to the frontend.\n5. **Web Dashboard**: A frontend (React or Vanilla JS) that displays live device tiles (with real-time updates) and a historical log of events from the database.\n\n**General Instructions**:\n- Generate and execute tasks for the simulator, rule engine, database, API, and frontend.\n- Ensure strict data contracts between the backend and frontend.\n\n**Execution & Networking Mandates (CRITICAL)**:\n- Your web server MUST bind to `0.0.0.0` (not `127.0.0.1` or `localhost`) on port `8080`.\n- You MUST create a `start.sh` script in the root of the project that installs dependencies and boots the entire application in the foreground.\n- The WebSocket endpoint MUST be available at `ws://<host>:8080` or `ws://<host>:8080/ws` and broadcast events formatted as `{ \"type\": \"device_state\" | \"rule_trigger\", \"payload\": {...} }`.\n- A REST endpoint MUST be available at `http://<host>:8080/api/history` returning a JSON array of recent events.",
     "expectedTools": [
@@ -27,8 +27,8 @@
       "imageName": "epochcli-eval-env:latest",
       "network": "host",
       "memoryLimit": "4g",
-      "model": "local-main/qwen-35b",
-      "contextOverride": 32000,
+      "model": "local-unified/qwen-unified",
+      "contextOverride": 64000,
       "logLevel": "INFO"
     }
   }

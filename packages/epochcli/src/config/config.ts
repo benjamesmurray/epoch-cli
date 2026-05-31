@@ -1566,10 +1566,12 @@ export namespace Config {
       }),
     )
 
-  export const defaultLayer = layer.pipe(
-    Layer.provide(AppFileSystem.defaultLayer),
-    Layer.provide(Auth.defaultLayer),
-    Layer.provide(Account.defaultLayer),
+  export const defaultLayer = Layer.suspend(() =>
+    layer.pipe(
+      Layer.provide(AppFileSystem.defaultLayer),
+      Layer.provide(Auth.defaultLayer),
+      Layer.provide(Account.defaultLayer),
+    ),
   )
 
   const { runPromise } = makeRuntime(Service, defaultLayer)

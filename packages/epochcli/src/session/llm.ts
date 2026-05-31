@@ -222,14 +222,14 @@ export namespace LLM {
     }
     meta.phaseTurnCount++
 
-    const [language, cfg, provider, auth] = await Promise.all([
+    const [language, cfg, providerInfo, auth] = await Promise.all([
       Provider.getLanguage(input.model),
       Config.get(),
       Provider.getProvider(input.model.providerID),
       Auth.get(input.model.providerID),
     ])
     // TODO: move this to a proper hook
-    const isOpenaiOauth = provider.id === "openai" && auth?.type === "oauth"
+    const isOpenaiOauth = providerInfo.id === "openai" && auth?.type === "oauth"
 
     const payload: ZoneStructuredPayload = {
       zone1_critical_rules: [`Current Phase: [${input.agent.name.toUpperCase()}].`],
@@ -294,7 +294,7 @@ export namespace LLM {
 
     // Phase 1: Intent Classification (Clerk / local-side) - Task 1.1
     // The Clerk detects user intent and shifts the active epochcli Agent.
-    if (provider.id === "local-main") {
+    if (providerInfo.id === "local-main") {
       try {
         const sideModel = await Provider.getSideModel()
         if (sideModel) {
@@ -450,7 +450,7 @@ export namespace LLM {
       }
     }
 
-    if (provider.id === "local-main") {
+    if (providerInfo.id === "local-main") {
       try {
         let rulesContext = ""
         const mcpClientsRecord = await MCP.clients()
@@ -537,7 +537,7 @@ export namespace LLM {
       : ProviderTransform.options({
           model: input.model,
           sessionID: input.sessionID,
-          providerOptions: provider.options,
+          providerOptions: providerInfo.options,
           thinkingEffort: isReasoningModel ? thinkingEffort : undefined,
         })
     const options: Record<string, any> = pipe(
@@ -653,7 +653,7 @@ Ready to process user request strictly under these parameters.
         sessionID: input.sessionID,
         agent: input.agent.name,
         model: input.model,
-        provider,
+        provider: providerInfo,
         message: input.user,
       },
       {
@@ -673,7 +673,7 @@ Ready to process user request strictly under these parameters.
         sessionID: input.sessionID,
         agent: input.agent.name,
         model: input.model,
-        provider,
+        provider: providerInfo,
         message: input.user,
       },
       {
@@ -701,7 +701,7 @@ Ready to process user request strictly under these parameters.
             toolName,
             args,
             messages: options.messages ?? input.messages,
-            provider,
+            provider: providerInfo,
             cfg,
           })
           if (interception) return interception
@@ -758,7 +758,7 @@ Ready to process user request strictly under these parameters.
 
           // Task 2.1 & 2.2: Clerk Interceptor (Middleware) for generic prerequisite errors
           if (isError && (resultStr.includes("You must run") || resultStr.includes("prerequisite"))) {
-            if (provider.id === "local-main") {
+            if (providerInfo.id === "local-main") {
               try {
                 log.info("Triggering Clerk Interceptor for prerequisite error")
                 const sideModel = await Provider.getSideModel()
@@ -853,7 +853,7 @@ Ready to process user request strictly under these parameters.
     // 1. Providers with "litellm" in their ID or API ID (auto-detected)
     // 2. Providers with explicit "litellmProxy: true" option (opt-in for custom gateways)
     const isLiteLLMProxy =
-      provider.options?.["litellmProxy"] === true ||
+      providerInfo.options?.["litellmProxy"] === true ||
       input.model.providerID.toLowerCase().includes("litellm") ||
       input.model.api.id.toLowerCase().includes("litellm")
 
@@ -903,7 +903,7 @@ Ready to process user request strictly under these parameters.
       }
     }
 
-    if (provider.id.startsWith("local-")) {
+    if (providerInfo.id.startsWith("local-")) {
       await new Promise((r) => setTimeout(r, 2000))
     }
 
@@ -919,7 +919,7 @@ Ready to process user request strictly under these parameters.
       },
       async experimental_repairToolCall(failed) {
         // Phase 2 OutputInterceptor: Catch broken JSON from local-main and use local-side to fix it.
-        if (provider.id === "local-main") {
+        if (providerInfo.id === "local-main") {
           try {
             const sideProviderConfig = cfg.provider?.["local-side"]
             if (sideProviderConfig) {

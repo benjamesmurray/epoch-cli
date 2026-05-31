@@ -428,7 +428,9 @@ export namespace Account {
     }),
   )
 
-  export const defaultLayer = layer.pipe(Layer.provide(AccountRepo.layer), Layer.provide(FetchHttpClient.layer))
+  export const defaultLayer = Layer.suspend(() =>
+    layer.pipe(Layer.provide(AccountRepo.layer), Layer.provide(FetchHttpClient.layer)),
+  )
 
   export const { runPromise } = makeRuntime(Service, defaultLayer)
 

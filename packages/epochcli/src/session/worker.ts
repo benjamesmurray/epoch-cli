@@ -281,7 +281,7 @@ export namespace PostGenerationWorker {
 
       // Hard context defense: Limit prompt to 90% of model's context window
       // 1.4 chars per token is a realistic heuristic for structured TOON/JSON payloads on local BPE models
-      const charLimit = (sideLanguage.modelId.includes("qwen") ? 32000 : 128000) * 0.9 * 1.4
+      const charLimit = sideModel.limit.context * 0.9 * 1.4
       let analysisPrompt = analysisPromptRaw
       if (analysisPromptRaw.length > charLimit) {
         log.error("SUPERVISOR_CONTEXT_CUTOFF_TRIGGERED", {

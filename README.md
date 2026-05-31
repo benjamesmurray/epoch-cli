@@ -4,12 +4,19 @@ Epoch CLI is a tool for software development that coordinates local AI models to
 
 ## Technical Approach
 
-### Dual-Model Architecture
-The system uses two models:
-- **Main Model**: A larger model (e.g., Qwen 35B or Gemma 26B) used for reasoning and generating code.
-- **Side Model (Supervisor)**: A smaller, faster model used for background tasks like summarizing history and enforcing rules.
+### Agent Personas and Orchestration
+The system distinguishes between functional **personas** (what the agent can do) and orchestrational **roles** (how the environment is managed). These can be executed by a single high-performance model or split across multiple models to optimize for latency and cost.
 
-These models are managed by **llama-swap**, a proxy that automatically loads and unloads models in VRAM as the system switches between coding and supervision.
+#### Agent Personas
+- **Plan**: Focused on research and design. Authorized for architectural discovery and drafting specifications but restricted from modifying source code.
+- **Build**: The implementation state. Once a design is formally approved, the agent is elevated to this persona, gaining write access to implement code, run tests, and execute shell commands.
+
+#### Orchestration Roles (Clerk & Supervisor)
+- **Clerk**: Manages the development lifecycle, including context compaction (Epochs), intent classification, and the semantic merging of discovered rules into project memory.
+- **Supervisor**: Monitors for "Stall Scoring" (repetitive failures or logic loops) and enforces behavioral constraints through targeted technical interventions.
+
+#### Dual-Model Support
+The system can be configured to use **llama-swap**, a proxy that automatically loads and unloads models in VRAM, to split these roles across a larger **Main Model** (for reasoning/coding) and a smaller **Side Model** (for background orchestration).
 
 ### Positional Prompting and Rules
 The system uses a **Positional Prompt Architecture** to organize information based on model attention curves. Prompts are structured into four zones:
@@ -34,11 +41,11 @@ For large datasets like file trees or linter logs, the CLI uses **TOON (Token-Or
 - **Credit:** [toon-format/toon](https://github.com/toon-format/toon).
 
 ### Session Continuity
-When a model reaches its context limit, the supervisor model generates a dense summary of the current state (`.epoch-continuity.toon`) and archives the detailed history in a `.history/` directory. This allows a new session to start with a clear understanding of the project's progress.
+When a model reaches its context limit, the **Clerk** generates a dense summary of the current state (`.epoch-continuity.toon`) and archives the detailed history in a `.history/` directory. This allows a new session to start with a clear understanding of the project's progress.
 - **Details:** See [continuity.md](docs/continuity.md).
 
 ### Loop Protection
-The system tracks "stall scores" for agent actions. If an agent repeats the same tool call, fails multiple times, or generates repetitive text, the supervisor model interrupts the loop and provides a technical directive to change strategy.
+The system tracks "stall scores" for agent actions. If an agent repeats the same tool call, fails multiple times, or generates repetitive text, the **Supervisor** interrupts the loop and provides a technical directive to change strategy.
 - **Details:** See [doom_protection.md](docs/doom_protection.md).
 
 ### Code Manipulation

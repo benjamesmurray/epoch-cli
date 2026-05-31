@@ -12,9 +12,38 @@ Instead of managing separate URLs and ports, all models are served through a sin
 
 ## 2. Configuration (`epochcli.jsonc`)
 
-Your configuration should define both `local-main` (Coding) and `local-side` (Supervisor) providers pointing to the same endpoint. The proxy handles the routing based on the `model` ID requested in the payload.
+You can configure Epoch CLI to use either a single unified endpoint for both main and side roles, or a dual-model configuration that leverages the `llama-swap` proxy.
 
-### Unified Setup Example
+### Option A: Single Endpoint Configuration (Recommended for High Context)
+
+This setup uses one model for both roles. It is ideal for maximizing the context window (e.g., 64k) and eliminating the 15-20 second "cold start" delay associated with swapping models.
+
+```jsonc
+{
+  "model": "local-unified/qwen-unified",
+  "side_model": "local-unified/qwen-unified",
+  "provider": {
+    "local-unified": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Local Unified (Qwen 64k)",
+      "options": {
+        "baseURL": "http://localhost:8085/v1",
+        "apiKey": "2250"
+      },
+      "models": {
+        "qwen-unified": {
+          "name": "Qwen Unified 64k",
+          "limit": { "context": 64000, "output": 4096 }
+        }
+      }
+    }
+  }
+}
+```
+
+### Option B: Dual-Model Configuration (llama-swap)
+
+This setup defines separate providers for main and side roles. The proxy handles routing based on the model ID. This is useful when you want a dedicated smaller model for clerk duties to save compute or when specific roles require different model capabilities.
 
 ```jsonc
 {
@@ -52,6 +81,10 @@ Your configuration should define both `local-main` (Coding) and `local-side` (Su
   }
 }
 ```
+
+### Switching Between Modes
+
+To switch modes, simply update the `model`, `side_model`, and `provider` fields in your `.epochcli/epochcli.jsonc` file to match the desired configuration block. The CLI will automatically pick up the changes on the next execution.
 
 ## 3. How Epoch CLI Identifies Models
 

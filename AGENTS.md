@@ -2,6 +2,7 @@
 
 ## 1. Mandatory Workflows
 - **`mcpx` (Unified MCP Interface)**: Use for ALL MCP interactions (spec, map, ground, github).
+    - **Adding Servers**: When asked to install or configure a new MCP server, you MUST follow the SOP defined in `docs/MCP_config_guide.md`.
     - **Syntax**: Pass arguments via standard flags, `key=value` strings, or structured JSON.
     - **Self-Discovery**: Use `tool="--help"` or `args=["--help"]` to inspect servers/tools.
 - **`spec` (State Management)**: Maintain project state via `mcpx` server="spec".

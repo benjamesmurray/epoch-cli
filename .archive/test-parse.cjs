@@ -1,24 +1,13 @@
-const { lexer } = require('marked');
-const fs = require('fs');
+const { readFileSync } = require('fs');
+const log = readFileSync('e2e_testing/results/suite_2026-05-15T11-36-28-696Z/iot-controller-full-stack-run-1.log', 'utf8');
 
-const content = fs.readFileSync('projects/active/gemma-4-dual-model/Tasks.md', 'utf8');
-const tokens = lexer(content);
+const errorMatches = log.match(/text part undefined not found/g);
+console.log("Error count:", errorMatches ? errorMatches.length : 0);
 
-let tasks = [];
-function processTokens(toks) {
-  for (const t of toks) {
-    if (t.type === 'list_item') {
-      const firstLine = t.text.split('\n')[0];
-      const textToMatch = firstLine.replace(/^\[[ xX]\]\s+/, '').trim();
-      const match = textToMatch.match(/^(\d+(?:\.\d+)*)\.?(.*)$/);
-      if (match) {
-        tasks.push({ id: match[1], completed: !!t.checked });
-      }
-    }
-    if (t.tokens) processTokens(t.tokens);
-    if (t.items) processTokens(t.items);
-  }
+const traces = log.match(/at\s+([^\n]+)/g);
+console.log("Traces:");
+if (traces) {
+    const stack = traces.filter(t => t.includes('epochcli') || t.includes('effect'));
+    console.log(stack.join('\n'));
 }
-processTokens(tokens);
 
-console.log(tasks);

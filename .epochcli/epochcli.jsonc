@@ -1,37 +1,20 @@
 {
   "$schema": "./config.json",
-  "model": "local-main/qwen-27b",
-  "side_model": "local-side/qwen-35b",
+  "model": "local-unified/qwen-unified",
+  "side_model": "local-unified/qwen-unified",
   "provider": {
-    "local-main": {
+    "local-unified": {
       "npm": "@ai-sdk/openai-compatible",
-      "name": "Local Main (Qwen 27B)",
+      "name": "Local Unified (Qwen 64k)",
       "options": {
         "baseURL": "http://localhost:8085/v1",
         "apiKey": "2250"
       },
       "models": {
-        "qwen-27b": {
-          "name": "Qwen 27B Coding",
+        "qwen-unified": {
+          "name": "Qwen Unified 64k",
           "limit": {
-            "context": 32000,
-            "output": 4096
-          }
-        }
-      }
-    },
-    "local-side": {
-      "npm": "@ai-sdk/openai-compatible",
-      "name": "Local Side (Qwen 35B Clerk)",
-      "options": {
-        "baseURL": "http://localhost:8085/v1",
-        "apiKey": "2250"
-      },
-      "models": {
-        "qwen-35b": {
-          "name": "Qwen 35B Clerk",
-          "limit": {
-            "context": 32000,
+            "context": 64000,
             "output": 4096
           }
         }

@@ -17,16 +17,19 @@ export class WorkspaceBuilder {
     // but pointing to the offline MCP installations and host's LLM ports.
     const mainModelName = config.docker?.model || "local-main/gemma-4-26b-q4-xl";
     const mainModelID = mainModelName.split("/")[1] || "gemma-4-26b-q4-xl";
+    const mainProviderID = mainModelName.split("/")[0] || "local-main";
     const llmHost = config.docker?.network === "host" ? "localhost" : "host.docker.internal";
     
-    const epochConfig = {
+    const isUnified = mainProviderID === "local-unified";
+    
+    const epochConfig: any = {
       ...config.epochcli,
       "model": mainModelName,
-      "side_model": "local-side/qwen-35b",
+      "side_model": isUnified ? mainModelName : (config.docker?.side_model || "local-side/qwen-35b"),
       "provider": {
-        "local-main": {
+        [mainProviderID]: {
           "npm": "@ai-sdk/openai-compatible",
-          "name": "Local Main (llama-swap)",
+          "name": isUnified ? "Local Unified (llama-swap)" : "Local Main (llama-swap)",
           "options": {
             "baseURL": `http://${llmHost}:8085/v1`,
             "apiKey": "2250"
@@ -38,28 +41,6 @@ export class WorkspaceBuilder {
                     "output": 4096,
                     "context": config.docker?.contextOverride || 32000
                 }
-            },
-            "gemma-4-q5": { 
-              "name": "Gemma 4 26B Q5",
-              "limit": { "context": 32000, "output": 4096 }
-            },
-            "qwen-3.5": { 
-              "name": "Qwen 3.5",
-              "limit": { "context": 32000, "output": 4096 }
-            }
-          }
-        },
-        "local-side": {
-          "npm": "@ai-sdk/openai-compatible",
-          "name": "Local Side (llama-swap)",
-          "options": {
-            "baseURL": `http://${llmHost}:8085/v1`,
-            "apiKey": "2250"
-          },
-          "models": {
-            "qwen-35b": { 
-              "name": "Qwen 35B Clerk",
-              "limit": { "context": 32000, "output": 4096 }
             }
           }
         }
@@ -76,6 +57,23 @@ export class WorkspaceBuilder {
         "github-pr-search": false
       }
     };
+
+    if (!isUnified) {
+      epochConfig.provider["local-side"] = {
+        "npm": "@ai-sdk/openai-compatible",
+        "name": "Local Side (llama-swap)",
+        "options": {
+          "baseURL": `http://${llmHost}:8085/v1`,
+          "apiKey": "2250"
+        },
+        "models": {
+          "qwen-35b": { 
+            "name": "Qwen 35B Clerk",
+            "limit": { "context": 32000, "output": 4096 }
+          }
+        }
+      };
+    }
 
 
     await fs.writeFile(

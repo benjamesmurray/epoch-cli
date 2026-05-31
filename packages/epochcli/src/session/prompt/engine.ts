@@ -250,6 +250,7 @@ export namespace SessionEngine {
         let structured: unknown | undefined
         let step = 0
         let stallScore = 0
+        let lastAdvancingTarget: string | undefined
         let forceTransition = false
         const toolHistory: { tool: string; input: any }[] = []
 
@@ -521,7 +522,17 @@ Lets get straight on with implementation work`
           const hasToolCalls = toolParts.length > 0
 
           // Update stall score
-          const isAdvancing = toolParts.some((p) => ADVANCING_TOOLS.includes(p.tool))
+          const advancingParts = toolParts.filter((p) => ADVANCING_TOOLS.includes(p.tool))
+          let isAdvancing = false
+          for (const p of advancingParts) {
+            const target = (p.state.input as any)?.filePath || p.tool
+            if (target !== lastAdvancingTarget) {
+              isAdvancing = true
+              lastAdvancingTarget = target
+              break
+            }
+          }
+
           const isInvalid = toolParts.some((p) => INVALID_TOOLS.includes(p.tool))
           const isOrientation = toolParts.some(
             (p) =>
@@ -541,6 +552,7 @@ Lets get straight on with implementation work`
 
           if (isAdvancing) {
             stallScore = 0
+            step = 0
           } else if (isIdenticalRepetition) {
             stallScore += 5
             stallReason = "repetition"

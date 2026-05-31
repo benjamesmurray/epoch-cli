@@ -88,7 +88,7 @@ export namespace Auth {
     }),
   )
 
-  export const defaultLayer = layer.pipe(Layer.provide(AppFileSystem.defaultLayer))
+  export const defaultLayer = Layer.suspend(() => layer.pipe(Layer.provide(AppFileSystem.defaultLayer)))
 
   const { runPromise } = makeRuntime(Service, defaultLayer)
 

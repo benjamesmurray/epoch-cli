@@ -82,3 +82,13 @@ The following project-specific servers are pre-configured. Agents should use the
 - **`ground`**: Synthesis of behavioral rules and operational facts.
     - `mcpx ground gt_status`: Check current project rules.
     - `mcpx ground gt_refresh`: Force a refresh of the project constitution.
+
+## 6. Agent SOP: Adding a New Server
+
+When an agent is instructed to add or install a new MCP server, it MUST follow this sequence to ensure the server is properly registered and discoverable:
+
+1.  **Identify the Server**: Determine the correct command (e.g., `npx -y package-name`) or binary path for the requested MCP server.
+2.  **Register the Server**: Update the configuration in `~/.config/mcpx/config.toml`.
+    - *Note*: Agents must use `echo` or `cat <<EOF` via `run_shell_command` to modify this file, as it lives outside the standard workspace directory.
+3.  **Verify Installation**: Run `mcpx-rust list` and `mcpx-rust <new_server> --help` to ensure the routing engine recognizes the new server and the tool schema is accessible.
+4.  **Update Project Knowledge**: Update `AGENTS.md` (or the relevant instruction file) with a brief summary of the new server's capabilities and its `mcpx` syntax so that future agent turns can utilize the new tools.

@@ -1276,11 +1276,11 @@ describe("session.llm.stream", () => {
         expect(systemMessages.length).toBeGreaterThanOrEqual(1)
 
         // Find the user message containing state check
-        const userMsg = messages.find((m) => m.role === "user" && m.content.includes("[STATE]"))
+        const userMsg = messages.find((m) => m.role === "user" && m.content.includes("[INTERNAL STATE CHECK]"))
 
         expect(userMsg).toBeDefined()
         expect(userMsg.content).toContain("Hello")
-        expect(userMsg.content).toContain("Phase: BUILD")
+        expect(userMsg.content).toContain("Role: Assigned to [BUILD].")
         expect(userMsg.content).toContain("<|channel>thought")
       },
     })
