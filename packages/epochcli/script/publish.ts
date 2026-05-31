@@ -8,8 +8,10 @@ const dir = fileURLToPath(new URL("..", import.meta.url))
 process.chdir(dir)
 
 const binaries: Record<string, string> = {}
-for (const filepath of new Bun.Glob("*/package.json").scanSync({ cwd: "./dist" })) {
+for (const filepath of new Bun.Glob("**/package.json").scanSync({ cwd: "./dist" })) {
+  if (filepath.includes("node_modules")) continue
   const pkg = await Bun.file(`./dist/${filepath}`).json()
+  if (pkg.name === "@epoch-ai/cli") continue
   binaries[pkg.name] = pkg.version
 }
 console.log("binaries", binaries)
@@ -39,29 +41,28 @@ await Bun.file(`./dist/${pkg.name}/package.json`).write(
   ),
 )
 
-const tasks = Object.entries(binaries).map(async ([name]) => {
+for (const [name] of Object.entries(binaries)) {
+  const pkgDir = `./dist/${name}`
   if (process.platform !== "win32") {
-    await $`chmod -R 755 .`.cwd(`./dist/${name}`)
+    await $`chmod -R 755 .`.cwd(pkgDir)
   }
-  await $`bun pm pack`.cwd(`./dist/${name}`)
-  await $`npm publish *.tgz --access public --tag latest`.cwd(`./dist/${name}`).nothrow()
-})
-await Promise.all(tasks)
-await $`cd ./dist/${pkg.name} && bun pm pack && npm publish *.tgz --access public --tag latest`.nothrow()
+  await $`npm publish --access public --tag latest`.cwd(pkgDir).nothrow()
+}
+await $`cd ./dist/${pkg.name} && npm publish --access public --tag latest`.nothrow()
 
-const image = "ghcr.io/benjamesmurray/epoch-cli"
-const platforms = "linux/amd64,linux/arm64"
-const tags = [`${image}:${version}`, `${image}:${Script.channel}`]
-const tagFlags = tags.flatMap((t) => ["-t", t])
-await $`docker buildx build --platform ${platforms} ${tagFlags} --push .`
+// const image = "ghcr.io/benjamesmurray/epoch-cli"
+// const platforms = "linux/amd64,linux/arm64"
+// const tags = [`${image}:${version}`, `${image}:${Script.channel}`]
+// const tagFlags = tags.flatMap((t) => ["-t", t])
+// await $`docker buildx build --platform ${platforms} ${tagFlags} --push .`
 
 // registries
 if (!Script.preview) {
   // Calculate SHA values
-  const arm64Sha = await $`sha256sum ./dist/epochcli-linux-arm64.tar.gz | cut -d' ' -f1`.text().then((x) => x.trim())
-  const x64Sha = await $`sha256sum ./dist/epochcli-linux-x64.tar.gz | cut -d' ' -f1`.text().then((x) => x.trim())
-  const macX64Sha = await $`sha256sum ./dist/epochcli-darwin-x64.zip | cut -d' ' -f1`.text().then((x) => x.trim())
-  const macArm64Sha = await $`sha256sum ./dist/epochcli-darwin-arm64.zip | cut -d' ' -f1`.text().then((x) => x.trim())
+  const arm64Sha = await $`sha256sum ./dist/@epoch-ai/cli-linux-arm64.tar.gz | cut -d' ' -f1`.text().then((x) => x.trim())
+  const x64Sha = await $`sha256sum ./dist/@epoch-ai/cli-linux-x64.tar.gz | cut -d' ' -f1`.text().then((x) => x.trim())
+  const macX64Sha = await $`sha256sum ./dist/@epoch-ai/cli-darwin-x64.zip | cut -d' ' -f1`.text().then((x) => x.trim())
+  const macArm64Sha = await $`sha256sum ./dist/@epoch-ai/cli-darwin-arm64.zip | cut -d' ' -f1`.text().then((x) => x.trim())
 
   const [pkgver, _subver = ""] = Script.version.split(/(-.*)/, 2)
 
@@ -70,7 +71,7 @@ if (!Script.preview) {
     "# Maintainer: dax",
     "# Maintainer: adam",
     "",
-    "pkgname='epochcli-bin'",
+    "pkgname='@epoch-ai/cli-bin'",
     `pkgver=${pkgver}`,
     `_subver=${_subver}`,
     "options=('!debug' '!strip')",
@@ -83,10 +84,10 @@ if (!Script.preview) {
     "conflicts=('epochcli')",
     "depends=('ripgrep')",
     "",
-    `source_aarch64=("\${pkgname}_\${pkgver}_aarch64.tar.gz::https://github.com/benjamesmurray/epoch-cli/releases/download/v\${pkgver}\${_subver}/epochcli-linux-arm64.tar.gz")`,
+    `source_aarch64=("\${pkgname}_\${pkgver}_aarch64.tar.gz::https://github.com/benjamesmurray/epoch-cli/releases/download/v\${pkgver}\${_subver}/@epoch-ai/cli-linux-arm64.tar.gz")`,
     `sha256sums_aarch64=('${arm64Sha}')`,
 
-    `source_x86_64=("\${pkgname}_\${pkgver}_x86_64.tar.gz::https://github.com/benjamesmurray/epoch-cli/releases/download/v\${pkgver}\${_subver}/opencode-linux-x64.tar.gz")`,
+    `source_x86_64=("\${pkgname}_\${pkgver}_x86_64.tar.gz::https://github.com/benjamesmurray/epoch-cli/releases/download/v\${pkgver}\${_subver}/@epoch-ai/cli-linux-x64.tar.gz")`,
     `sha256sums_x86_64=('${x64Sha}')`,
     "",
     "package() {",
@@ -95,7 +96,7 @@ if (!Script.preview) {
     "",
   ].join("\n")
 
-  for (const [pkg, pkgbuild] of [["epochcli-bin", binaryPkgbuild]]) {
+  for (const [pkg, pkgbuild] of [["@epoch-ai/cli-bin", binaryPkgbuild]]) {
     for (let i = 0; i < 30; i++) {
       try {
         await $`rm -rf ./dist/aur-${pkg}`
@@ -128,7 +129,7 @@ if (!Script.preview) {
     "",
     "  on_macos do",
     "    if Hardware::CPU.intel?",
-    `      url "https://github.com/benjamesmurray/epoch-cli/releases/download/v${Script.version}/epochcli-darwin-x64.zip"`,
+    `      url "https://github.com/benjamesmurray/epoch-cli/releases/download/v${Script.version}/@epoch-ai/cli-darwin-x64.zip"`,
     `      sha256 "${macX64Sha}"`,
     "",
     "      def install",
@@ -136,7 +137,7 @@ if (!Script.preview) {
     "      end",
     "    end",
     "    if Hardware::CPU.arm?",
-    `      url "https://github.com/benjamesmurray/epoch-cli/releases/download/v${Script.version}/epochcli-darwin-arm64.zip"`,
+    `      url "https://github.com/benjamesmurray/epoch-cli/releases/download/v${Script.version}/@epoch-ai/cli-darwin-arm64.zip"`,
     `      sha256 "${macArm64Sha}"`,
     "",
     "      def install",
@@ -147,14 +148,14 @@ if (!Script.preview) {
     "",
     "  on_linux do",
     "    if Hardware::CPU.intel? and Hardware::CPU.is_64_bit?",
-    `      url "https://github.com/benjamesmurray/epoch-cli/releases/download/v${Script.version}/opencode-linux-x64.tar.gz"`,
+    `      url "https://github.com/benjamesmurray/epoch-cli/releases/download/v${Script.version}/@epoch-ai/cli-linux-x64.tar.gz"`,
     `      sha256 "${x64Sha}"`,
     "      def install",
     '        bin.install "epochcli"',
     "      end",
     "    end",
     "    if Hardware::CPU.arm? and Hardware::CPU.is_64_bit?",
-    `      url "https://github.com/benjamesmurray/epoch-cli/releases/download/v${Script.version}/epochcli-linux-arm64.tar.gz"`,
+    `      url "https://github.com/benjamesmurray/epoch-cli/releases/download/v${Script.version}/@epoch-ai/cli-linux-arm64.tar.gz"`,
     `      sha256 "${arm64Sha}"`,
     "      def install",
     '        bin.install "epochcli"',
