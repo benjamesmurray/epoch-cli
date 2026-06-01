@@ -1219,7 +1219,19 @@ export function Prompt(props: PromptProps) {
           />
         </box>
         <box flexDirection="row" justifyContent="space-between">
-          <Show when={status().type !== "idle"} fallback={props.hint ?? <text />}>
+          <Show 
+            when={status().type !== "idle"} 
+            fallback={
+              <box flexDirection="row" gap={2}>
+                {props.hint ?? <text />}
+                <Show when={store.mode === "normal"}>
+                  <text fg={theme.text}>
+                    {keybind.print("yolo_toggle")} <span style={{ fg: theme.textMuted }}>mode</span>
+                  </text>
+                </Show>
+              </box>
+            }
+          >
             <box
               flexDirection="row"
               gap={1}
@@ -1307,7 +1319,7 @@ export function Prompt(props: PromptProps) {
                     <Match when={usage()}>
                       {(item) => (
                         <text fg={theme.textMuted} wrapMode="none">
-                          {[item().context, item().cost].filter(Boolean).join(" · ")}
+                          {item().context}
                         </text>
                       )}
                     </Match>

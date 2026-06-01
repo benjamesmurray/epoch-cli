@@ -1,34 +1,46 @@
 import type { AssistantMessage } from "@epoch-ai/sdk/v2"
 import type { TuiPlugin, TuiPluginApi, TuiPluginModule } from "@epoch-ai/plugin/tui"
-import { createMemo } from "solid-js"
+import { createMemo, Show } from "solid-js"
 
 const id = "internal:sidebar-context"
-
-const money = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-})
 
 function View(props: { api: TuiPluginApi; session_id: string }) {
   const theme = () => props.api.theme.current
   const msg = createMemo(() => props.api.state.session.messages(props.session_id))
-  const cost = createMemo(() => msg().reduce((sum, item) => sum + (item.role === "assistant" ? item.cost : 0), 0))
 
   const state = createMemo(() => {
     const last = msg().findLast((item): item is AssistantMessage => item.role === "assistant" && item.tokens.output > 0)
     if (!last) {
       return {
         tokens: 0,
-        percent: null,
+        usable: null,
+        limit: null,
+        margin: null,
       }
     }
 
     const tokens =
       last.tokens.input + last.tokens.output + last.tokens.reasoning + last.tokens.cache.read + last.tokens.cache.write
     const model = props.api.state.provider.find((item) => item.id === last.providerID)?.models[last.modelID]
+    
+    let limit = null
+    let usable = null
+    let margin = null
+
+    if (model) {
+      limit = model.limit.context
+      if (limit > 0) {
+        const maxOutput = Math.min(model.limit.output || 32000, 32000)
+        margin = Math.min(1024, Math.max(500, maxOutput))
+        usable = model.limit.input ? model.limit.input : limit - margin
+      }
+    }
+
     return {
       tokens,
-      percent: model?.limit.context ? Math.round((tokens / model.limit.context) * 100) : null,
+      usable,
+      limit,
+      margin,
     }
   })
 
@@ -38,8 +50,15 @@ function View(props: { api: TuiPluginApi; session_id: string }) {
         <b>Context</b>
       </text>
       <text fg={theme().textMuted}>{state().tokens.toLocaleString()} tokens</text>
-      <text fg={theme().textMuted}>{state().percent ?? 0}% used</text>
-      <text fg={theme().textMuted}>{money.format(cost())} spent</text>
+      <Show when={state().usable !== null}>
+        <text fg={theme().textMuted}>{state().usable!.toLocaleString()} usable</text>
+      </Show>
+      <Show when={state().limit !== null}>
+        <text fg={theme().textMuted}>{state().limit!.toLocaleString()} limit</text>
+      </Show>
+      <Show when={state().margin !== null}>
+        <text fg={theme().textMuted}>{state().margin!.toLocaleString()} margin</text>
+      </Show>
     </box>
   )
 }

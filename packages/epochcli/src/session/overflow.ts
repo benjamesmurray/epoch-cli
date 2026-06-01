@@ -30,6 +30,5 @@ export function isOverflow(input: {
           (input.tokens.reasoning ?? 0) +
           ((input.tokens.cache?.read ?? 0) + (input.tokens.cache?.write ?? 0)))
 
-  console.log(`[OverflowCheck] tokens=${count} usable=${usable} (limit=${context} margin=${safetyMargin})`)
   return count >= usable
 }

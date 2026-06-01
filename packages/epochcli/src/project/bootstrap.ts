@@ -10,9 +10,15 @@ import { Bus } from "../bus"
 import { Command } from "../command"
 import { Instance } from "./instance"
 import { Log } from "@/util/log"
+import { initProjectFiles } from "./init-files"
 
 export async function InstanceBootstrap() {
   Log.Default.info("bootstrapping", { directory: Instance.directory })
+  
+  if (Instance.project.vcs === "git" && Instance.worktree !== "/") {
+    await initProjectFiles(Instance.directory, Instance.worktree)
+  }
+
   await Plugin.init()
   Format.init()
   await LSP.init()
