@@ -36,7 +36,7 @@ Download and install from [code.visualstudio.com](https://code.visualstudio.com/
 Once the prerequisites are installed, open a **new** PowerShell terminal (or VS Code integrated terminal) so your `PATH` environment variables are refreshed.
 
 ### 1. Install MCP Servers
-Use Cargo (Rust's package manager) to install the unified router and the project's specific MCP servers:
+Use Cargo (Rust's package manager) to install the unified router and the project's specific MCP servers. Because these are fetched from the central Rust registry (crates.io), **you can run this command from any directory**:
 
 ```powershell
 cargo install mcpx-rust project-map-cli-rust ground-truth-cli-rust deliver-cli
