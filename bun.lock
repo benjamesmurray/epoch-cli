@@ -28,7 +28,7 @@
       "name": "@epoch-ai/cli",
       "version": "2.2.4",
       "bin": {
-        "epochcli": "bin/epochcli",
+        "epochcli": "bin/epochcli.cjs",
       },
       "dependencies": {
         "ajv": "8.20.0",

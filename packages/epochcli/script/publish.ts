@@ -27,7 +27,7 @@ await Bun.file(`./dist/${pkg.name}/package.json`).write(
     {
       name: pkg.name,
       bin: {
-        epochcli: `./bin/epochcli`,
+        epochcli: `./bin/epochcli.cjs`,
       },
       scripts: {
         postinstall: "node ./postinstall.mjs",
