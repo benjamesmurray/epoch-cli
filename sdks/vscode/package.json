@@ -2,7 +2,7 @@
   "name": "epochcli",
   "displayName": "epochcli",
   "description": "epochcli for VS Code",
-  "version": "2.2.5",
+  "version": "2.2.7",
   "publisher": "sst-dev",
   "repository": {
     "type": "git",
