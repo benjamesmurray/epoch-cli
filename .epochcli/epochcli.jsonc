@@ -1,32 +1,7 @@
 {
-  "$schema": "./config.json",
-  "model": "local-unified/qwen-unified",
-  "side_model": "local-unified/qwen-unified",
-  "provider": {
-    "local-unified": {
-      "npm": "@ai-sdk/openai-compatible",
-      "name": "Local Unified (Qwen 64k)",
-      "options": {
-        "baseURL": "http://localhost:8085/v1",
-        "apiKey": "2250"
-      },
-      "models": {
-        "qwen-unified": {
-          "name": "Qwen Unified 64k",
-          "limit": {
-            "context": 64000,
-            "output": 4096
-          }
-        }
-      }
-    }
-  },
-  "permission": {
-    "edit": {
-      "packages/opencode/migration/*": "deny"
-    }
-  },
   "mcpx": {
-    "enabled": true
-  }
+    "enabled": true,
+    "binaryPath": "mcpx-rust"
+  },
+  "mcp": {}
 }

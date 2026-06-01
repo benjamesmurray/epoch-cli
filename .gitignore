@@ -64,3 +64,4 @@ zone*_size.txt
 # Local session/history
 .epoch-continuity.toon
 .history/
+.npmrc

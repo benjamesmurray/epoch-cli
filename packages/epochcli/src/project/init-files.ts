@@ -43,10 +43,12 @@ cargo install mcpx-rust
 
 ## 2. Registering Servers
 
-\`mcpx-rust\` stores its configuration in \`~/.config/mcpx/config.toml\`. You must edit this file manually to add or modify servers.
+\`mcpx-rust\` stores its configuration in \`~/.config/mcpx/config.toml\` (Linux/macOS) or \`%USERPROFILE%\\.config\\mcpx\\config.toml\` (Windows). You must edit this file manually to add or modify servers.
+
+**Note for Windows Users:** \`mcpx-rust\` relies on the \`HOME\` environment variable to locate the configuration. If you encounter errors like "HOME environment variable not set," you must set \`HOME\` (e.g., to your user profile directory \`C:\\Users\\<YourName>\`) globally or in your active terminal session.
 
 ### Manual Configuration
-Add entries to the \`[mcp_servers]\` section in \`~/.config/mcpx/config.toml\`:
+Add entries to the \`[mcp_servers]\` section in your configuration file:
 
 \`\`\`toml
 [mcp_servers.map]
@@ -55,6 +57,10 @@ args = ["mcp"]
 
 [mcp_servers.spec]
 command = "deliver-cli"
+args = ["mcp"]
+
+[mcp_servers.ground]
+command = "ground-truth-cli-rust"
 args = ["mcp"]
 
 [mcp_servers.github]
@@ -276,37 +282,29 @@ export async function initProjectFiles(directory: string, worktree: string) {
   try {
     const epochcliDir = path.join(worktree, ".epochcli")
     
-    try {
-      await fs.access(epochcliDir)
-      return // Already initialized
-    } catch {
-      // Doesn't exist, proceed with initialization
-    }
-
-    log.info("Initializing new project files", { worktree })
-
-    // Create .epochcli directory
+    // Create .epochcli directory if it doesn't exist
     await fs.mkdir(epochcliDir, { recursive: true })
 
-    // Generate JSON Schema
+    // Generate and write JSON Schema (Always refresh)
     const schema = zodToJsonSchema(Config.Info, {
       name: "Config",
       $refStrategy: "none",
     })
-    
-    // Write config.json (schema)
     await fs.writeFile(
       path.join(epochcliDir, "config.json"),
       JSON.stringify(schema, null, 2)
     )
 
-    // Write default epochcli.jsonc
-    await fs.writeFile(
-      path.join(epochcliDir, "epochcli.jsonc"),
-      DEFAULT_EPOCHCLI_JSONC
-    )
+    // Write default epochcli.jsonc if it doesn't exist
+    const configFile = path.join(epochcliDir, "epochcli.jsonc")
+    try {
+      await fs.access(configFile)
+    } catch {
+      await fs.writeFile(configFile, DEFAULT_EPOCHCLI_JSONC)
+      log.info("Created default epochcli.jsonc", { path: configFile })
+    }
 
-    // Setup docs
+    // Setup docs (Always refresh)
     const docsDir = path.join(epochcliDir, "docs")
     await fs.mkdir(docsDir, { recursive: true })
     await fs.writeFile(path.join(docsDir, "MCP_config_guide.md"), MCP_CONFIG_GUIDE_CONTENT)
@@ -320,8 +318,6 @@ export async function initProjectFiles(directory: string, worktree: string) {
       await fs.writeFile(agentsFile, AGENTS_MD_CONTENT)
       log.info("Created AGENTS.md", { path: agentsFile })
     }
-
-    log.info("Project initialized successfully", { dir: epochcliDir })
   } catch (error) {
     log.error("Failed to initialize project files", { error })
   }

@@ -65,7 +65,11 @@ The moment the `.spec-tasks-approved` semaphore is created, the system MUST trig
 The system middleware (Clerk) detects the semaphore file at the start of every turn. If `.spec-tasks-approved` exists, the agent is **automatically and deterministically assigned the `build` persona**, bypassing LLM-based classification. This ensures an absolute handover that unlocks write access even across context rotations (Epochs).
 
 ### Epoch Initiation Models & Grounding Protocols
-To prevent orientation loops and the Stagnation Trap, the system injects specific grounding protocols depending on the phase. There are three distinct Epoch Initiation Models:
+To prevent orientation loops and the Stagnation Trap, the system injects specific grounding protocols depending on the phase. There are four distinct Epoch Initiation Models:
+
+0. **Type 0: Ad-Hoc / Exploration**
+   - **Context:** Agent is communicating with the user outside of an active feature (e.g., general codebase questions, environment setup).
+   - **Directive:** The continuity engine explicitly skips SDD tracking, setting phase to 'Ad-Hoc Exploration'. The agent should act as a general-purpose assistant and must NOT try to force the user into defining a feature or running `sc_init` unless explicitly asked.
 
 1. **Type 1: Planning Phase**
    - **Context:** Agent is in the `plan` persona drafting specs or tasks.

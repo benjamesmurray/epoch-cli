@@ -26,7 +26,7 @@
     },
     "packages/epochcli": {
       "name": "@epoch-ai/cli",
-      "version": "2.2.5",
+      "version": "2.2.8",
       "bin": {
         "epochcli": "bin/epochcli.cjs",
       },
@@ -156,23 +156,23 @@
         "zod-to-json-schema": "3.24.5",
       },
       "optionalDependencies": {
-        "@epoch-ai/cli-darwin-arm64": "2.2.0",
-        "@epoch-ai/cli-darwin-x64": "2.2.0",
-        "@epoch-ai/cli-darwin-x64-baseline": "2.2.0",
-        "@epoch-ai/cli-linux-arm64": "2.2.0",
-        "@epoch-ai/cli-linux-arm64-musl": "2.2.0",
-        "@epoch-ai/cli-linux-x64": "2.2.0",
-        "@epoch-ai/cli-linux-x64-baseline": "2.2.0",
-        "@epoch-ai/cli-linux-x64-baseline-musl": "2.2.0",
-        "@epoch-ai/cli-linux-x64-musl": "2.2.0",
-        "@epoch-ai/cli-windows-arm64": "2.2.0",
-        "@epoch-ai/cli-windows-x64": "2.2.0",
-        "@epoch-ai/cli-windows-x64-baseline": "2.2.0",
+        "@epoch-ai/cli-darwin-arm64": "2.2.8",
+        "@epoch-ai/cli-darwin-x64": "2.2.8",
+        "@epoch-ai/cli-darwin-x64-baseline": "2.2.8",
+        "@epoch-ai/cli-linux-arm64": "2.2.8",
+        "@epoch-ai/cli-linux-arm64-musl": "2.2.8",
+        "@epoch-ai/cli-linux-x64": "2.2.8",
+        "@epoch-ai/cli-linux-x64-baseline": "2.2.8",
+        "@epoch-ai/cli-linux-x64-baseline-musl": "2.2.8",
+        "@epoch-ai/cli-linux-x64-musl": "2.2.8",
+        "@epoch-ai/cli-windows-arm64": "2.2.8",
+        "@epoch-ai/cli-windows-x64": "2.2.8",
+        "@epoch-ai/cli-windows-x64-baseline": "2.2.8",
       },
     },
     "packages/plugin": {
       "name": "@epoch-ai/plugin",
-      "version": "2.2.5",
+      "version": "2.2.8",
       "dependencies": {
         "@epoch-ai/sdk": "2.2.0",
         "zod": "catalog:",
@@ -196,7 +196,7 @@
     },
     "packages/script": {
       "name": "@epoch-ai/script",
-      "version": "2.2.5",
+      "version": "2.2.8",
       "dependencies": {
         "semver": "^7.6.3",
       },
@@ -207,7 +207,7 @@
     },
     "packages/sdk/js": {
       "name": "@epoch-ai/sdk",
-      "version": "2.2.5",
+      "version": "2.2.8",
       "dependencies": {
         "cross-spawn": "catalog:",
       },
@@ -222,7 +222,7 @@
     },
     "packages/util": {
       "name": "@epoch-ai/util",
-      "version": "2.2.5",
+      "version": "2.2.8",
       "dependencies": {
         "picocolors": "^1.1.1",
         "zod": "catalog:",

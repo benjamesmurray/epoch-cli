@@ -13,10 +13,12 @@ cargo install mcpx-rust
 
 ## 2. Registering Servers
 
-`mcpx-rust` stores its configuration in `~/.config/mcpx/config.toml`. You must edit this file manually to add or modify servers.
+`mcpx-rust` stores its configuration in `~/.config/mcpx/config.toml` (Linux/macOS) or `%USERPROFILE%\.config\mcpx\config.toml` (Windows). You must edit this file manually to add or modify servers.
+
+**Note for Windows Users:** `mcpx-rust` relies on the `HOME` environment variable to locate the configuration. If you encounter errors like "HOME environment variable not set," you must set `HOME` (e.g., to your user profile directory `C:\Users\<YourName>`) globally or in your active terminal session.
 
 ### Manual Configuration
-Add entries to the `[mcp_servers]` section in `~/.config/mcpx/config.toml`:
+Add entries to the `[mcp_servers]` section in your configuration file:
 
 ```toml
 [mcp_servers.map]
@@ -25,6 +27,10 @@ args = ["mcp"]
 
 [mcp_servers.spec]
 command = "deliver-cli"
+args = ["mcp"]
+
+[mcp_servers.ground]
+command = "ground-truth-cli-rust"
 args = ["mcp"]
 
 [mcp_servers.github]
