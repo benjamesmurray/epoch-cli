@@ -41,10 +41,20 @@ const pkgjsons = await Array.fromAsync(
 ).then((arr) => arr.filter((x) => !x.includes("node_modules") && !x.includes("dist") && !x.includes("e2e_testing")))
 
 for (const file of pkgjsons) {
-  let pkg = await Bun.file(file).text()
-  pkg = pkg.replaceAll(/"version": "[^"]+"/g, `"version": "${Script.version}"`)
+  let pkg = await Bun.file(file).json()
+  pkg.version = Script.version
+
+  // Sync optionalDependencies for the CLI wrapper
+  if (pkg.name === "@epoch-ai/cli" && pkg.optionalDependencies) {
+    for (const dep of Object.keys(pkg.optionalDependencies)) {
+      if (dep.startsWith("@epoch-ai/cli-")) {
+        pkg.optionalDependencies[dep] = Script.version
+      }
+    }
+  }
+
   console.log("updated:", file)
-  await Bun.file(file).write(pkg)
+  await Bun.file(file).write(JSON.stringify(pkg, null, 2))
 }
 
 const extensionToml = fileURLToPath(new URL("../packages/extensions/zed/extension.toml", import.meta.url))

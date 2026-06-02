@@ -273,8 +273,10 @@ const DEFAULT_EPOCHCLI_JSONC = `{
     }
   },
   "mcpx": {
-    "enabled": true
-  }
+    "enabled": true,
+    "binaryPath": "mcpx-rust"
+  },
+  "mcp": {}
 }
 `
 
