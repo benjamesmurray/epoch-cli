@@ -3,37 +3,15 @@
 import { Script } from "@epoch-ai/script"
 import { $ } from "bun"
 import { fileURLToPath } from "url"
+import path from "path"
+import fs from "fs"
 
-const highlightsTemplate = `
-<!--
-Add highlights before publishing. Delete this section if no highlights.
-
-- For multiple highlights, use multiple <highlight> tags
-- Highlights with the same source attribute get grouped together
--->
-
-<!--
-<highlight source="SourceName (TUI/Desktop/Web/Core)">
-  <h2>Feature title goes here</h2>
-  <p short="Short description used for Desktop Recap">
-    Full description of the feature or change
-  </p>
-
-  https://github.com/user-attachments/assets/uuid-for-video (you will want to drag & drop the video or picture)
-
-  <img
-    width="1912"
-    height="1164"
-    alt="image"
-    src="https://github.com/user-attachments/assets/uuid-for-image"
-  />
-</highlight>
--->
-
-`
+const rootDir = fileURLToPath(new URL("..", import.meta.url))
+process.chdir(rootDir)
 
 console.log("=== publishing ===\n")
 
+// 1. Update versions in all package.json files
 const pkgjsons = await Array.fromAsync(
   new Bun.Glob("**/package.json").scan({
     absolute: true,
@@ -57,8 +35,9 @@ for (const file of pkgjsons) {
   await Bun.file(file).write(JSON.stringify(pkg, null, 2))
 }
 
-const extensionToml = fileURLToPath(new URL("../packages/extensions/zed/extension.toml", import.meta.url))
-if (await Bun.file(extensionToml).exists()) {
+// 2. Update Zed extension version if applicable
+const extensionToml = path.join(rootDir, "packages/extensions/zed/extension.toml")
+if (fs.existsSync(extensionToml)) {
   let toml = await Bun.file(extensionToml).text()
   toml = toml.replace(/^version = "[^"]+"/m, `version = "${Script.version}"`)
   toml = toml.replaceAll(/releases\/download\/v[^/]+\//g, `releases/download/v${Script.version}/`)
@@ -66,38 +45,44 @@ if (await Bun.file(extensionToml).exists()) {
   await Bun.file(extensionToml).write(toml)
 }
 
-const rootDir = fileURLToPath(new URL("..", import.meta.url))
+// 3. Install and Build
+if (!process.env.SKIP_BUILD) {
+  await $`bun install`
+  console.log("\n=== building sdk ===\n")
+  await import(`${rootDir}/packages/sdk/js/script/build.ts`)
+  process.chdir(rootDir)
 
-await $`bun install`
-console.log("\n=== building sdk ===\n")
-await import(`../packages/sdk/js/script/build.ts`)
-process.chdir(rootDir)
+  console.log("\n=== building cli ===\n")
+  await import(`${rootDir}/packages/epochcli/script/build.ts`)
+  process.chdir(rootDir)
+}
 
-console.log("\n=== building cli ===\n")
-await import(`../packages/epochcli/script/build.ts`)
-process.chdir(rootDir)
-
+// 4. Release Operations
 if (Script.release) {
   if (!Script.preview) {
     await $`git commit -am "release: v${Script.version}"`.nothrow()
     await $`git tag v${Script.version}`.nothrow()
     await $`git fetch origin`
-    await $`git cherry-pick HEAD..origin/dev`.nothrow()
-    await $`git push origin HEAD --tags --no-verify --force-with-lease`.nothrow()
-    await new Promise((resolve) => setTimeout(resolve, 5_000))
+    // Ensure we are on dev branch or similar if needed, but the script usually runs on dev
+    await $`git push origin dev --tags`.nothrow()
   }
 
-  await $`gh release edit v${Script.version} --draft=false --repo ${process.env.GH_REPO}`
+  // Publish in order
+  console.log("\n=== publishing sdk ===\n")
+  await import(`${rootDir}/packages/sdk/js/script/publish.ts`)
+  process.chdir(rootDir)
+
+  console.log("\n=== publishing plugin ===\n")
+  await import(`${rootDir}/packages/plugin/script/publish.ts`)
+  process.chdir(rootDir)
+
+  console.log("\n=== publishing cli and binaries ===\n")
+  await import(`${rootDir}/packages/epochcli/script/publish.ts`)
+  process.chdir(rootDir)
+
+  if (!Script.preview) {
+    await $`gh release edit v${Script.version} --draft=false --repo ${process.env.GH_REPO}`.nothrow()
+  }
 }
 
-console.log("\n=== sdk ===\n")
-await import(`../packages/sdk/js/script/publish.ts`)
-
-console.log("\n=== plugin ===\n")
-await import(`../packages/plugin/script/publish.ts`)
-
-console.log("\n=== cli ===\n")
-await import(`../packages/epochcli/script/publish.ts`)
-
-const dir = fileURLToPath(new URL("..", import.meta.url))
-process.chdir(dir)
+console.log("\n=== publish complete ===\n")
