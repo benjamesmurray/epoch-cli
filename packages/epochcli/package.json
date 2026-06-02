@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "version": "2.2.8",
+  "version": "2.2.9",
   "name": "@epoch-ai/cli",
   "type": "module",
   "license": "MIT",
@@ -167,18 +167,18 @@
     "ajv": "8.20.0"
   },
   "optionalDependencies": {
-    "@epoch-ai/cli-darwin-arm64": "2.2.8",
-    "@epoch-ai/cli-darwin-x64": "2.2.8",
-    "@epoch-ai/cli-darwin-x64-baseline": "2.2.8",
-    "@epoch-ai/cli-linux-arm64": "2.2.8",
-    "@epoch-ai/cli-linux-x64": "2.2.8",
-    "@epoch-ai/cli-linux-x64-baseline": "2.2.8",
-    "@epoch-ai/cli-linux-arm64-musl": "2.2.8",
-    "@epoch-ai/cli-linux-x64-musl": "2.2.8",
-    "@epoch-ai/cli-linux-x64-baseline-musl": "2.2.8",
-    "@epoch-ai/cli-windows-arm64": "2.2.8",
-    "@epoch-ai/cli-windows-x64": "2.2.8",
-    "@epoch-ai/cli-windows-x64-baseline": "2.2.8"
+    "@epoch-ai/cli-darwin-arm64": "2.2.9",
+    "@epoch-ai/cli-darwin-x64": "2.2.9",
+    "@epoch-ai/cli-darwin-x64-baseline": "2.2.9",
+    "@epoch-ai/cli-linux-arm64": "2.2.9",
+    "@epoch-ai/cli-linux-x64": "2.2.9",
+    "@epoch-ai/cli-linux-x64-baseline": "2.2.9",
+    "@epoch-ai/cli-linux-arm64-musl": "2.2.9",
+    "@epoch-ai/cli-linux-x64-musl": "2.2.9",
+    "@epoch-ai/cli-linux-x64-baseline-musl": "2.2.9",
+    "@epoch-ai/cli-windows-arm64": "2.2.9",
+    "@epoch-ai/cli-windows-x64": "2.2.9",
+    "@epoch-ai/cli-windows-x64-baseline": "2.2.9"
   },
   "overrides": {
     "drizzle-orm": "1.0.0-beta.19-d95b7a4"
