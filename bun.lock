@@ -26,7 +26,7 @@
     },
     "packages/epochcli": {
       "name": "@epoch-ai/cli",
-      "version": "2.2.9",
+      "version": "2.2.10",
       "bin": {
         "epochcli": "bin/epochcli.cjs",
       },
@@ -172,7 +172,7 @@
     },
     "packages/plugin": {
       "name": "@epoch-ai/plugin",
-      "version": "2.2.9",
+      "version": "2.2.10",
       "dependencies": {
         "@epoch-ai/sdk": "2.2.0",
         "zod": "catalog:",
@@ -196,7 +196,7 @@
     },
     "packages/script": {
       "name": "@epoch-ai/script",
-      "version": "2.2.9",
+      "version": "2.2.10",
       "dependencies": {
         "semver": "^7.6.3",
       },
@@ -207,7 +207,7 @@
     },
     "packages/sdk/js": {
       "name": "@epoch-ai/sdk",
-      "version": "2.2.9",
+      "version": "2.2.10",
       "dependencies": {
         "cross-spawn": "catalog:",
       },
@@ -222,7 +222,7 @@
     },
     "packages/util": {
       "name": "@epoch-ai/util",
-      "version": "2.2.9",
+      "version": "2.2.10",
       "dependencies": {
         "picocolors": "^1.1.1",
         "zod": "catalog:",
@@ -567,6 +567,30 @@
     "@effect/platform-node-shared": ["@effect/platform-node-shared@4.0.0-beta.43", "", { "dependencies": { "@types/ws": "^8.18.1", "ws": "^8.19.0" }, "peerDependencies": { "effect": "^4.0.0-beta.43" } }, "sha512-A9q0GEb61pYcQ06Dr6gXj1nKlDI3KHsar1sk3qb1ZY+kVSR64tBAylI8zGon23KY+NPtTUj/sEIToB7jc3Qt5w=="],
 
     "@epoch-ai/cli": ["@epoch-ai/cli@workspace:packages/epochcli"],
+
+    "@epoch-ai/cli-darwin-arm64": ["@epoch-ai/cli-darwin-arm64@2.2.9", "", { "os": "darwin", "cpu": "arm64" }, "sha512-SxXyFIMlwZi5cHZMS7QPVZRwE5VkNhe7QRErAYxT9Qm+1xavNKvkeysGAaNmwzsGqpXWWHxDJbQQOtCpov1Ztw=="],
+
+    "@epoch-ai/cli-darwin-x64": ["@epoch-ai/cli-darwin-x64@2.2.9", "", { "os": "darwin", "cpu": "x64" }, "sha512-aUZ1w6lsIYeFv5v1mh4sKYYpZGGpaUQbEs8llXgntb5hWo6RXYJUxY4dYAclNJaVnJsHGAP5FYjwlpjADaRErg=="],
+
+    "@epoch-ai/cli-darwin-x64-baseline": ["@epoch-ai/cli-darwin-x64-baseline@2.2.9", "", { "os": "darwin", "cpu": "x64" }, "sha512-qOg9X5k3B6NGj/DEwmEt7NBSnsIvPiecHCyodbC1cMqZNRSptzr8PPnw6i5cGiSk0S25TPWRgd454a3TfsbhFQ=="],
+
+    "@epoch-ai/cli-linux-arm64": ["@epoch-ai/cli-linux-arm64@2.2.9", "", { "os": "linux", "cpu": "arm64" }, "sha512-xle0O695jz8dGQql9QKuI+mEL1rVZmc8+qnuGDDlhyjVVDRYLc87cLmrRmT3IK0EwN+5Ql00Da+0sqidyoRkdA=="],
+
+    "@epoch-ai/cli-linux-arm64-musl": ["@epoch-ai/cli-linux-arm64-musl@2.2.9", "", { "os": "linux", "cpu": "arm64" }, "sha512-qh61+HvZ/DALzwXhnLG8CGT/QQC2G07Z/GOYayjn0YKPMlTUDDmYqaDxQGiKXdAyWXG6h1ZxsSf7dfdMShMORg=="],
+
+    "@epoch-ai/cli-linux-x64": ["@epoch-ai/cli-linux-x64@2.2.9", "", { "os": "linux", "cpu": "x64" }, "sha512-7yL3TwiWmuGRTIO3Sdoft4YF9qaSUKiEp/SgvLsQswB+bq8qOpCn68XeODkEOJLs3qXZui46cjxoh07PI1ij+Q=="],
+
+    "@epoch-ai/cli-linux-x64-baseline": ["@epoch-ai/cli-linux-x64-baseline@2.2.9", "", { "os": "linux", "cpu": "x64" }, "sha512-PGvrC+GhATF/iSaHQ6Pukm02jTFxefLLMHzjEI1gJ1srnDGnSq/mRnThqQWhX+eRY07vFNp5obThafGzkkqo9A=="],
+
+    "@epoch-ai/cli-linux-x64-baseline-musl": ["@epoch-ai/cli-linux-x64-baseline-musl@2.2.9", "", { "os": "linux", "cpu": "x64" }, "sha512-EumaMZQ+lryxXIznlAmI0ch5h9guR2qz7XSQt4Sd9z4yjw4nYSETSNvOQt6p2a/9lQAxMVu8XX1Eq3GUVCjFrg=="],
+
+    "@epoch-ai/cli-linux-x64-musl": ["@epoch-ai/cli-linux-x64-musl@2.2.9", "", { "os": "linux", "cpu": "x64" }, "sha512-UJ27G+D3VusrDxy8KpQWNhkkltqkIA8fhhH0vQiFj2+KK9E/kKMDJSnHNBAy28za7Q7XH44k7k16nvV1ZClegg=="],
+
+    "@epoch-ai/cli-windows-arm64": ["@epoch-ai/cli-windows-arm64@2.2.9", "", { "os": "win32", "cpu": "arm64" }, "sha512-bxH+DzKUoQK4eE4F6dvZIbBIvXwUFGLjI5CKjztJi6qsbkve4RYm2mEOmo+nJ10nvFhxskg4+NM8SDFFtLaldg=="],
+
+    "@epoch-ai/cli-windows-x64": ["@epoch-ai/cli-windows-x64@2.2.9", "", { "os": "win32", "cpu": "x64" }, "sha512-GG6FAHb21VTWblaoJSARHM8xwsc60tNT8JdA5F6fA5mzzhUx++D1JtKbRxH8DXoLC734agVPMknxgD5eVJM+PA=="],
+
+    "@epoch-ai/cli-windows-x64-baseline": ["@epoch-ai/cli-windows-x64-baseline@2.2.9", "", { "os": "win32", "cpu": "x64" }, "sha512-Kl/xSMJY4vkgccplfsNN0tRLMeAVOAB39f2Vxos96zJNWQHMH7bupdHKQkxPulQOHFcryCaa3HORcFaehchdJw=="],
 
     "@epoch-ai/plugin": ["@epoch-ai/plugin@workspace:packages/plugin"],
 

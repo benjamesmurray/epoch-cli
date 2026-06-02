@@ -18,5 +18,5 @@ for (const [key, value] of Object.entries(pkg.exports)) {
   }
 }
 await Bun.write("package.json", JSON.stringify(pkg, null, 2))
-await $`npm publish --tag latest --access public`.nothrow()
+await $`npm publish --tag ${Script.channel} --access public`.nothrow()
 await Bun.write("package.json", JSON.stringify(original, null, 2))

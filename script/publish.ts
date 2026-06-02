@@ -56,8 +56,16 @@ if (await Bun.file(extensionToml).exists()) {
   await Bun.file(extensionToml).write(toml)
 }
 
+const rootDir = fileURLToPath(new URL("..", import.meta.url))
+
 await $`bun install`
+console.log("\n=== building sdk ===\n")
 await import(`../packages/sdk/js/script/build.ts`)
+process.chdir(rootDir)
+
+console.log("\n=== building cli ===\n")
+await import(`../packages/epochcli/script/build.ts`)
+process.chdir(rootDir)
 
 if (Script.release) {
   if (!Script.preview) {
@@ -72,14 +80,14 @@ if (Script.release) {
   await $`gh release edit v${Script.version} --draft=false --repo ${process.env.GH_REPO}`
 }
 
-console.log("\n=== cli ===\n")
-await import(`../packages/epochcli/script/publish.ts`)
-
 console.log("\n=== sdk ===\n")
 await import(`../packages/sdk/js/script/publish.ts`)
 
 console.log("\n=== plugin ===\n")
 await import(`../packages/plugin/script/publish.ts`)
+
+console.log("\n=== cli ===\n")
+await import(`../packages/epochcli/script/publish.ts`)
 
 const dir = fileURLToPath(new URL("..", import.meta.url))
 process.chdir(dir)

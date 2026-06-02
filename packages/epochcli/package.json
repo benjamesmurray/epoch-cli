@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "version": "2.2.9",
+  "version": "2.2.10",
   "name": "@epoch-ai/cli",
   "type": "module",
   "license": "MIT",
