@@ -46,9 +46,9 @@ for (const [name] of Object.entries(binaries)) {
   if (process.platform !== "win32") {
     await $`chmod -R 755 .`.cwd(pkgDir)
   }
-  await $`npm publish --access public --tag ${Script.channel}`.cwd(pkgDir).nothrow()
+  await $`npm publish --access public --tag ${Script.channel} --//registry.npmjs.org/:_authToken=${process.env.NPM_TOKEN}`.cwd(pkgDir).nothrow()
 }
-await $`cd ./dist/${pkg.name} && npm publish --access public --tag ${Script.channel}`.nothrow()
+await $`cd ./dist/${pkg.name} && npm publish --access public --tag ${Script.channel} --//registry.npmjs.org/:_authToken=${process.env.NPM_TOKEN}`.nothrow()
 
 // const image = "ghcr.io/benjamesmurray/epoch-cli"
 // const platforms = "linux/amd64,linux/arm64"

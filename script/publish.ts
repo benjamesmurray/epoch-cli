@@ -74,16 +74,23 @@ if (Script.release) {
 
   // Publish in order
   console.log("\n=== publishing sdk ===\n")
-  await import(`${rootDir}/packages/sdk/js/script/publish.ts`)
+  await $`npm publish --workspace=packages/sdk/js --tag latest --access public --//registry.npmjs.org/:_authToken=${process.env.NPM_TOKEN}`
   process.chdir(rootDir)
 
   console.log("\n=== publishing plugin ===\n")
-  await import(`${rootDir}/packages/plugin/script/publish.ts`)
+  await $`npm publish --workspace=packages/plugin --tag latest --access public --//registry.npmjs.org/:_authToken=${process.env.NPM_TOKEN}`
   process.chdir(rootDir)
 
   console.log("\n=== publishing cli and binaries ===\n")
   await import(`${rootDir}/packages/epochcli/script/publish.ts`)
   process.chdir(rootDir)
+
+  console.log("\n=== publishing other workspaces ===\n")
+  await $`npm publish --workspace=packages/util --tag latest --access public --//registry.npmjs.org/:_authToken=${process.env.NPM_TOKEN}`.nothrow()
+  await $`npm publish --workspace=packages/script --tag latest --access public --//registry.npmjs.org/:_authToken=${process.env.NPM_TOKEN}`.nothrow()
+
+  console.log("\n=== publishing root ===\n")
+  await $`npm publish --tag latest --access public --//registry.npmjs.org/:_authToken=${process.env.NPM_TOKEN}`.nothrow()
 
   if (!Script.preview) {
     await $`gh release edit v${Script.version} --draft=false --repo ${process.env.GH_REPO}`.nothrow()
