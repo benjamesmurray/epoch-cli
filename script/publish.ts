@@ -9,6 +9,11 @@ import fs from "fs"
 const rootDir = fileURLToPath(new URL("..", import.meta.url))
 process.chdir(rootDir)
 
+if (!process.env.NPM_TOKEN) {
+  console.error("NPM_TOKEN is required in .env for publication")
+  process.exit(1)
+}
+
 console.log("=== publishing ===\n")
 
 // 1. Update versions in all package.json files
