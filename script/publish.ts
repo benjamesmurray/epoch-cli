@@ -74,11 +74,11 @@ if (Script.release) {
 
   // Publish in order
   console.log("\n=== publishing sdk ===\n")
-  await $`npm publish --workspace=packages/sdk/js --tag latest --access public --//registry.npmjs.org/:_authToken=${process.env.NPM_TOKEN}`
+  await $`npm publish --workspace=packages/sdk/js --tag latest --access public --//registry.npmjs.org/:_authToken=${process.env.NPM_TOKEN}`.nothrow()
   process.chdir(rootDir)
 
   console.log("\n=== publishing plugin ===\n")
-  await $`npm publish --workspace=packages/plugin --tag latest --access public --//registry.npmjs.org/:_authToken=${process.env.NPM_TOKEN}`
+  await $`npm publish --workspace=packages/plugin --tag latest --access public --//registry.npmjs.org/:_authToken=${process.env.NPM_TOKEN}`.nothrow()
   process.chdir(rootDir)
 
   console.log("\n=== publishing cli and binaries ===\n")
