@@ -13,17 +13,30 @@ cargo install mcpx-rust
 
 ## 2. Registering Servers
 
-`mcpx-rust` stores its configuration in `~/.config/mcpx/config.toml` (Linux/macOS) or `%USERPROFILE%\.config\mcpx\config.toml` (Windows). You must edit this file manually to add or modify servers.
+`mcpx-rust` stores its configuration in:
+- **Linux/macOS:** `~/.config/mcpx/config.toml`
+- **Windows:** `%USERPROFILE%\.config\mcpx\config.toml`
 
-**Note for Windows Users:** `mcpx-rust` relies on the `HOME` environment variable to locate the configuration. If you encounter errors like "HOME environment variable not set," you must set `HOME` (e.g., to your user profile directory `C:\Users\<YourName>`) globally or in your active terminal session.
+**Note for Windows Users:** `mcpx-rust` relies on the `HOME` environment variable to locate the configuration. If you encounter a "HOME environment variable not set" error, run the following to sync it with your user profile:
+
+- **PowerShell:** `[Environment]::SetEnvironmentVariable("HOME", $env:USERPROFILE, "User")`
+- **CMD:** `setx HOME %USERPROFILE%`
+
+*Note: Restart your terminal session after running these commands.*
 
 ### Manual Configuration
-Add entries to the `[mcp_servers]` section in your configuration file:
+Add entries to the `[mcp_servers]` section in your configuration file. 
+
+#### Core Project Configuration (Copy/Paste)
+Use this block to quickly enable the project's core MCP servers. 
+
+*Note for Windows: If you get "command not found" errors, ensure your Cargo bin folder (`%USERPROFILE%\.cargo\bin`) is in your PATH, or use the absolute path to the .exe (e.g., `command = "C:/Users/YourName/.cargo/bin/deliver-cli.exe"`).*
 
 ```toml
 [mcp_servers.map]
 command = "project-map-cli-rust"
 args = ["mcp"]
+```
 
 [mcp_servers.spec]
 command = "deliver-cli"
@@ -32,7 +45,10 @@ args = ["mcp"]
 [mcp_servers.ground]
 command = "ground-truth-cli-rust"
 args = ["mcp"]
+```
 
+#### Additional Servers (e.g., GitHub)
+```toml
 [mcp_servers.github]
 command = "npx"
 args = ["-y", "@modelcontextprotocol/server-github"]

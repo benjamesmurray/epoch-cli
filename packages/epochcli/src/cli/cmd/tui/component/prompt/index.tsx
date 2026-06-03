@@ -1226,7 +1226,7 @@ export function Prompt(props: PromptProps) {
                 {props.hint ?? <text />}
                 <Show when={store.mode === "normal"}>
                   <text fg={theme.text}>
-                    {keybind.print("yolo_toggle")} <span style={{ fg: theme.textMuted }}>mode</span>
+                    ctrl+y <span style={{ fg: theme.textMuted }}>mode</span>
                   </text>
                 </Show>
               </box>

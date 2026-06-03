@@ -55,6 +55,15 @@ bun install -g @epoch-ai/cli
 
 `mcpx-rust` requires a configuration file to know how to route commands to the individual MCP servers. On Windows, this lives in your user profile directory.
 
+### 1. Set the HOME Environment Variable
+`mcpx-rust` (being cross-platform) requires the `HOME` environment variable to be explicitly set on Windows. Run the following in PowerShell:
+
+```powershell
+[Environment]::SetEnvironmentVariable("HOME", $env:USERPROFILE, "User")
+```
+*Note: You must restart your terminal session after running this command.*
+
+### 2. Create the Configuration File
 1. In PowerShell, create the configuration directory:
    ```powershell
    mkdir -Force $env:USERPROFILE\.config\mcpx
