@@ -11,7 +11,7 @@ Install Git for Windows if you haven't already.
 - Download: [gitforwindows.org](https://gitforwindows.org/)
 
 ### 2. Node.js & NPM
-Required for some package management features and fallback dependencies.
+Required for fallback dependency handling and general package execution.
 - Download the LTS version from [nodejs.org](https://nodejs.org/).
 
 ### 3. Rust & Cargo
@@ -27,58 +27,70 @@ powershell -c "irm bun.sh/install.ps1 | iex"
 ```
 
 ### 5. Visual Studio Code
+
 Download and install from [code.visualstudio.com](https://code.visualstudio.com/).
 
 ---
 
 ## Phase 2: Installing Epoch CLI and MCP Servers
 
-Once the prerequisites are installed, open a **new** PowerShell terminal (or VS Code integrated terminal) so your `PATH` environment variables are refreshed.
+> **Important:** After installing Bun and Rust, close all open terminals and open a **new** PowerShell terminal (or restart VS Code) to ensure your environment variables are completely refreshed.
 
 ### 1. Install MCP Servers
-Use Cargo (Rust's package manager) to install the unified router and the project's specific MCP servers. Because these are fetched from the central Rust registry (crates.io), **you can run this command from any directory**:
+
+Use Cargo to fetch and compile the unified router and the core ecosystem tools globally:
 
 ```powershell
 cargo install mcpx-rust project-map-cli-rust ground-truth-cli-rust deliver-cli
 ```
 
 ### 2. Install Epoch CLI
-Use Bun to globally install the CLI:
+
+Use Bun to globally install the CLI interface:
 
 ```powershell
-bun install -g @epoch-ai/cli
+bun install -g @packages/epochcli/dist/@epoch-ai/cli-windows-x64-baseline.zip
 ```
 
 ---
 
 ## Phase 3: Configuring MCP Servers
 
-`mcpx-rust` requires a configuration file to know how to route commands to the individual MCP servers. On Windows, this lives in your user profile directory.
+`mcpx-rust` evaluates paths cross-platform and looks for configuration files relative to the user profile.
 
-### 1. Set the HOME Environment Variable
-`mcpx-rust` (being cross-platform) requires the `HOME` environment variable to be explicitly set on Windows. Run the following in PowerShell:
+### 1. Set the HOME Environment Variable (If Required)
+
+If your version of `mcpx-rust` relies on the UNIX-style `HOME` variable rather than native Windows directory resolution, run the following in PowerShell to explicitly bridge it to your Windows User Profile:
 
 ```powershell
 [Environment]::SetEnvironmentVariable("HOME", $env:USERPROFILE, "User")
 ```
-*Note: You must restart your terminal session after running this command.*
+
+*Note: You must restart your terminal session/VS Code after running this system change.*
 
 ### 2. Create the Configuration File
-1. In PowerShell, create the configuration directory:
-   ```powershell
-   mkdir -Force $env:USERPROFILE\.config\mcpx
-   ```
-2. Create the configuration file:
-   ```powershell
-   New-Item -Force $env:USERPROFILE\.config\mcpx\config.toml
-   ```
-3. Open this file in VS Code:
-   ```powershell
-   code $env:USERPROFILE\.config\mcpx\config.toml
-   ```
-4. Paste the following configuration into `config.toml` and save the file:
 
-   ```toml
+1. In PowerShell, generate the required config directory structure:
+
+```powershell
+   mkdir -Force $env:USERPROFILE\.config\mcpx
+```
+
+2. Create the blank configuration file:
+
+```powershell
+   New-Item -Force $env:USERPROFILE\.config\mcpx\config.toml
+```
+
+3. Open the file instantly in VS Code to edit:
+
+```powershell
+   code $env:USERPROFILE\.config\mcpx\config.toml
+```
+
+4. Paste the following setup into `config.toml` and save (`Ctrl + S`):
+
+```toml
    [mcp_servers.map]
    command = "project-map-cli-rust"
    args = ["mcp"]
@@ -90,25 +102,24 @@ bun install -g @epoch-ai/cli
    [mcp_servers.spec]
    command = "deliver-cli"
    args = ["mcp"]
-   ```
+```
 
 ---
 
 ## Phase 4: VS Code Integration & Usage
 
-1. **Open your project** in VS Code.
+1. **Open your target development project** in VS Code.
 2. Open the **Integrated Terminal** (`Ctrl + \``).
-3. Set your default terminal profile to **PowerShell** or **Git Bash** (Epoch CLI works well in both).
+3. Ensure your active profile is set to **PowerShell** or **Git Bash**.
 
 ### Verification
-Run the following commands in the terminal to ensure everything is wired up correctly:
+
+Run these diagnostic commands to confirm the paths and routing are completely operational:
 
 ```powershell
-# Check that Epoch CLI is installed
+# Verify Epoch CLI is accessible globally
 epochcli --version
 
-# Check that the MCP router sees your configured servers
+# Confirm mcpx can map and interact with your compiled Rust extensions
 mcpx-rust list
 ```
-
-If both commands return successfully, your Windows environment is fully configured for Spec-Driven Development with Epoch CLI.
