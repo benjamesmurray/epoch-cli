@@ -1,3 +1,4 @@
+import { execSync } from "child_process"
 import { Log } from "../util/log"
 import path from "path"
 import { pathToFileURL } from "url"
@@ -1462,7 +1463,22 @@ export namespace Config {
             result.permission = mergeDeep(perms, result.permission ?? {})
           }
 
-          if (!result.username) result.username = os.userInfo().username
+          if (!result.username) {
+            try {
+              // Try git global config first (non-blocking for UI as this is server-side)
+              // We use a short timeout to prevent hanging if git is in a weird state.
+              const gitName = execSync("git config --global user.name", {
+                stdio: ["ignore", "pipe", "ignore"],
+                timeout: 2000,
+              })
+                .toString()
+                .trim()
+              if (gitName) result.username = gitName
+            } catch {
+              // Fallback to OS username
+            }
+            if (!result.username) result.username = os.userInfo().username
+          }
 
           if (Flag.EPOCHCLI_DISABLE_AUTOCOMPACT) {
             result.compaction = { ...result.compaction, auto: false }

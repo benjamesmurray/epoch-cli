@@ -1,5 +1,5 @@
 import { Prompt, type PromptRef } from "@tui/component/prompt"
-import { createEffect, createSignal } from "solid-js"
+import { createEffect, createMemo, createSignal } from "solid-js"
 import { Logo } from "../component/logo"
 import { useSync } from "../context/sync"
 import { Toast } from "../ui/toast"
@@ -8,23 +8,9 @@ import { useRouteData } from "@tui/context/route"
 import { usePromptRef } from "../context/prompt"
 import { useLocal } from "../context/local"
 import { TuiPluginRuntime } from "../plugin"
-import { execSync } from "child_process"
 
 // TODO: what is the best way to do this?
 let once = false
-
-let userName = "there"
-try {
-  const output = execSync("git config --global user.name", { stdio: "pipe" }).toString().trim()
-  if (output) userName = output
-} catch {
-  // Ignore errors (e.g., git not found, config not set)
-}
-
-const placeholder = {
-  normal: [`Hi ${userName}, let's go!`],
-  shell: ["ls -la", "git status", "pwd"],
-}
 
 export function Home() {
   const sync = useSync()
@@ -34,6 +20,14 @@ export function Home() {
   const args = useArgs()
   const local = useLocal()
   let sent = false
+
+  const placeholder = createMemo(() => {
+    const userName = sync.data.config.username || "there"
+    return {
+      normal: [`Hi ${userName}, let's go!`],
+      shell: ["ls -la", "git status", "pwd"],
+    }
+  })
 
   const bind = (r: PromptRef | undefined) => {
     setRef(r)
@@ -78,7 +72,7 @@ export function Home() {
               ref={bind}
               workspaceID={route.workspaceID}
               right={<TuiPluginRuntime.Slot name="home_prompt_right" workspace_id={route.workspaceID} />}
-              placeholders={placeholder}
+              placeholders={placeholder()}
             />
           </TuiPluginRuntime.Slot>
         </box>
