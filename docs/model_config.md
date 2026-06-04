@@ -108,5 +108,6 @@ Models stay active in VRAM for **60 minutes** of inactivity before being automat
 *   **Dashboard:** You can monitor which model is currently active and view proxy status at `http://localhost:8085/ui`.
 *   **Restart Stack:** If you need to restart the entire dual-model stack, use the provided launch script:
     ```bash
-    /home/llm/utils/launch/launch-dual.sh
+    # Example path for a dual-model launch script
+    ./scripts/launch-dual.sh
     ```
