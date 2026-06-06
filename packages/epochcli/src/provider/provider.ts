@@ -1323,9 +1323,12 @@ export namespace Provider {
               }
             }
 
+            const isBuiltin = modelsDev[providerID] !== undefined
             if (Object.keys(provider.models).length === 0) {
-              delete providers[providerID]
-              continue
+              if (isBuiltin || (provider.source !== "config" && provider.source !== "custom")) {
+                delete providers[providerID]
+                continue
+              }
             }
 
             log.info("found", { providerID })
@@ -1503,11 +1506,36 @@ export namespace Provider {
           throw new ModelNotFoundError({ providerID, modelID, suggestions: matches.map((m) => m.target) })
         }
 
-        const info = provider.models[modelID]
+        let info = provider.models[modelID]
         if (!info) {
-          const available = Object.keys(provider.models)
-          const matches = fuzzysort.go(modelID, available, { limit: 3, threshold: -10000 })
-          throw new ModelNotFoundError({ providerID, modelID, suggestions: matches.map((m) => m.target) })
+          if (provider.source === "config" || provider.source === "custom") {
+            info = {
+              id: modelID,
+              providerID: providerID,
+              api: { id: modelID, url: "", npm: "" },
+              name: modelID,
+              status: "active",
+              capabilities: {
+                temperature: true,
+                reasoning: false,
+                attachment: false,
+                toolcall: true,
+                input: { text: true, audio: false, image: false, video: false, pdf: false },
+                output: { text: true, audio: false, image: false, video: false, pdf: false },
+                interleaved: false,
+              },
+              cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
+              limit: { context: 128000, output: 8192 },
+              options: {},
+              headers: {},
+              release_date: new Date().toISOString(),
+            }
+            provider.models[modelID] = info
+          } else {
+            const available = Object.keys(provider.models)
+            const matches = fuzzysort.go(modelID, available, { limit: 3, threshold: -10000 })
+            throw new ModelNotFoundError({ providerID, modelID, suggestions: matches.map((m) => m.target) })
+          }
         }
         return info
       })
